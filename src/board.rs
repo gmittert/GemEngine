@@ -1,66 +1,63 @@
+mod moves;
+mod posn;
+use crate::board::moves::*;
+use crate::board::posn::*;
 use std::fmt;
 use std::ops;
 
-#[repr(u8)]
-#[derive(Debug, PartialEq)]
-pub enum Rank {
-    One,
-    Two,
-    Three,
-    Four,
-    Five,
-    Six,
-    Seven,
-    Eight,
-}
-
-#[repr(u8)]
-#[derive(Debug, PartialEq)]
-pub enum File {
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
-    H,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Posn {
-    rank: Rank,
-    file: File,
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct BitBoard {
     bits: u64,
 }
 
 impl BitBoard {
-    pub fn from(p: Posn) -> BitBoard {
+    pub fn from(p: &Posn) -> BitBoard {
         BitBoard {
             bits: (1 << (p.file as u8)) << (8 * p.rank as u8),
         }
+    }
+
+    pub fn make_move(&mut self, m: &Move) {
+        let from = BitBoard::from(&m.from);
+        let to = BitBoard::from(&m.to);
+
+        self.bits = self.bits & !from.bits | to.bits
+    }
+
+    pub fn undo_move(&mut self, m: &Move) {
+        let from = BitBoard::from(&m.from);
+        let to = BitBoard::from(&m.to);
+
+        self.bits = (self.bits & !to.bits) | from.bits
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Board {
-    black_king: BitBoard,
-    black_queen: BitBoard,
-    black_knight: BitBoard,
-    black_pawn: BitBoard,
-    black_bishop: BitBoard,
-    black_rook: BitBoard,
+    black_pieces: [BitBoard; 6],
+    white_pieces: [BitBoard; 6],
+}
 
-    white_king: BitBoard,
-    white_queen: BitBoard,
-    white_knight: BitBoard,
-    white_pawn: BitBoard,
-    white_bishop: BitBoard,
-    white_rook: BitBoard,
+impl Board {
+    pub fn make_move(&mut self, m: &Move) {
+        match m.turn {
+            Turn::Black => self.black_pieces[m.piece as usize].make_move(m),
+            Turn::White => self.white_pieces[m.piece as usize].make_move(m),
+        }
+    }
+    pub fn undo_move(&mut self, m: &Move) {
+        match m.turn {
+            Turn::Black => self.black_pieces[m.piece as usize].undo_move(m),
+            Turn::White => self.white_pieces[m.piece as usize].undo_move(m),
+        };
+        match m.capture {
+            Some(p) => match m.turn {
+                Turn::Black => self.white_pieces[p as usize] |= m.to,
+                Turn::White => self.black_pieces[p as usize] |= m.to,
+            },
+            None => (),
+        };
+    }
 }
 
 impl fmt::Display for Board {
@@ -68,35 +65,35 @@ impl fmt::Display for Board {
         let mut chars: [char; 64] = ['.'; 64];
 
         for i in 0..64 {
-            if (self.black_king.bits & (1 << i)) != 0 {
+            if (self.black_pieces[Piece::King as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'k'
-            } else if (self.black_queen.bits & (1 << i)) != 0 {
+            } else if (self.black_pieces[Piece::Queen as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'q'
-            } else if (self.black_knight.bits & (1 << i)) != 0 {
+            } else if (self.black_pieces[Piece::Knight as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'n'
-            } else if (self.black_pawn.bits & (1 << i)) != 0 {
+            } else if (self.black_pieces[Piece::Pawn as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'p'
-            } else if (self.black_bishop.bits & (1 << i)) != 0 {
+            } else if (self.black_pieces[Piece::Bishop as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'b'
-            } else if (self.black_rook.bits & (1 << i)) != 0 {
+            } else if (self.black_pieces[Piece::Rook as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'r'
-            } else if (self.white_king.bits & (1 << i)) != 0 {
+            } else if (self.white_pieces[Piece::King as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'K'
-            } else if (self.white_queen.bits & (1 << i)) != 0 {
+            } else if (self.white_pieces[Piece::Queen as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'Q'
-            } else if (self.white_knight.bits & (1 << i)) != 0 {
+            } else if (self.white_pieces[Piece::Knight as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'N'
-            } else if (self.white_pawn.bits & (1 << i)) != 0 {
+            } else if (self.white_pieces[Piece::Pawn as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'P'
-            } else if (self.white_bishop.bits & (1 << i)) != 0 {
+            } else if (self.white_pieces[Piece::Bishop as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'B'
-            } else if (self.white_rook.bits & (1 << i)) != 0 {
+            } else if (self.white_pieces[Piece::Rook as usize].bits & (1 << i)) != 0 {
                 chars[i] = 'R'
             }
         }
         for rank in 0..8 {
             for file in 0..8 {
-                write!(f, "{}", chars[file + (8*(7-rank))])?;
+                write!(f, "{}", chars[file + (8 * (7 - rank))])?;
             }
             write!(f, "\n")?;
         }
@@ -108,7 +105,7 @@ impl ops::BitOr<Posn> for BitBoard {
     type Output = Self;
     fn bitor(self, rhs: Posn) -> Self::Output {
         BitBoard {
-            bits: self.bits | BitBoard::from(rhs).bits,
+            bits: self.bits | BitBoard::from(&rhs).bits,
         }
     }
 }
@@ -122,116 +119,77 @@ impl ops::BitOr for BitBoard {
     }
 }
 
+impl ops::BitOrAssign<Posn> for BitBoard {
+    fn bitor_assign(&mut self, rhs: Posn) {
+        self.bits |= BitBoard::from(&rhs).bits;
+    }
+}
+
+impl ops::BitOrAssign for BitBoard {
+    fn bitor_assign(&mut self, rhs: BitBoard) {
+        self.bits |= rhs.bits;
+    }
+}
+
 impl ops::BitOr for Posn {
     type Output = BitBoard;
     fn bitor(self, rhs: Self) -> Self::Output {
-        BitBoard::from(self) | BitBoard::from(rhs)
+        BitBoard::from(&self) | BitBoard::from(&rhs)
     }
 }
 
 impl ops::BitOr<BitBoard> for Posn {
     type Output = BitBoard;
     fn bitor(self, rhs: BitBoard) -> Self::Output {
-        BitBoard::from(self) | rhs
+        BitBoard::from(&self) | rhs
     }
 }
 
-macro_rules! make_posns {
-    ($file:ident) => {
-        paste::paste! {
-        #[allow(dead_code)]
-        pub fn [<$file:lower 1>]() -> Posn {
-            Posn {
-                rank: Rank::One,
-                file: File::$file
-            }
-        }
-        #[allow(dead_code)]
-        pub fn [<$file:lower 2>]() -> Posn {
-            Posn {
-                rank: Rank::Two,
-                file: File::$file
-            }
-        }
-        #[allow(dead_code)]
-        pub fn [<$file:lower 3>]() -> Posn {
-            Posn {
-                rank: Rank::Three,
-                file: File::$file
-            }
-        }
-        #[allow(dead_code)]
-        pub fn [<$file:lower 4>]() -> Posn {
-            Posn {
-                rank: Rank::Four,
-                file: File::$file
-            }
-        }
-        #[allow(dead_code)]
-        pub fn [<$file:lower 5>]() -> Posn {
-            Posn {
-                rank: Rank::Five,
-                file: File::$file
-            }
-        }
-        #[allow(dead_code)]
-        pub fn [<$file:lower 6>]() -> Posn {
-            Posn {
-                rank: Rank::Six,
-                file: File::$file
-            }
-        }
-        #[allow(dead_code)]
-        pub fn [<$file:lower 7>]() -> Posn {
-            Posn {
-                rank: Rank::Seven,
-                file: File::$file
-            }
-        }
-        #[allow(dead_code)]
-        pub fn [<$file:lower 8>]() -> Posn {
-            Posn {
-                rank: Rank::Eight,
-                file: File::$file
-            }
-        }
-        }
-    };
-}
-
-make_posns!(A);
-make_posns!(B);
-make_posns!(C);
-make_posns!(D);
-make_posns!(E);
-make_posns!(F);
-make_posns!(G);
-make_posns!(H);
-
 pub fn starting_board() -> Board {
     Board {
-        black_king: BitBoard::from(e8()),
-        black_queen: BitBoard::from(d8()),
-        black_knight: b8() | g8(),
-        black_pawn: a7() | b7() | c7() | d7() | e7() | f7() | g7() | h7(),
-        black_bishop: c8() | f8(),
-        black_rook: a8() | h8(),
+        black_pieces: [
+            a7() | b7() | c7() | d7() | e7() | f7() | g7() | h7(),
+            a8() | h8(),
+            b8() | g8(),
+            c8() | f8(),
+            BitBoard::from(&d8()),
+            BitBoard::from(&e8()),
+        ],
 
-        white_king: BitBoard::from(e1()),
-        white_queen: BitBoard::from(d1()),
-        white_knight: b1() | g1(),
-        white_pawn: a2() | b2() | c2() | d2() | e2() | f2() | g2() | h2(),
-        white_bishop: c1() | f1(),
-        white_rook: a1() | h1(),
+        white_pieces: [
+            a2() | b2() | c2() | d2() | e2() | f2() | g2() | h2(),
+            a1() | h1(),
+            b1() | g1(),
+            c1() | f1(),
+            BitBoard::from(&d1()),
+            BitBoard::from(&e1()),
+        ],
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::board::*;
     #[test]
     fn formatted_start() {
         let exp =
             "rnbqkbnr\npppppppp\n........\n........\n........\n........\nPPPPPPPP\nRNBQKBNR\n";
         assert_eq!(format!("{}", crate::board::starting_board()), exp);
+    }
+
+    #[test]
+    fn make_move() {
+        let mut board = starting_board();
+        let board2 = starting_board();
+        let m = Move {
+            from: e2(),
+            to: e4(),
+            turn: Turn::White,
+            piece: Piece::Pawn,
+            capture: None,
+        };
+        board.make_move(&m);
+        board.undo_move(&m);
+        assert_eq!(board, board2);
     }
 }
