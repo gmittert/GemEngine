@@ -1,7 +1,7 @@
 mod moves;
 mod posn;
-use crate::board::moves::*;
-use crate::board::posn::*;
+pub use crate::board::moves::*;
+pub use crate::board::posn::*;
 use std::fmt;
 use std::ops;
 
@@ -187,6 +187,8 @@ mod tests {
             turn: Turn::White,
             piece: Piece::Pawn,
             capture: None,
+            is_check: false,
+            is_mate: false,
         };
         board.make_move(&m);
         board.undo_move(&m);

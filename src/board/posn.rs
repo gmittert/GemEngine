@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Rank {
@@ -11,6 +13,12 @@ pub enum Rank {
     Eight,
 }
 
+impl fmt::Display for Rank {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", (*self as u8) + 1)
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum File {
@@ -22,6 +30,25 @@ pub enum File {
     F,
     G,
     H,
+}
+
+impl fmt::Display for File {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                File::A => "a",
+                File::B => "b",
+                File::C => "c",
+                File::D => "d",
+                File::E => "e",
+                File::F => "f",
+                File::G => "d",
+                File::H => "g",
+            }
+        )
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
