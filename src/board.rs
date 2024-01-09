@@ -12,16 +12,14 @@ pub struct BitBoard {
 
 impl BitBoard {
     pub fn from(p: &Posn) -> BitBoard {
-        BitBoard {
-            bits: (1 << (p.file as u8)) << (8 * p.rank as u8),
-        }
+        BitBoard { bits: 1 << p.pos }
     }
 
     pub fn make_move(&mut self, m: &Move) {
         let from = BitBoard::from(&m.from);
         let to = BitBoard::from(&m.to);
 
-        self.bits = self.bits & !from.bits | to.bits
+        self.bits = self.bits & !from.bits | to.bits;
     }
 
     pub fn undo_move(&mut self, m: &Move) {
@@ -36,6 +34,9 @@ impl BitBoard {
 pub struct Board {
     black_pieces: [BitBoard; 6],
     white_pieces: [BitBoard; 6],
+
+    to_play: Turn,
+    turn_count: u16,
 }
 
 impl Board {
@@ -44,7 +45,10 @@ impl Board {
             Turn::Black => self.black_pieces[m.piece as usize].make_move(m),
             Turn::White => self.white_pieces[m.piece as usize].make_move(m),
         }
+        self.to_play = !self.to_play;
+        self.turn_count += 1;
     }
+
     pub fn undo_move(&mut self, m: &Move) {
         match m.turn {
             Turn::Black => self.black_pieces[m.piece as usize].undo_move(m),
@@ -57,6 +61,103 @@ impl Board {
             },
             None => (),
         };
+        self.to_play = !self.to_play;
+        self.turn_count -= 1;
+    }
+
+    pub fn current_board(&self) -> BitBoard {
+        let mut b = BitBoard { bits: 0 };
+        for i in 0..6 {
+            b |= self.black_pieces[i];
+            b |= self.white_pieces[i];
+        }
+        b
+    }
+
+    pub fn white_pieces(&self) -> BitBoard {
+        let mut b = BitBoard { bits: 0 };
+        for i in 0..6 {
+            b |= self.white_pieces[i];
+        }
+        b
+    }
+
+    pub fn black_pieces(&self) -> BitBoard {
+        let mut b = BitBoard { bits: 0 };
+        for i in 0..6 {
+            b |= self.black_pieces[i];
+        }
+        b
+    }
+
+    pub fn knight_moves(&self, out: &mut Vec<Move>) {
+        const NOT_A_FILE: u64 = 0xFEFE_FEFE_FEFE_FEFE;
+        const NOT_A_B_FILE: u64 = 0xFCFC_FCFC_FCFC_FCFC;
+        const NOT_H_FILE: u64 = 0x7F7F_7F7F_7F7F_7F7F;
+        const NOT_G_H_FILE: u64 = 0x3F3F_3F3F_3F3F_3F3F;
+        fn no_no_ea(b: u64) -> u64 {
+            (b << 17) & NOT_A_FILE
+        }
+        fn no_ea_ea(b: u64) -> u64 {
+            (b << 10) & NOT_A_B_FILE
+        }
+        fn so_ea_ea(b: u64) -> u64 {
+            (b >> 6) & NOT_A_B_FILE
+        }
+        fn so_so_ea(b: u64) -> u64 {
+            (b >> 15) & NOT_A_FILE
+        }
+        fn no_no_we(b: u64) -> u64 {
+            (b << 15) & NOT_H_FILE
+        }
+        fn no_we_we(b: u64) -> u64 {
+            (b << 6) & NOT_G_H_FILE
+        }
+        fn so_we_we(b: u64) -> u64 {
+            (b >> 10) & NOT_G_H_FILE
+        }
+        fn so_so_we(b: u64) -> u64 {
+            (b >> 17) & NOT_H_FILE
+        }
+        let knights = match self.to_play {
+            Turn::White => self.white_pieces[Piece::Knight as usize].bits,
+            Turn::Black => self.black_pieces[Piece::Knight as usize].bits,
+        };
+
+        let allied_pieces = match self.to_play {
+            Turn::White => self.white_pieces(),
+            Turn::Black => self.black_pieces(),
+        }
+        .bits;
+
+        for i in 0..64 as u8 {
+            if knights & (1 << i) != 0 {
+                for pos in [
+                    no_no_ea(1 << i),
+                    no_ea_ea(1 << i),
+                    so_ea_ea(1 << i),
+                    so_so_ea(1 << i),
+                    so_so_we(1 << i),
+                    so_we_we(1 << i),
+                    no_we_we(1 << i),
+                    no_no_we(1 << i),
+                ] {
+                    if pos != 0 && (pos & allied_pieces == 0) {
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: Posn {
+                                pos: pos.trailing_zeros() as u8,
+                            },
+                            turn: self.to_play,
+                            piece: Piece::Knight,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                        });
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -164,6 +265,9 @@ pub fn starting_board() -> Board {
             BitBoard::from(&d1()),
             BitBoard::from(&e1()),
         ],
+
+        to_play: Turn::White,
+        turn_count: 1,
     }
 }
 

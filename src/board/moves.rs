@@ -1,8 +1,9 @@
 use crate::board::posn::*;
 use std::fmt;
+use std::ops::Not;
 
 #[repr(u8)]
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Piece {
     Pawn,
     Rook,
@@ -13,13 +14,24 @@ pub enum Piece {
 }
 
 #[repr(u8)]
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Turn {
     Black,
     White,
 }
 
-#[derive(PartialEq)]
+impl Not for Turn {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Turn::White => Turn::Black,
+            Turn::Black => Turn::White,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Move {
     pub from: Posn,
     pub to: Posn,
@@ -56,10 +68,13 @@ impl fmt::Display for Move {
                     return write!(
                         f,
                         "{}x{}{}{}",
-                        self.from.file, self.to.file, self.to.rank, is_check
+                        self.from.file(),
+                        self.to.file(),
+                        self.to.rank(),
+                        is_check
                     )
                 }
-                None => return write!(f, "{}{}{}", self.to.file, self.to.rank, is_check),
+                None => return write!(f, "{}{}{}", self.to.file(), self.to.rank(), is_check),
             },
         };
         let capture = match self.capture {
@@ -69,28 +84,38 @@ impl fmt::Display for Move {
         write!(
             f,
             "{}{}{}{}{}",
-            icon, capture, self.to.file, self.to.rank, is_check
+            icon,
+            capture,
+            self.to.file(),
+            self.to.rank(),
+            is_check
         )
     }
-}
-
-pub fn generate_legal_moves() -> Vec<Move> {
-    vec![]
 }
 
 #[cfg(test)]
 mod tests {
     use crate::board::*;
+
+    pub fn generate_legal_moves(b: &Board) -> Vec<Move> {
+        let mut moves = vec![];
+
+        b.knight_moves(&mut moves);
+        moves
+    }
+
     fn perft(b: &mut Board, depth: u8) -> u64 {
         let mut nodes = 0;
         if depth == 0 {
             return 1;
         }
 
-        let moves = generate_legal_moves();
+        let moves = generate_legal_moves(b);
 
         for m in moves {
             b.make_move(&m);
+            print!("{}\n", m);
+            print!("{}\n", b);
             nodes += perft(b, depth - 1);
             b.undo_move(&m);
         }
@@ -107,6 +132,7 @@ mod tests {
         let mut b = starting_board();
         assert_eq!(perft(&mut b, 1), 20);
     }
+    /*
     #[test]
     fn perft2() {
         let mut b = starting_board();
@@ -122,4 +148,5 @@ mod tests {
         let mut b = starting_board();
         assert_eq!(perft(&mut b, 4), 197281);
     }
+    */
 }

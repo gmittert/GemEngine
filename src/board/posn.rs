@@ -53,8 +53,41 @@ impl fmt::Display for File {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Posn {
-    pub rank: Rank,
-    pub file: File,
+    pub pos: u8,
+}
+
+impl Posn {
+    pub fn from(rank: Rank, file: File) -> Posn {
+        Posn {
+            pos: (8 * rank as u8) + file as u8,
+        }
+    }
+
+    pub fn rank(&self) -> Rank {
+        match (self.pos >> 3) & 0x7 {
+            0 => Rank::One,
+            1 => Rank::Two,
+            2 => Rank::Three,
+            3 => Rank::Four,
+            4 => Rank::Five,
+            5 => Rank::Six,
+            6 => Rank::Seven,
+            _ => Rank::Eight,
+        }
+    }
+
+    pub fn file(&self) -> File {
+        match self.pos & 0x7 {
+            0 => File::A,
+            1 => File::B,
+            2 => File::C,
+            3 => File::D,
+            4 => File::E,
+            5 => File::F,
+            6 => File::G,
+            _ => File::H,
+        }
+    }
 }
 
 macro_rules! make_posns {
@@ -62,59 +95,59 @@ macro_rules! make_posns {
         paste::paste! {
         #[allow(dead_code)]
         pub fn [<$file:lower 1>]() -> Posn {
-            Posn {
-                rank: Rank::One,
-                file: File::$file
-            }
+            Posn::from(
+                Rank::One,
+                File::$file
+            )
         }
         #[allow(dead_code)]
         pub fn [<$file:lower 2>]() -> Posn {
-            Posn {
-                rank: Rank::Two,
-                file: File::$file
-            }
+            Posn::from(
+                Rank::Two,
+                File::$file
+            )
         }
         #[allow(dead_code)]
         pub fn [<$file:lower 3>]() -> Posn {
-            Posn {
-                rank: Rank::Three,
-                file: File::$file
-            }
+            Posn::from(
+                Rank::Three,
+                File::$file
+            )
         }
         #[allow(dead_code)]
-        pub fn [<$file:lower 4>]() -> Posn {
-            Posn {
-                rank: Rank::Four,
-                file: File::$file
-            }
+        pub fn [<$file:lower 4>]() -> Posn{
+            Posn::from(
+                Rank::Four,
+                File::$file
+            )
         }
         #[allow(dead_code)]
         pub fn [<$file:lower 5>]() -> Posn {
-            Posn {
-                rank: Rank::Five,
-                file: File::$file
-            }
+            Posn::from(
+                Rank::Five,
+                File::$file
+            )
         }
         #[allow(dead_code)]
         pub fn [<$file:lower 6>]() -> Posn {
-            Posn {
-                rank: Rank::Six,
-                file: File::$file
-            }
+            Posn::from(
+                Rank::Six,
+                File::$file
+            )
         }
         #[allow(dead_code)]
         pub fn [<$file:lower 7>]() -> Posn {
-            Posn {
-                rank: Rank::Seven,
-                file: File::$file
-            }
+            Posn::from(
+                Rank::Seven,
+                File::$file
+            )
         }
         #[allow(dead_code)]
-        pub fn [<$file:lower 8>]() -> Posn {
-            Posn {
-                rank: Rank::Eight,
-                file: File::$file
-            }
+        pub fn [<$file:lower 8>]() -> Posn{
+            Posn::from(
+                Rank::Eight,
+                File::$file
+            )
         }
         }
     };
