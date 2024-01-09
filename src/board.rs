@@ -228,6 +228,79 @@ impl Board {
             }
         }
     }
+
+    pub fn pawn_moves(&self, out: &mut Vec<Move>) {
+        // Single Pushes
+        let pawns = match self.to_play {
+            Turn::White => self.white_pieces[Piece::Pawn as usize].bits,
+            Turn::Black => self.black_pieces[Piece::Pawn as usize].bits,
+        };
+
+        let allied_pieces = match self.to_play {
+            Turn::White => self.white_pieces(),
+            Turn::Black => self.black_pieces(),
+        }
+        .bits;
+
+        let opponent_pieces = match self.to_play {
+            Turn::White => self.black_pieces(),
+            Turn::Black => self.white_pieces(),
+        }
+        .bits;
+
+        for i in 0..64 as u8 {
+            if pawns & (1 << i) != 0 {
+                let push_i = match self.to_play {
+                    Turn::White => i + 8,
+                    Turn::Black => i - 8,
+                };
+                let push_pos = 1 << push_i;
+                if push_pos != 0
+                    && (push_pos & allied_pieces == 0)
+                    && (push_pos & opponent_pieces == 0)
+                {
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn { pos: push_i },
+                        turn: self.to_play,
+                        piece: Piece::Pawn,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                let can_double_push = match self.to_play {
+                    Turn::White => i < 16,
+                    Turn::Black => i > 48,
+                };
+                if can_double_push {
+                    let double_push_i = match self.to_play {
+                        Turn::White => i + 16,
+                        Turn::Black => i - 16,
+                    };
+                    let double_push_pos = 1 << (i + 16);
+                    if double_push_pos != 0
+                        && (push_pos & allied_pieces == 0)
+                        && (push_pos & opponent_pieces == 0)
+                        && (double_push_pos & allied_pieces == 0)
+                        && (double_push_pos & opponent_pieces == 0)
+                    {
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: Posn { pos: double_push_i },
+                            turn: self.to_play,
+                            piece: Piece::Pawn,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Double Pushes
+    }
 }
 
 impl fmt::Display for Board {

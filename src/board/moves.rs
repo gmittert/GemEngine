@@ -102,6 +102,7 @@ mod tests {
 
         b.knight_moves(&mut moves);
         b.king_moves(&mut moves);
+        b.pawn_moves(&mut moves);
         moves
     }
 
@@ -115,8 +116,8 @@ mod tests {
 
         for m in moves {
             b.make_move(&m);
-            print!("{}\n", m);
-            print!("{}\n", b);
+            println!("{}", m);
+            println!("{}", b);
             nodes += perft(b, depth - 1);
             b.undo_move(&m);
         }
