@@ -271,14 +271,14 @@ impl Board {
                 }
                 let can_double_push = match self.to_play {
                     Turn::White => i < 16,
-                    Turn::Black => i > 48,
+                    Turn::Black => i > 47,
                 };
                 if can_double_push {
                     let double_push_i = match self.to_play {
                         Turn::White => i + 16,
                         Turn::Black => i - 16,
                     };
-                    let double_push_pos = 1 << (i + 16);
+                    let double_push_pos = 1 << double_push_i;
                     if double_push_pos != 0
                         && (push_pos & allied_pieces == 0)
                         && (push_pos & opponent_pieces == 0)
@@ -298,8 +298,6 @@ impl Board {
                 }
             }
         }
-
-        // Double Pushes
     }
 }
 
@@ -309,29 +307,29 @@ impl fmt::Display for Board {
 
         for i in 0..64 {
             if (self.black_pieces[Piece::King as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'k'
+                chars[i] = '♔'
             } else if (self.black_pieces[Piece::Queen as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'q'
+                chars[i] = '♕'
             } else if (self.black_pieces[Piece::Knight as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'n'
+                chars[i] = '♘'
             } else if (self.black_pieces[Piece::Pawn as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'p'
+                chars[i] = '♙'
             } else if (self.black_pieces[Piece::Bishop as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'b'
+                chars[i] = '♗'
             } else if (self.black_pieces[Piece::Rook as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'r'
+                chars[i] = '♖'
             } else if (self.white_pieces[Piece::King as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'K'
+                chars[i] = '♚'
             } else if (self.white_pieces[Piece::Queen as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'Q'
+                chars[i] = '♛'
             } else if (self.white_pieces[Piece::Knight as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'N'
+                chars[i] = '♞'
             } else if (self.white_pieces[Piece::Pawn as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'P'
+                chars[i] = '♟'
             } else if (self.white_pieces[Piece::Bishop as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'B'
+                chars[i] = '♝'
             } else if (self.white_pieces[Piece::Rook as usize].bits & (1 << i)) != 0 {
-                chars[i] = 'R'
+                chars[i] = '♜'
             }
         }
         for rank in 0..8 {
@@ -419,7 +417,7 @@ mod tests {
     #[test]
     fn formatted_start() {
         let exp =
-            "rnbqkbnr\npppppppp\n........\n........\n........\n........\nPPPPPPPP\nRNBQKBNR\n";
+            "♖♘♗♕♔♗♘♖\n♙♙♙♙♙♙♙♙\n........\n........\n........\n........\n♟♟♟♟♟♟♟♟\n♜♞♝♛♚♝♞♜\n";
         assert_eq!(format!("{}", crate::board::starting_board()), exp);
     }
 

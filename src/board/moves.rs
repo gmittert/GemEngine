@@ -59,7 +59,7 @@ impl fmt::Display for Move {
             (Piece::Knight, Turn::White) => "♞",
             (Piece::Bishop, Turn::Black) => "♗",
             (Piece::Bishop, Turn::White) => "♝",
-            (Piece::Queen, Turn::Black) => "♛",
+            (Piece::Queen, Turn::Black) => "♕",
             (Piece::Queen, Turn::White) => "♛",
             (Piece::King, Turn::Black) => "♔",
             (Piece::King, Turn::White) => "♚",
@@ -134,12 +134,14 @@ mod tests {
         let mut b = starting_board();
         assert_eq!(perft(&mut b, 1), 20);
     }
-    /*
+
     #[test]
     fn perft2() {
         let mut b = starting_board();
         assert_eq!(perft(&mut b, 2), 400);
     }
+
+    /*
     #[test]
     fn perft3() {
         let mut b = starting_board();

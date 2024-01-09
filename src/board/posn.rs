@@ -44,8 +44,8 @@ impl fmt::Display for File {
                 File::D => "d",
                 File::E => "e",
                 File::F => "f",
-                File::G => "d",
-                File::H => "g",
+                File::G => "g",
+                File::H => "h",
             }
         )
     }
