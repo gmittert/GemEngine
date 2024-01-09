@@ -90,6 +90,75 @@ impl Board {
         b
     }
 
+    pub fn king_moves(&self, out: &mut Vec<Move>) {
+        const NOT_A_FILE: u64 = 0xFEFE_FEFE_FEFE_FEFE;
+        const NOT_H_FILE: u64 = 0x7F7F_7F7F_7F7F_7F7F;
+        fn no(b: u64) -> u64 {
+            b << 8
+        }
+        fn no_ea(b: u64) -> u64 {
+            (b << 7) & NOT_H_FILE
+        }
+        fn ea(b: u64) -> u64 {
+            (b >> 1) & NOT_H_FILE
+        }
+        fn so_ea(b: u64) -> u64 {
+            (b >> 9) & NOT_H_FILE
+        }
+        fn so(b: u64) -> u64 {
+            b >> 8
+        }
+        fn so_we(b: u64) -> u64 {
+            (b >> 7) & NOT_A_FILE
+        }
+        fn we(b: u64) -> u64 {
+            (b << 1) & NOT_A_FILE
+        }
+        fn no_we(b: u64) -> u64 {
+            (b << 9) & NOT_A_FILE
+        }
+
+        let kings = match self.to_play {
+            Turn::White => self.white_pieces[Piece::King as usize].bits,
+            Turn::Black => self.black_pieces[Piece::King as usize].bits,
+        };
+
+        let allied_pieces = match self.to_play {
+            Turn::White => self.white_pieces(),
+            Turn::Black => self.black_pieces(),
+        }
+        .bits;
+
+        for i in 0..64 as u8 {
+            if kings & (1 << i) != 0 {
+                for pos in [
+                    no(1 << i),
+                    no_ea(1 << i),
+                    ea(1 << i),
+                    so_ea(1 << i),
+                    so(1 << i),
+                    so_we(1 << i),
+                    we(1 << i),
+                    no_we(1 << i),
+                ] {
+                    if pos != 0 && (pos & allied_pieces == 0) {
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: Posn {
+                                pos: pos.trailing_zeros() as u8,
+                            },
+                            turn: self.to_play,
+                            piece: Piece::King,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     pub fn knight_moves(&self, out: &mut Vec<Move>) {
         const NOT_A_FILE: u64 = 0xFEFE_FEFE_FEFE_FEFE;
         const NOT_A_B_FILE: u64 = 0xFCFC_FCFC_FCFC_FCFC;

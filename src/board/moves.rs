@@ -101,6 +101,7 @@ mod tests {
         let mut moves = vec![];
 
         b.knight_moves(&mut moves);
+        b.king_moves(&mut moves);
         moves
     }
 
