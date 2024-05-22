@@ -5,6 +5,15 @@ pub use crate::board::posn::*;
 use std::fmt;
 use std::ops;
 
+const EIGHTH_RANK: u64 = 0x0100_0000_0000_0000;
+const SECOND_RANK: u64 = 0x0000_0000_0000_0100;
+const H_FILE: u64 = 0x0101_0101_0101_0101;
+const A_FILE: u64 = 0x8080_8080_8080_8080;
+const NOT_A_FILE: u64 = 0xFEFE_FEFE_FEFE_FEFE;
+const NOT_A_B_FILE: u64 = 0xFCFC_FCFC_FCFC_FCFC;
+const NOT_H_FILE: u64 = 0x7F7F_7F7F_7F7F_7F7F;
+const NOT_G_H_FILE: u64 = 0x3F3F_3F3F_3F3F_3F3F;
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct BitBoard {
     bits: u64,
@@ -74,6 +83,26 @@ impl Board {
         b
     }
 
+    pub fn query_pos(&self, p: &Posn) -> Option<Piece> {
+        let pieces: [Piece; 6] = [
+            Piece::Pawn,
+            Piece::Rook,
+            Piece::Knight,
+            Piece::Bishop,
+            Piece::Queen,
+            Piece::King,
+        ];
+        for i in pieces {
+            if (self.black_pieces[i as usize].bits | self.white_pieces[i as usize].bits)
+                & BitBoard::from(&p).bits
+                != 0
+            {
+                return Some(i);
+            }
+        }
+        None
+    }
+
     pub fn white_pieces(&self) -> BitBoard {
         let mut b = BitBoard { bits: 0 };
         for i in 0..6 {
@@ -90,9 +119,624 @@ impl Board {
         b
     }
 
+    pub fn queen_moves(&self, out: &mut Vec<Move>) {
+        let queens = match self.to_play {
+            Turn::White => self.white_pieces,
+            Turn::Black => self.black_pieces,
+        }[Piece::Queen as usize]
+            .bits;
+
+        let allied_pieces = match self.to_play {
+            Turn::White => self.white_pieces(),
+            Turn::Black => self.black_pieces(),
+        }
+        .bits;
+
+        let opponent_pieces = match self.to_play {
+            Turn::Black => self.white_pieces(),
+            Turn::White => self.black_pieces(),
+        }
+        .bits;
+        for i in 0..64 as u8 {
+            if queens & (1 << i) != 0 {
+                // North
+                let mut north_pos = 1 << i;
+                while north_pos < EIGHTH_RANK {
+                    north_pos <<= 8;
+                    if north_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if north_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: north_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Queen,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: north_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Queen,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // South
+                let mut south_pos = 1 << i;
+                while south_pos >= SECOND_RANK {
+                    south_pos >>= 8;
+                    if south_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if south_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: south_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Queen,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: south_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Queen,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // East
+                let mut east_pos = 1 << i;
+                while east_pos & H_FILE == 0 {
+                    east_pos >>= 1;
+                    if east_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if east_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: east_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Queen,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: east_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Queen,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // West
+                let mut west_pos = 1 << i;
+                while west_pos & A_FILE == 0 {
+                    west_pos <<= 1;
+                    if west_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if west_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: west_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Queen,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: west_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Queen,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+
+                // North West
+                let mut nw_pos = 1 << i;
+                while nw_pos < EIGHTH_RANK && (nw_pos & A_FILE) == 0 {
+                    nw_pos <<= 9;
+                    if nw_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if nw_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: nw_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Queen,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: nw_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Queen,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // North East
+                let mut ne_pos = 1 << i;
+                while ne_pos < EIGHTH_RANK && (ne_pos & H_FILE) == 0 {
+                    ne_pos <<= 7;
+                    if ne_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if ne_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: ne_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Queen,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: ne_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Queen,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // South West
+                let mut sw_pos = 1 << i;
+                while sw_pos >= SECOND_RANK && (sw_pos & A_FILE) == 0 {
+                    sw_pos >>= 7;
+                    if sw_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if sw_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: sw_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Queen,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: sw_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Queen,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // South East
+                let mut se_pos = 1 << i;
+                while se_pos >= SECOND_RANK && (se_pos & H_FILE) == 0 {
+                    se_pos >>= 9;
+                    if se_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if se_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: se_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Queen,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: se_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Queen,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+            }
+        }
+    }
+
+    pub fn rook_moves(&self, out: &mut Vec<Move>) {
+        let rooks = match self.to_play {
+            Turn::White => self.white_pieces,
+            Turn::Black => self.black_pieces,
+        }[Piece::Rook as usize]
+            .bits;
+
+        let allied_pieces = match self.to_play {
+            Turn::White => self.white_pieces(),
+            Turn::Black => self.black_pieces(),
+        }
+        .bits;
+
+        let opponent_pieces = match self.to_play {
+            Turn::Black => self.white_pieces(),
+            Turn::White => self.black_pieces(),
+        }
+        .bits;
+        for i in 0..64 {
+            if rooks & (1 << i) != 0 {
+                // North
+                let mut north_pos = 1 << i;
+                while north_pos < EIGHTH_RANK {
+                    north_pos <<= 8;
+                    if north_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if north_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: north_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Rook,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: north_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Rook,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // South
+                let mut south_pos = 1 << i;
+                while south_pos >= SECOND_RANK {
+                    south_pos >>= 8;
+                    if south_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if south_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: south_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Rook,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: south_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Rook,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // East
+                let mut east_pos = 1 << i;
+                while east_pos & H_FILE == 0 {
+                    east_pos >>= 1;
+                    if east_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if east_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: east_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Rook,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: east_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Rook,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // West
+                let mut west_pos = 1 << i;
+                while west_pos & A_FILE == 0 {
+                    west_pos <<= 1;
+                    if west_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if west_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: west_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Rook,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: west_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Rook,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+            }
+        }
+    }
+
+    pub fn bishop_moves(&self, out: &mut Vec<Move>) {
+        let bishops = match self.to_play {
+            Turn::White => self.white_pieces,
+            Turn::Black => self.black_pieces,
+        }[Piece::Bishop as usize]
+            .bits;
+
+        let allied_pieces = match self.to_play {
+            Turn::White => self.white_pieces(),
+            Turn::Black => self.black_pieces(),
+        }
+        .bits;
+
+        let opponent_pieces = match self.to_play {
+            Turn::Black => self.white_pieces(),
+            Turn::White => self.black_pieces(),
+        }
+        .bits;
+        for i in 0..64 as u8 {
+            if bishops & (1 << i) != 0 {
+                // North West
+                let mut nw_pos = 1 << i;
+                while nw_pos < EIGHTH_RANK && (nw_pos & A_FILE) == 0 {
+                    nw_pos <<= 9;
+                    if nw_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if nw_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: nw_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Bishop,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: nw_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Bishop,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // North East
+                let mut ne_pos = 1 << i;
+                while ne_pos < EIGHTH_RANK && (ne_pos & H_FILE) == 0 {
+                    ne_pos <<= 7;
+                    if ne_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if ne_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: ne_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Bishop,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: ne_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Bishop,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // South West
+                let mut sw_pos = 1 << i;
+                while sw_pos >= SECOND_RANK && (sw_pos & A_FILE) == 0 {
+                    sw_pos >>= 7;
+                    if sw_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if sw_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: sw_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Bishop,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: sw_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Bishop,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                // South East
+                let mut se_pos = 1 << i;
+                while se_pos >= SECOND_RANK && (se_pos & H_FILE) == 0 {
+                    se_pos >>= 9;
+                    if se_pos & allied_pieces != 0 {
+                        break;
+                    }
+                    if se_pos & opponent_pieces != 0 {
+                        let to = Posn {
+                            pos: se_pos.trailing_zeros() as u8,
+                        };
+                        out.push(Move {
+                            from: Posn { pos: i },
+                            to: to.clone(),
+                            turn: self.to_play,
+                            piece: Piece::Bishop,
+                            capture: self.query_pos(&to),
+                            is_check: false,
+                            is_mate: false,
+                        });
+                        break;
+                    }
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: se_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Bishop,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+            }
+        }
+    }
+
     pub fn king_moves(&self, out: &mut Vec<Move>) {
-        const NOT_A_FILE: u64 = 0xFEFE_FEFE_FEFE_FEFE;
-        const NOT_H_FILE: u64 = 0x7F7F_7F7F_7F7F_7F7F;
         fn no(b: u64) -> u64 {
             b << 8
         }
@@ -119,9 +763,10 @@ impl Board {
         }
 
         let kings = match self.to_play {
-            Turn::White => self.white_pieces[Piece::King as usize].bits,
-            Turn::Black => self.black_pieces[Piece::King as usize].bits,
-        };
+            Turn::White => self.white_pieces,
+            Turn::Black => self.black_pieces,
+        }[Piece::King as usize]
+            .bits;
 
         let allied_pieces = match self.to_play {
             Turn::White => self.white_pieces(),
@@ -160,10 +805,6 @@ impl Board {
     }
 
     pub fn knight_moves(&self, out: &mut Vec<Move>) {
-        const NOT_A_FILE: u64 = 0xFEFE_FEFE_FEFE_FEFE;
-        const NOT_A_B_FILE: u64 = 0xFCFC_FCFC_FCFC_FCFC;
-        const NOT_H_FILE: u64 = 0x7F7F_7F7F_7F7F_7F7F;
-        const NOT_G_H_FILE: u64 = 0x3F3F_3F3F_3F3F_3F3F;
         fn no_no_ea(b: u64) -> u64 {
             (b << 17) & NOT_A_FILE
         }
@@ -270,8 +911,8 @@ impl Board {
                     });
                 }
                 let can_double_push = match self.to_play {
-                    Turn::White => i < 16,
-                    Turn::Black => i > 47,
+                    Turn::White => i >= 8 && i <= 15,
+                    Turn::Black => i >= 48 && i <= 55,
                 };
                 if can_double_push {
                     let double_push_i = match self.to_play {
@@ -295,6 +936,44 @@ impl Board {
                             is_mate: false,
                         });
                     }
+                }
+                let capture_west_pos = match self.to_play {
+                    Turn::White => (1 << i << 9) & NOT_A_FILE,
+                    Turn::Black => (1 << i >> 7) & NOT_A_FILE,
+                };
+                let capture_east_pos = match self.to_play {
+                    Turn::White => (1 << i << 7) & NOT_H_FILE,
+                    Turn::Black => (1 << i >> 9) & NOT_H_FILE,
+                };
+                if capture_west_pos & opponent_pieces != 0 {
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: capture_west_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Pawn,
+                        capture: self.query_pos(&Posn {
+                            pos: capture_west_pos.trailing_zeros() as u8,
+                        }),
+                        is_check: false,
+                        is_mate: false,
+                    });
+                }
+                if capture_east_pos & opponent_pieces != 0 {
+                    out.push(Move {
+                        from: Posn { pos: i },
+                        to: Posn {
+                            pos: capture_east_pos.trailing_zeros() as u8,
+                        },
+                        turn: self.to_play,
+                        piece: Piece::Pawn,
+                        capture: self.query_pos(&Posn {
+                            pos: capture_east_pos.trailing_zeros() as u8,
+                        }),
+                        is_check: false,
+                        is_mate: false,
+                    });
                 }
             }
         }
@@ -334,7 +1013,7 @@ impl fmt::Display for Board {
         }
         for rank in 0..8 {
             for file in 0..8 {
-                write!(f, "{}", chars[file + (8 * (7 - rank))])?;
+                write!(f, "{}", chars[(7 - file) + (8 * (7 - rank))])?;
             }
             write!(f, "\n")?;
         }
@@ -383,6 +1062,31 @@ impl ops::BitOr<BitBoard> for Posn {
     type Output = BitBoard;
     fn bitor(self, rhs: BitBoard) -> Self::Output {
         BitBoard::from(&self) | rhs
+    }
+}
+
+pub fn empty_board(turn: Turn) -> Board {
+    Board {
+        black_pieces: [
+            BitBoard { bits: 0 },
+            BitBoard { bits: 0 },
+            BitBoard { bits: 0 },
+            BitBoard { bits: 0 },
+            BitBoard { bits: 0 },
+            BitBoard { bits: 0 },
+        ],
+
+        white_pieces: [
+            BitBoard { bits: 0 },
+            BitBoard { bits: 0 },
+            BitBoard { bits: 0 },
+            BitBoard { bits: 0 },
+            BitBoard { bits: 0 },
+            BitBoard { bits: 0 },
+        ],
+
+        to_play: turn,
+        turn_count: 1,
     }
 }
 
@@ -437,5 +1141,310 @@ mod tests {
         board.make_move(&m);
         board.undo_move(&m);
         assert_eq!(board, board2);
+    }
+
+    #[test]
+    fn rook_moves_empty() {
+        for i in 0..64 {
+            let mut board = empty_board(Turn::White);
+            board.white_pieces[Piece::Rook as usize] = BitBoard { bits: 1 << i };
+            let mut moves = vec![];
+            board.rook_moves(&mut moves);
+            assert_eq!(moves.len(), 14);
+        }
+    }
+
+    #[test]
+    fn rook_moves_blocked_ally() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Rook as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Pawn as usize] = d4() | d6() | c5() | e5();
+        let mut moves = vec![];
+        board.rook_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+    }
+
+    #[test]
+    fn rook_moves_blocked_opponent() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Rook as usize] = BitBoard::from(&d5());
+        board.black_pieces[Piece::Pawn as usize] = d4() | d6() | c5() | e5();
+        let mut moves = vec![];
+        board.rook_moves(&mut moves);
+        assert_eq!(moves.len(), 4);
+    }
+
+    #[test]
+    fn bishop_moves_empty() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(&a1());
+        let mut moves = vec![];
+        board.bishop_moves(&mut moves);
+        assert_eq!(moves.len(), 7);
+    }
+
+    #[test]
+    fn bishop_moves_blocked_ally() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Pawn as usize] = e6() | e4() | c6() | c4();
+        let mut moves = vec![];
+        board.bishop_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+    }
+
+    #[test]
+    fn bishop_moves_blocked_opponent() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(&d5());
+        board.black_pieces[Piece::Pawn as usize] = e6() | e4() | c6() | c4();
+        let mut moves = vec![];
+        board.bishop_moves(&mut moves);
+        assert_eq!(moves.len(), 4);
+    }
+
+    #[test]
+    fn queen_moves_empty() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Queen as usize] = BitBoard::from(&a1());
+        let mut moves = vec![];
+        board.queen_moves(&mut moves);
+        assert_eq!(moves.len(), 21);
+
+        board.white_pieces[Piece::Queen as usize] = BitBoard::from(&d5());
+        moves.clear();
+        board.queen_moves(&mut moves);
+        assert_eq!(moves.len(), 27);
+    }
+
+    #[test]
+    fn queen_moves_blocked_ally() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Queen as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Pawn as usize] =
+            e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
+        let mut moves = vec![];
+        board.queen_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+    }
+
+    #[test]
+    fn queen_moves_blocked_opponent() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Queen as usize] = BitBoard::from(&d5());
+        board.black_pieces[Piece::Pawn as usize] =
+            e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
+        let mut moves = vec![];
+        board.queen_moves(&mut moves);
+        assert_eq!(moves.len(), 8);
+    }
+
+    #[test]
+    fn king_moves_empty() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::King as usize] = BitBoard::from(&a1());
+        let mut moves = vec![];
+        board.king_moves(&mut moves);
+        assert_eq!(moves.len(), 3);
+
+        board.white_pieces[Piece::King as usize] = BitBoard::from(&d5());
+        moves.clear();
+        board.king_moves(&mut moves);
+        assert_eq!(moves.len(), 8);
+    }
+
+    #[test]
+    fn king_moves_blocked_ally() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::King as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Knight as usize] =
+            e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
+        let mut moves = vec![];
+        board.king_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+    }
+
+    #[test]
+    fn king_moves_blocked_opponent() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::King as usize] = BitBoard::from(&d5());
+        board.black_pieces[Piece::Knight as usize] =
+            e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
+        let mut moves = vec![];
+        board.king_moves(&mut moves);
+        assert_eq!(moves.len(), 8);
+    }
+
+    #[test]
+    fn knight_moves_empty() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a1());
+        let mut moves = vec![];
+        board.knight_moves(&mut moves);
+        assert_eq!(moves.len(), 2);
+
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&d5());
+        moves.clear();
+        board.knight_moves(&mut moves);
+        assert_eq!(moves.len(), 8);
+
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a5());
+        moves.clear();
+        board.knight_moves(&mut moves);
+        assert_eq!(moves.len(), 4);
+    }
+
+    #[test]
+    fn knight_moves_blocked_ally() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Pawn as usize] =
+            e7() | e3() | c7() | c3() | f4() | f6() | b4() | b6();
+        let mut moves = vec![];
+        board.knight_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+    }
+
+    #[test]
+    fn knight_moves_blocked_opponent() {
+        let mut board = empty_board(Turn::White);
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&d5());
+        board.black_pieces[Piece::Pawn as usize] =
+            e7() | e3() | c7() | c3() | f4() | f6() | b4() | b6();
+        let mut moves = vec![];
+        board.knight_moves(&mut moves);
+        assert_eq!(moves.len(), 8);
+    }
+
+    #[test]
+    fn pawn_moves_empty() {
+        let mut board = empty_board(Turn::White);
+        let mut moves = vec![];
+
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a3());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 1);
+
+        moves.clear();
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a2());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 2);
+
+        board.to_play = Turn::Black;
+
+        moves.clear();
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a5());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 1);
+
+        moves.clear();
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a7());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 2);
+    }
+
+    #[test]
+    fn pawn_moves_blocked_ally() {
+        let mut board = empty_board(Turn::White);
+        let mut moves = vec![];
+
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a3());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+
+        moves.clear();
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a2());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a3());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+
+        moves.clear();
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a2());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 1);
+
+        board.to_play = Turn::Black;
+
+        moves.clear();
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a5());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+
+        moves.clear();
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a7());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a6());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+
+        moves.clear();
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a7());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a5());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 1);
+    }
+
+    #[test]
+    fn pawn_moves_blocked_opponent() {
+        let mut board = empty_board(Turn::White);
+        let mut moves = vec![];
+
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a3());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+
+        moves.clear();
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a2());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a3());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+
+        moves.clear();
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a2());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 1);
+
+        board.to_play = Turn::Black;
+
+        moves.clear();
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a5());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+
+        moves.clear();
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a7());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a6());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 0);
+
+        moves.clear();
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a7());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a5());
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 1);
+    }
+
+    #[test]
+    fn pawn_captures() {
+        let mut board = empty_board(Turn::White);
+        let mut moves = vec![];
+
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&d3());
+        board.black_pieces[Piece::Pawn as usize] = c4() | e4() | d4();
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 2);
+
+        board.to_play = Turn::Black;
+
+        moves.clear();
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Pawn as usize] = c4() | e4() | d4();
+        board.pawn_moves(&mut moves);
+        assert_eq!(moves.len(), 2);
     }
 }

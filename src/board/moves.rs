@@ -100,13 +100,16 @@ mod tests {
     pub fn generate_legal_moves(b: &Board) -> Vec<Move> {
         let mut moves = vec![];
 
+        b.rook_moves(&mut moves);
+        b.bishop_moves(&mut moves);
+        b.queen_moves(&mut moves);
         b.knight_moves(&mut moves);
         b.king_moves(&mut moves);
         b.pawn_moves(&mut moves);
         moves
     }
 
-    fn perft(b: &mut Board, depth: u8) -> u64 {
+    fn perft(b: &mut Board, depth: u8, should_print: bool) -> u64 {
         let mut nodes = 0;
         if depth == 0 {
             return 1;
@@ -114,11 +117,13 @@ mod tests {
 
         let moves = generate_legal_moves(b);
 
-        for m in moves {
+        for m in &moves {
             b.make_move(&m);
-            println!("{}", m);
-            println!("{}", b);
-            nodes += perft(b, depth - 1);
+            if should_print {
+                println!("{}, ", m);
+                println!("{}", b);
+            }
+            nodes += perft(b, depth - 1, should_print);
             b.undo_move(&m);
         }
         nodes
@@ -127,26 +132,26 @@ mod tests {
     #[test]
     fn perft0() {
         let mut b = starting_board();
-        assert_eq!(perft(&mut b, 0), 1);
+        assert_eq!(perft(&mut b, 0, false), 1);
     }
     #[test]
     fn perft1() {
         let mut b = starting_board();
-        assert_eq!(perft(&mut b, 1), 20);
+        assert_eq!(perft(&mut b, 1, false), 20);
     }
 
     #[test]
     fn perft2() {
         let mut b = starting_board();
-        assert_eq!(perft(&mut b, 2), 400);
+        assert_eq!(perft(&mut b, 2, false), 400);
     }
 
-    /*
     #[test]
     fn perft3() {
         let mut b = starting_board();
-        assert_eq!(perft(&mut b, 3), 8902);
+        assert_eq!(perft(&mut b, 3, true), 8902);
     }
+    /*
     #[test]
     fn perft4() {
         let mut b = starting_board();

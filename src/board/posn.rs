@@ -22,14 +22,14 @@ impl fmt::Display for Rank {
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum File {
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
     H,
+    G,
+    F,
+    E,
+    D,
+    C,
+    B,
+    A,
 }
 
 impl fmt::Display for File {
@@ -78,14 +78,14 @@ impl Posn {
 
     pub fn file(&self) -> File {
         match self.pos & 0x7 {
-            0 => File::A,
-            1 => File::B,
-            2 => File::C,
-            3 => File::D,
-            4 => File::E,
-            5 => File::F,
-            6 => File::G,
-            _ => File::H,
+            0 => File::H,
+            1 => File::G,
+            2 => File::F,
+            3 => File::E,
+            4 => File::D,
+            5 => File::C,
+            6 => File::B,
+            _ => File::A,
         }
     }
 }
