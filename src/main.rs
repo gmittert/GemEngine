@@ -8,7 +8,7 @@ fn main() {
     let m1 = board::Move {
         from: board::e2(),
         to: board::e4(),
-        turn: board::Turn::White,
+        turn: board::Color::White,
         piece: board::Piece::Pawn,
         capture: None,
         is_check: false,
@@ -21,7 +21,7 @@ fn main() {
     let m2 = board::Move {
         from: board::e7(),
         to: board::e5(),
-        turn: board::Turn::Black,
+        turn: board::Color::Black,
         piece: board::Piece::Pawn,
         capture: None,
         is_check: false,

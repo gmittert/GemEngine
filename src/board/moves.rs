@@ -15,18 +15,18 @@ pub enum Piece {
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Turn {
+pub enum Color {
     Black,
     White,
 }
 
-impl Not for Turn {
+impl Not for Color {
     type Output = Self;
 
     fn not(self) -> Self::Output {
         match self {
-            Turn::White => Turn::Black,
-            Turn::Black => Turn::White,
+            Color::White => Color::Black,
+            Color::Black => Color::White,
         }
     }
 }
@@ -35,7 +35,7 @@ impl Not for Turn {
 pub struct Move {
     pub from: Posn,
     pub to: Posn,
-    pub turn: Turn,
+    pub turn: Color,
     pub piece: Piece,
     pub capture: Option<Piece>,
     pub is_check: bool,
@@ -53,16 +53,16 @@ impl fmt::Display for Move {
         };
 
         let icon = match (self.piece, self.turn) {
-            (Piece::Rook, Turn::Black) => "♖",
-            (Piece::Rook, Turn::White) => "♜",
-            (Piece::Knight, Turn::Black) => "♘",
-            (Piece::Knight, Turn::White) => "♞",
-            (Piece::Bishop, Turn::Black) => "♗",
-            (Piece::Bishop, Turn::White) => "♝",
-            (Piece::Queen, Turn::Black) => "♕",
-            (Piece::Queen, Turn::White) => "♛",
-            (Piece::King, Turn::Black) => "♔",
-            (Piece::King, Turn::White) => "♚",
+            (Piece::Rook, Color::Black) => "♖",
+            (Piece::Rook, Color::White) => "♜",
+            (Piece::Knight, Color::Black) => "♘",
+            (Piece::Knight, Color::White) => "♞",
+            (Piece::Bishop, Color::Black) => "♗",
+            (Piece::Bishop, Color::White) => "♝",
+            (Piece::Queen, Color::Black) => "♕",
+            (Piece::Queen, Color::White) => "♛",
+            (Piece::King, Color::Black) => "♔",
+            (Piece::King, Color::White) => "♚",
             (Piece::Pawn, _) => match self.capture {
                 Some(_) => {
                     return write!(
@@ -100,12 +100,12 @@ mod tests {
     pub fn generate_legal_moves(b: &Board) -> Vec<Move> {
         let mut moves = vec![];
 
-        b.rook_moves(&mut moves);
-        b.bishop_moves(&mut moves);
-        b.queen_moves(&mut moves);
-        b.knight_moves(&mut moves);
-        b.king_moves(&mut moves);
-        b.pawn_moves(&mut moves);
+        b.rook_moves(b.to_play, &mut moves);
+        b.bishop_moves(b.to_play, &mut moves);
+        b.queen_moves(b.to_play, &mut moves);
+        b.knight_moves(b.to_play, &mut moves);
+        b.king_moves(b.to_play, &mut moves);
+        b.pawn_moves(b.to_play, &mut moves);
         moves
     }
 
@@ -149,13 +149,13 @@ mod tests {
     #[test]
     fn perft3() {
         let mut b = starting_board();
-        assert_eq!(perft(&mut b, 3, true), 8902);
+        assert_eq!(perft(&mut b, 3, false), 8902);
     }
     /*
     #[test]
     fn perft4() {
         let mut b = starting_board();
-        assert_eq!(perft(&mut b, 4), 197281);
+        assert_eq!(perft(&mut b, 4, true), 197281);
     }
     */
 }

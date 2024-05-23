@@ -88,6 +88,35 @@ impl Posn {
             _ => File::A,
         }
     }
+
+    pub fn no(&self) -> Option<Posn> {
+        if self.rank() == Rank::Eight {
+            None
+        } else {
+            Some(Posn { pos: self.pos + 8 })
+        }
+    }
+    pub fn so(&self) -> Option<Posn> {
+        if self.rank() == Rank::One{
+            None
+        } else {
+            Some(Posn { pos: self.pos - 8 })
+        }
+    }
+    pub fn ea(&self) -> Option<Posn> {
+        if self.file() == File::H{
+            None
+        } else {
+            Some(Posn { pos: self.pos - 1 })
+        }
+    }
+    pub fn we(&self) -> Option<Posn> {
+        if self.file() == File::A{
+            None
+        } else {
+            Some(Posn { pos: self.pos + 1 })
+        }
+    }
 }
 
 macro_rules! make_posns {
