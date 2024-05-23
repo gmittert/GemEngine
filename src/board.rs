@@ -758,17 +758,17 @@ impl Board {
                 i.no().and_then(|x| x.we()),
             ] {
                 if let Some(pos) = mpos {
-                 if !allied_pieces.contains(pos) {
-                    out.push(Move {
-                        from: i,
-                        to: pos,
-                        turn: color,
-                        piece: Piece::King,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                 }
+                    if !allied_pieces.contains(pos) {
+                        out.push(Move {
+                            from: i,
+                            to: pos,
+                            turn: color,
+                            piece: Piece::King,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                        });
+                    }
                 }
             }
         }
@@ -885,36 +885,30 @@ impl Board {
     pub fn pawn_moves(&self, color: Color, out: &mut Vec<Move>) {
         // Single Pushes
         let pawns = match color {
-            Color::White => self.white_pieces[Piece::Pawn as usize].bits,
-            Color::Black => self.black_pieces[Piece::Pawn as usize].bits,
-        };
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Pawn as usize];
 
         let allied_pieces = match color {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
-        }
-        .bits;
+        };
 
         let opponent_pieces = match color {
             Color::White => self.black_pieces(),
             Color::Black => self.white_pieces(),
-        }
-        .bits;
+        };
 
-        for i in 0..64 as u8 {
-            if pawns & (1 << i) != 0 {
-                let push_i = match color {
-                    Color::White => i + 8,
-                    Color::Black => i - 8,
-                };
-                let push_pos = 1 << push_i;
-                if push_pos != 0
-                    && (push_pos & allied_pieces == 0)
-                    && (push_pos & opponent_pieces == 0)
-                {
+        for i in pawns {
+            let mpush_pos = match color {
+                Color::White => i.no(),
+                Color::Black => i.so(),
+            };
+            if let Some(push_pos) = mpush_pos {
+                if !allied_pieces.contains(push_pos) && !opponent_pieces.contains(push_pos) {
                     out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn { pos: push_i },
+                        from: i,
+                        to: push_pos,
                         turn: color,
                         piece: Piece::Pawn,
                         capture: None,
@@ -923,70 +917,66 @@ impl Board {
                     });
                 }
                 let can_double_push = match color {
-                    Color::White => i >= 8 && i <= 15,
-                    Color::Black => i >= 48 && i <= 55,
+                    Color::White => i.rank() == Rank::Two,
+                    Color::Black => i.rank() == Rank::Seven,
                 };
                 if can_double_push {
-                    let double_push_i = match color {
-                        Color::White => i + 16,
-                        Color::Black => i - 16,
+                    let mdouble_push_pos = match color {
+                        Color::White => i.no().and_then(|x| x.no()),
+                        Color::Black => i.so().and_then(|x| x.so()),
                     };
-                    let double_push_pos = 1 << double_push_i;
-                    if double_push_pos != 0
-                        && (push_pos & allied_pieces == 0)
-                        && (push_pos & opponent_pieces == 0)
-                        && (double_push_pos & allied_pieces == 0)
-                        && (double_push_pos & opponent_pieces == 0)
-                    {
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: Posn { pos: double_push_i },
-                            turn: color,
-                            piece: Piece::Pawn,
-                            capture: None,
-                            is_check: false,
-                            is_mate: false,
-                        });
+                    if let Some(double_push_pos) = mdouble_push_pos {
+                        if !allied_pieces.contains(push_pos)
+                            && !allied_pieces.contains(double_push_pos)
+                            && !opponent_pieces.contains(push_pos)
+                            && !opponent_pieces.contains(double_push_pos)
+                        {
+                            out.push(Move {
+                                from: i,
+                                to: double_push_pos,
+                                turn: color,
+                                piece: Piece::Pawn,
+                                capture: None,
+                                is_check: false,
+                                is_mate: false,
+                            });
+                        }
                     }
                 }
-                let capture_west_pos = match color {
-                    Color::White => (1 << i << 9) & NOT_A_FILE,
-                    Color::Black => (1 << i >> 7) & NOT_A_FILE,
-                };
-                let capture_east_pos = match color {
-                    Color::White => (1 << i << 7) & NOT_H_FILE,
-                    Color::Black => (1 << i >> 9) & NOT_H_FILE,
-                };
-                if capture_west_pos & opponent_pieces != 0 {
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: capture_west_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Pawn,
-                        capture: self.query_pos(&Posn {
-                            pos: capture_west_pos.trailing_zeros() as u8,
-                        }),
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-                if capture_east_pos & opponent_pieces != 0 {
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: capture_east_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Pawn,
-                        capture: self.query_pos(&Posn {
-                            pos: capture_east_pos.trailing_zeros() as u8,
-                        }),
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
+            }
+            let capture_west_pos = match color {
+                Color::White => i.no().and_then(|x|x.we()),
+                Color::Black => i.so().and_then(|x|x.we()),
+            };
+            let capture_east_pos = match color {
+                Color::White => i.no().and_then(|x|x.ea()),
+                Color::Black => i.so().and_then(|x|x.ea()),
+            };
+            if capture_west_pos.is_some() && opponent_pieces.contains(capture_west_pos.unwrap()) {
+                out.push(Move {
+                    from: i,
+                    to: capture_west_pos.unwrap(),
+                    turn: color,
+                    piece: Piece::Pawn,
+                    capture: self.query_pos(
+                        &capture_west_pos.unwrap()
+                    ),
+                    is_check: false,
+                    is_mate: false,
+                });
+            }
+            if capture_east_pos.is_some() && opponent_pieces.contains(capture_east_pos.unwrap()) {
+                out.push(Move {
+                    from: i,
+                    to: capture_east_pos.unwrap(),
+                    turn: color,
+                    piece: Piece::Pawn,
+                    capture: self.query_pos(
+                        &capture_east_pos.unwrap()
+                    ),
+                    is_check: false,
+                    is_mate: false,
+                });
             }
         }
     }
