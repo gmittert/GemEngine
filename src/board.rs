@@ -122,294 +122,46 @@ impl Board {
         let queens = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
-        }[Piece::Queen as usize]
-            .bits;
+        }[Piece::Queen as usize];
 
         let allied_pieces = match color {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
-        }
-        .bits;
+        };
 
         let opponent_pieces = match color {
             Color::Black => self.white_pieces(),
             Color::White => self.black_pieces(),
-        }
-        .bits;
-        for i in 0..64 as u8 {
-            if queens & (1 << i) != 0 {
-                // North
-                let mut north_pos = 1 << i;
-                while north_pos < EIGHTH_RANK {
-                    north_pos <<= 8;
-                    if north_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if north_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: north_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Queen,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
+        };
+        for i in queens {
+            for shift in [
+                |p: Posn| p.no(),
+                |p: Posn| p.so(),
+                |p: Posn| p.ea(),
+                |p: Posn| p.we(),
+                |p: Posn| p.nw(),
+                |p: Posn| p.ne(),
+                |p: Posn| p.sw(),
+                |p: Posn| p.se(),
+            ] {
+                let mut slide = shift(i);
+                while let Some(pos) = slide {
+                    if allied_pieces.contains(pos) {
                         break;
                     }
                     out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: north_pos.trailing_zeros() as u8,
-                        },
+                        from: i,
+                        to: pos,
                         turn: color,
                         piece: Piece::Queen,
-                        capture: None,
+                        capture: self.query_pos(&pos),
                         is_check: false,
                         is_mate: false,
                     });
-                }
-                // South
-                let mut south_pos = 1 << i;
-                while south_pos >= SECOND_RANK {
-                    south_pos >>= 8;
-                    if south_pos & allied_pieces != 0 {
+                    if opponent_pieces.contains(pos) {
                         break;
                     }
-                    if south_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: south_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Queen,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: south_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Queen,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-                // East
-                let mut east_pos = 1 << i;
-                while east_pos & H_FILE == 0 {
-                    east_pos >>= 1;
-                    if east_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if east_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: east_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Queen,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: east_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Queen,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-                // West
-                let mut west_pos = 1 << i;
-                while west_pos & A_FILE == 0 {
-                    west_pos <<= 1;
-                    if west_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if west_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: west_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Queen,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: west_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Queen,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-
-                // North West
-                let mut nw_pos = 1 << i;
-                while nw_pos < EIGHTH_RANK && (nw_pos & A_FILE) == 0 {
-                    nw_pos <<= 9;
-                    if nw_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if nw_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: nw_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Queen,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: nw_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Queen,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-                // North East
-                let mut ne_pos = 1 << i;
-                while ne_pos < EIGHTH_RANK && (ne_pos & H_FILE) == 0 {
-                    ne_pos <<= 7;
-                    if ne_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if ne_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: ne_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Queen,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: ne_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Queen,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-                // South West
-                let mut sw_pos = 1 << i;
-                while sw_pos >= SECOND_RANK && (sw_pos & A_FILE) == 0 {
-                    sw_pos >>= 7;
-                    if sw_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if sw_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: sw_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Queen,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: sw_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Queen,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-                // South East
-                let mut se_pos = 1 << i;
-                while se_pos >= SECOND_RANK && (se_pos & H_FILE) == 0 {
-                    se_pos >>= 9;
-                    if se_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if se_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: se_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Queen,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: se_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Queen,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
+                    slide = shift(pos);
                 }
             }
         }
@@ -419,157 +171,42 @@ impl Board {
         let rooks = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
-        }[Piece::Rook as usize]
-            .bits;
+        }[Piece::Rook as usize];
 
         let allied_pieces = match color {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
-        }
-        .bits;
+        };
 
         let opponent_pieces = match color {
             Color::Black => self.white_pieces(),
             Color::White => self.black_pieces(),
-        }
-        .bits;
-        for i in 0..64 {
-            if rooks & (1 << i) != 0 {
-                // North
-                let mut north_pos = 1 << i;
-                while north_pos < EIGHTH_RANK {
-                    north_pos <<= 8;
-                    if north_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if north_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: north_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Rook,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
+        };
+        for i in rooks {
+            for shift in [
+                |p: Posn| p.no(),
+                |p: Posn| p.so(),
+                |p: Posn| p.ea(),
+                |p: Posn| p.we(),
+            ] {
+                let mut slide = shift(i);
+                while let Some(pos) = slide {
+                    if allied_pieces.contains(pos) {
                         break;
                     }
                     out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: north_pos.trailing_zeros() as u8,
-                        },
+                        from: i,
+                        to: pos,
                         turn: color,
                         piece: Piece::Rook,
-                        capture: None,
+                        capture: self.query_pos(&pos),
                         is_check: false,
                         is_mate: false,
                     });
-                }
-                // South
-                let mut south_pos = 1 << i;
-                while south_pos >= SECOND_RANK {
-                    south_pos >>= 8;
-                    if south_pos & allied_pieces != 0 {
+                    if opponent_pieces.contains(pos) {
                         break;
                     }
-                    if south_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: south_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Rook,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: south_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Rook,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-                // East
-                let mut east_pos = 1 << i;
-                while east_pos & H_FILE == 0 {
-                    east_pos >>= 1;
-                    if east_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if east_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: east_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Rook,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: east_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Rook,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-                // West
-                let mut west_pos = 1 << i;
-                while west_pos & A_FILE == 0 {
-                    west_pos <<= 1;
-                    if west_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if west_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: west_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Rook,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: west_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Rook,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
+                    slide = shift(pos);
                 }
             }
         }
@@ -579,157 +216,42 @@ impl Board {
         let bishops = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
-        }[Piece::Bishop as usize]
-            .bits;
+        }[Piece::Bishop as usize];
 
         let allied_pieces = match color {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
-        }
-        .bits;
+        };
 
         let opponent_pieces = match color {
             Color::Black => self.white_pieces(),
             Color::White => self.black_pieces(),
-        }
-        .bits;
-        for i in 0..64 as u8 {
-            if bishops & (1 << i) != 0 {
-                // North West
-                let mut nw_pos = 1 << i;
-                while nw_pos < EIGHTH_RANK && (nw_pos & A_FILE) == 0 {
-                    nw_pos <<= 9;
-                    if nw_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if nw_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: nw_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Bishop,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
+        };
+        for i in bishops {
+            for shift in [
+                |p: Posn| p.nw(),
+                |p: Posn| p.ne(),
+                |p: Posn| p.sw(),
+                |p: Posn| p.se(),
+            ] {
+                let mut slide = shift(i);
+                while let Some(pos) = slide {
+                    if allied_pieces.contains(pos) {
                         break;
                     }
                     out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: nw_pos.trailing_zeros() as u8,
-                        },
+                        from: i,
+                        to: pos,
                         turn: color,
                         piece: Piece::Bishop,
-                        capture: None,
+                        capture: self.query_pos(&pos),
                         is_check: false,
                         is_mate: false,
                     });
-                }
-                // North East
-                let mut ne_pos = 1 << i;
-                while ne_pos < EIGHTH_RANK && (ne_pos & H_FILE) == 0 {
-                    ne_pos <<= 7;
-                    if ne_pos & allied_pieces != 0 {
+                    if opponent_pieces.contains(pos) {
                         break;
                     }
-                    if ne_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: ne_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Bishop,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: ne_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Bishop,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-                // South West
-                let mut sw_pos = 1 << i;
-                while sw_pos >= SECOND_RANK && (sw_pos & A_FILE) == 0 {
-                    sw_pos >>= 7;
-                    if sw_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if sw_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: sw_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Bishop,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: sw_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Bishop,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-                // South East
-                let mut se_pos = 1 << i;
-                while se_pos >= SECOND_RANK && (se_pos & H_FILE) == 0 {
-                    se_pos >>= 9;
-                    if se_pos & allied_pieces != 0 {
-                        break;
-                    }
-                    if se_pos & opponent_pieces != 0 {
-                        let to = Posn {
-                            pos: se_pos.trailing_zeros() as u8,
-                        };
-                        out.push(Move {
-                            from: Posn { pos: i },
-                            to: to.clone(),
-                            turn: color,
-                            piece: Piece::Bishop,
-                            capture: self.query_pos(&to),
-                            is_check: false,
-                            is_mate: false,
-                        });
-                        break;
-                    }
-                    out.push(Move {
-                        from: Posn { pos: i },
-                        to: Posn {
-                            pos: se_pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Bishop,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
+                    slide = shift(pos);
                 }
             }
         }
