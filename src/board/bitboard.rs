@@ -67,6 +67,15 @@ impl ops::BitOr for BitBoard {
     }
 }
 
+impl ops::BitAnd for BitBoard {
+    type Output = Self;
+    fn bitand(self, rhs: BitBoard) -> Self::Output {
+        BitBoard {
+            bits: self.bits & rhs.bits,
+        }
+    }
+}
+
 impl ops::BitOrAssign<Posn> for BitBoard {
     fn bitor_assign(&mut self, rhs: Posn) {
         self.bits |= BitBoard::from(&rhs).bits;
@@ -92,8 +101,6 @@ impl ops::BitOr<BitBoard> for Posn {
         BitBoard::from(&self) | rhs
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

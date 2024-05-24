@@ -70,9 +70,8 @@ impl Board {
             Piece::King,
         ];
         for i in pieces {
-            if (self.black_pieces[i as usize].bits | self.white_pieces[i as usize].bits)
-                & BitBoard::from(&p).bits
-                != 0
+            if (self.black_pieces[i as usize] | self.white_pieces[i as usize]) & BitBoard::from(&p)
+                != BitBoard::empty()
             {
                 return Some(i);
             }
