@@ -9,6 +9,10 @@ pub struct BitBoard {
 }
 
 impl BitBoard {
+    pub fn empty() -> BitBoard {
+        BitBoard { bits: 0 }
+    }
+
     pub fn from(p: &Posn) -> BitBoard {
         BitBoard { bits: 1 << p.pos }
     }

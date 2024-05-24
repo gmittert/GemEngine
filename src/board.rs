@@ -747,18 +747,19 @@ impl Board {
         };
 
         for i in kings {
-            for mpos in [
+            for pos in [
                 i.no(),
-                i.no().and_then(|x| x.ea()),
+                i.ne(),
                 i.ea(),
-                i.so().and_then(|x| x.ea()),
+                i.se(),
                 i.so(),
-                i.so().and_then(|x| x.we()),
+                i.sw(),
                 i.we(),
-                i.no().and_then(|x| x.we()),
+                i.nw(),
             ] {
-                if let Some(pos) = mpos {
-                    if !allied_pieces.contains(pos) {
+                pos.into_iter()
+                    .filter(|pos| !allied_pieces.contains(*pos))
+                    .for_each(|pos| {
                         out.push(Move {
                             from: i,
                             to: pos,
@@ -767,83 +768,35 @@ impl Board {
                             capture: None,
                             is_check: false,
                             is_mate: false,
-                        });
-                    }
-                }
+                        })
+                    });
             }
         }
     }
 
     pub fn knight_attacks(&self, color: Color) -> BitBoard {
-        fn no_no_ea(b: u64) -> u64 {
-            (b << 17) & NOT_A_FILE
-        }
-        fn no_ea_ea(b: u64) -> u64 {
-            (b << 10) & NOT_A_B_FILE
-        }
-        fn so_ea_ea(b: u64) -> u64 {
-            (b >> 6) & NOT_A_B_FILE
-        }
-        fn so_so_ea(b: u64) -> u64 {
-            (b >> 15) & NOT_A_FILE
-        }
-        fn no_no_we(b: u64) -> u64 {
-            (b << 15) & NOT_H_FILE
-        }
-        fn no_we_we(b: u64) -> u64 {
-            (b << 6) & NOT_G_H_FILE
-        }
-        fn so_we_we(b: u64) -> u64 {
-            (b >> 10) & NOT_G_H_FILE
-        }
-        fn so_so_we(b: u64) -> u64 {
-            (b >> 17) & NOT_H_FILE
-        }
         let knights = match color {
             Color::White => self.white_pieces[Piece::Knight as usize],
             Color::Black => self.black_pieces[Piece::Knight as usize],
         };
 
-        let mut out_bits: u64 = 0;
-
-        for i in knights {
-            out_bits |= no_no_ea(1 << i.pos)
-                | no_ea_ea(1 << i.pos)
-                | so_ea_ea(1 << i.pos)
-                | so_so_ea(1 << i.pos)
-                | so_so_we(1 << i.pos)
-                | so_we_we(1 << i.pos)
-                | no_we_we(1 << i.pos)
-                | no_no_we(1 << i.pos);
-        }
-        BitBoard { bits: out_bits }
+        knights.into_iter().fold(BitBoard::empty(), |acc, knight| {
+            acc | [
+                knight.nne(),
+                knight.see(),
+                knight.sse(),
+                knight.ssw(),
+                knight.sww(),
+                knight.nww(),
+                knight.nnw(),
+            ]
+            .into_iter()
+            .filter_map(|p| p)
+            .fold(BitBoard::empty(), |acc, p| acc | p)
+        })
     }
 
     pub fn knight_moves(&self, color: Color, out: &mut Vec<Move>) {
-        fn no_no_ea(b: u64) -> u64 {
-            (b << 17) & NOT_A_FILE
-        }
-        fn no_ea_ea(b: u64) -> u64 {
-            (b << 10) & NOT_A_B_FILE
-        }
-        fn so_ea_ea(b: u64) -> u64 {
-            (b >> 6) & NOT_A_B_FILE
-        }
-        fn so_so_ea(b: u64) -> u64 {
-            (b >> 15) & NOT_A_FILE
-        }
-        fn no_no_we(b: u64) -> u64 {
-            (b << 15) & NOT_H_FILE
-        }
-        fn no_we_we(b: u64) -> u64 {
-            (b << 6) & NOT_G_H_FILE
-        }
-        fn so_we_we(b: u64) -> u64 {
-            (b >> 10) & NOT_G_H_FILE
-        }
-        fn so_so_we(b: u64) -> u64 {
-            (b >> 17) & NOT_H_FILE
-        }
         let knights = match color {
             Color::White => self.white_pieces[Piece::Knight as usize],
             Color::Black => self.black_pieces[Piece::Knight as usize],
@@ -851,35 +804,34 @@ impl Board {
         let allied_pieces = match color {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
-        }
-        .bits;
+        };
 
-        for i in knights {
-            for pos in [
-                no_no_ea(1 << i.pos),
-                no_ea_ea(1 << i.pos),
-                so_ea_ea(1 << i.pos),
-                so_so_ea(1 << i.pos),
-                so_so_we(1 << i.pos),
-                so_we_we(1 << i.pos),
-                no_we_we(1 << i.pos),
-                no_no_we(1 << i.pos),
-            ] {
-                if pos != 0 && (pos & allied_pieces == 0) {
-                    out.push(Move {
-                        from: i,
-                        to: Posn {
-                            pos: pos.trailing_zeros() as u8,
-                        },
-                        turn: color,
-                        piece: Piece::Knight,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                    });
-                }
-            }
-        }
+        knights.into_iter().for_each(|knight| {
+            [
+                knight.nne(),
+                knight.nee(),
+                knight.see(),
+                knight.sse(),
+                knight.ssw(),
+                knight.sww(),
+                knight.nww(),
+                knight.nnw(),
+            ]
+            .into_iter()
+            .filter_map(|p| p)
+            .filter(|p| !allied_pieces.contains(*p))
+            .for_each(|p| {
+                out.push(Move {
+                    from: knight,
+                    to: p,
+                    turn: color,
+                    piece: Piece::Knight,
+                    capture: None,
+                    is_check: false,
+                    is_mate: false,
+                })
+            })
+        });
     }
 
     pub fn pawn_moves(&self, color: Color, out: &mut Vec<Move>) {
@@ -915,68 +867,51 @@ impl Board {
                         is_check: false,
                         is_mate: false,
                     });
-                }
-                let can_double_push = match color {
-                    Color::White => i.rank() == Rank::Two,
-                    Color::Black => i.rank() == Rank::Seven,
-                };
-                if can_double_push {
-                    let mdouble_push_pos = match color {
-                        Color::White => i.no().and_then(|x| x.no()),
-                        Color::Black => i.so().and_then(|x| x.so()),
+                    let can_double_push = match color {
+                        Color::White => i.rank() == Rank::Two,
+                        Color::Black => i.rank() == Rank::Seven,
                     };
-                    if let Some(double_push_pos) = mdouble_push_pos {
-                        if !allied_pieces.contains(push_pos)
-                            && !allied_pieces.contains(double_push_pos)
-                            && !opponent_pieces.contains(push_pos)
-                            && !opponent_pieces.contains(double_push_pos)
-                        {
-                            out.push(Move {
-                                from: i,
-                                to: double_push_pos,
-                                turn: color,
-                                piece: Piece::Pawn,
-                                capture: None,
-                                is_check: false,
-                                is_mate: false,
-                            });
+                    if can_double_push {
+                        let mdouble_push_pos = match color {
+                            Color::White => i.no().and_then(|x| x.no()),
+                            Color::Black => i.so().and_then(|x| x.so()),
+                        };
+                        if let Some(double_push_pos) = mdouble_push_pos {
+                            if !allied_pieces.contains(double_push_pos)
+                                && !opponent_pieces.contains(double_push_pos)
+                            {
+                                out.push(Move {
+                                    from: i,
+                                    to: double_push_pos,
+                                    turn: color,
+                                    piece: Piece::Pawn,
+                                    capture: None,
+                                    is_check: false,
+                                    is_mate: false,
+                                });
+                            }
                         }
                     }
                 }
             }
-            let capture_west_pos = match color {
-                Color::White => i.no().and_then(|x|x.we()),
-                Color::Black => i.so().and_then(|x|x.we()),
-            };
-            let capture_east_pos = match color {
-                Color::White => i.no().and_then(|x|x.ea()),
-                Color::Black => i.so().and_then(|x|x.ea()),
-            };
-            if capture_west_pos.is_some() && opponent_pieces.contains(capture_west_pos.unwrap()) {
-                out.push(Move {
-                    from: i,
-                    to: capture_west_pos.unwrap(),
-                    turn: color,
-                    piece: Piece::Pawn,
-                    capture: self.query_pos(
-                        &capture_west_pos.unwrap()
-                    ),
-                    is_check: false,
-                    is_mate: false,
-                });
-            }
-            if capture_east_pos.is_some() && opponent_pieces.contains(capture_east_pos.unwrap()) {
-                out.push(Move {
-                    from: i,
-                    to: capture_east_pos.unwrap(),
-                    turn: color,
-                    piece: Piece::Pawn,
-                    capture: self.query_pos(
-                        &capture_east_pos.unwrap()
-                    ),
-                    is_check: false,
-                    is_mate: false,
-                });
+
+            for take in [
+                mpush_pos.and_then(|x| x.we()),
+                mpush_pos.and_then(|x| x.ea()),
+            ] {
+                take.into_iter()
+                    .filter(|pos| opponent_pieces.contains(*pos))
+                    .for_each(|pos| {
+                        out.push(Move {
+                            from: i,
+                            to: pos,
+                            turn: color,
+                            piece: Piece::Pawn,
+                            capture: self.query_pos(&pos),
+                            is_check: false,
+                            is_mate: false,
+                        })
+                    });
             }
         }
     }
