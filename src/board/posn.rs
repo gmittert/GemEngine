@@ -97,61 +97,61 @@ impl Posn {
         }
     }
     pub fn so(&self) -> Option<Posn> {
-        if self.rank() == Rank::One{
+        if self.rank() == Rank::One {
             None
         } else {
             Some(Posn { pos: self.pos - 8 })
         }
     }
     pub fn ea(&self) -> Option<Posn> {
-        if self.file() == File::H{
+        if self.file() == File::H {
             None
         } else {
             Some(Posn { pos: self.pos - 1 })
         }
     }
     pub fn we(&self) -> Option<Posn> {
-        if self.file() == File::A{
+        if self.file() == File::A {
             None
         } else {
             Some(Posn { pos: self.pos + 1 })
         }
     }
     pub fn nw(&self) -> Option<Posn> {
-        self.no().and_then(|p|p.we())
+        self.no().and_then(|p| p.we())
     }
     pub fn ne(&self) -> Option<Posn> {
-        self.no().and_then(|p|p.ea())
+        self.no().and_then(|p| p.ea())
     }
     pub fn sw(&self) -> Option<Posn> {
-        self.so().and_then(|p|p.we())
+        self.so().and_then(|p| p.we())
     }
     pub fn se(&self) -> Option<Posn> {
-        self.so().and_then(|p|p.ea())
+        self.so().and_then(|p| p.ea())
     }
     pub fn nnw(&self) -> Option<Posn> {
-        self.no().and_then(|p|p.no()).and_then(|p|p.we())
+        self.no().and_then(|p| p.no()).and_then(|p| p.we())
     }
     pub fn nne(&self) -> Option<Posn> {
-        self.no().and_then(|p|p.no()).and_then(|p|p.ea())
+        self.no().and_then(|p| p.no()).and_then(|p| p.ea())
     }
     pub fn nww(&self) -> Option<Posn> {
-        self.no().and_then(|p|p.we()).and_then(|p|p.we())
+        self.no().and_then(|p| p.we()).and_then(|p| p.we())
     }
     pub fn nee(&self) -> Option<Posn> {
-        self.no().and_then(|p|p.ea()).and_then(|p|p.ea())
+        self.no().and_then(|p| p.ea()).and_then(|p| p.ea())
     }
     pub fn ssw(&self) -> Option<Posn> {
-        self.so().and_then(|p|p.so()).and_then(|p|p.we())
+        self.so().and_then(|p| p.so()).and_then(|p| p.we())
     }
     pub fn sse(&self) -> Option<Posn> {
-        self.so().and_then(|p|p.so()).and_then(|p|p.ea())
+        self.so().and_then(|p| p.so()).and_then(|p| p.ea())
     }
     pub fn sww(&self) -> Option<Posn> {
-        self.so().and_then(|p|p.we()).and_then(|p|p.we())
+        self.so().and_then(|p| p.we()).and_then(|p| p.we())
     }
     pub fn see(&self) -> Option<Posn> {
-        self.so().and_then(|p|p.ea()).and_then(|p|p.ea())
+        self.so().and_then(|p| p.ea()).and_then(|p| p.ea())
     }
 }
 

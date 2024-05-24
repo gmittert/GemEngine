@@ -52,7 +52,7 @@ impl Board {
     }
 
     pub fn current_board(&self) -> BitBoard {
-        let mut b = BitBoard { bits: 0 };
+        let mut b = BitBoard::empty();
         for i in 0..6 {
             b |= self.black_pieces[i];
             b |= self.white_pieces[i];
@@ -60,7 +60,7 @@ impl Board {
         b
     }
 
-    pub fn query_pos(&self, p: &Posn) -> Option<Piece> {
+    pub fn query_pos(&self, p: Posn) -> Option<Piece> {
         let pieces: [Piece; 6] = [
             Piece::Pawn,
             Piece::Rook,
@@ -70,7 +70,7 @@ impl Board {
             Piece::King,
         ];
         for i in pieces {
-            if (self.black_pieces[i as usize] | self.white_pieces[i as usize]) & BitBoard::from(&p)
+            if (self.black_pieces[i as usize] | self.white_pieces[i as usize]) & BitBoard::from(p)
                 != BitBoard::empty()
             {
                 return Some(i);
@@ -102,7 +102,7 @@ impl Board {
     }
 
     pub fn white_pieces(&self) -> BitBoard {
-        let mut b = BitBoard { bits: 0 };
+        let mut b = BitBoard::empty();
         for i in 0..6 {
             b |= self.white_pieces[i];
         }
@@ -110,7 +110,7 @@ impl Board {
     }
 
     pub fn black_pieces(&self) -> BitBoard {
-        let mut b = BitBoard { bits: 0 };
+        let mut b = BitBoard::empty();
         for i in 0..6 {
             b |= self.black_pieces[i];
         }
@@ -153,7 +153,7 @@ impl Board {
                         to: pos,
                         turn: color,
                         piece: Piece::Queen,
-                        capture: self.query_pos(&pos),
+                        capture: self.query_pos(pos),
                         is_check: false,
                         is_mate: false,
                     });
@@ -198,7 +198,7 @@ impl Board {
                         to: pos,
                         turn: color,
                         piece: Piece::Rook,
-                        capture: self.query_pos(&pos),
+                        capture: self.query_pos(pos),
                         is_check: false,
                         is_mate: false,
                     });
@@ -243,7 +243,7 @@ impl Board {
                         to: pos,
                         turn: color,
                         piece: Piece::Bishop,
-                        capture: self.query_pos(&pos),
+                        capture: self.query_pos(pos),
                         is_check: false,
                         is_mate: false,
                     });
@@ -428,7 +428,7 @@ impl Board {
                             to: pos,
                             turn: color,
                             piece: Piece::Pawn,
-                            capture: self.query_pos(&pos),
+                            capture: self.query_pos(pos),
                             is_check: false,
                             is_mate: false,
                         })
@@ -442,30 +442,30 @@ impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut chars: [char; 64] = ['.'; 64];
 
-        for i in 0..64 {
-            if (self.black_pieces[Piece::King as usize].bits & (1 << i)) != 0 {
+        for i in 0..64 as usize {
+            if self.black_pieces[Piece::King as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♔'
-            } else if (self.black_pieces[Piece::Queen as usize].bits & (1 << i)) != 0 {
+            } else if self.black_pieces[Piece::Queen as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♕'
-            } else if (self.black_pieces[Piece::Knight as usize].bits & (1 << i)) != 0 {
+            } else if self.black_pieces[Piece::Knight as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♘'
-            } else if (self.black_pieces[Piece::Pawn as usize].bits & (1 << i)) != 0 {
+            } else if self.black_pieces[Piece::Pawn as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♙'
-            } else if (self.black_pieces[Piece::Bishop as usize].bits & (1 << i)) != 0 {
+            } else if self.black_pieces[Piece::Bishop as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♗'
-            } else if (self.black_pieces[Piece::Rook as usize].bits & (1 << i)) != 0 {
+            } else if self.black_pieces[Piece::Rook as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♖'
-            } else if (self.white_pieces[Piece::King as usize].bits & (1 << i)) != 0 {
+            } else if self.white_pieces[Piece::King as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♚'
-            } else if (self.white_pieces[Piece::Queen as usize].bits & (1 << i)) != 0 {
+            } else if self.white_pieces[Piece::Queen as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♛'
-            } else if (self.white_pieces[Piece::Knight as usize].bits & (1 << i)) != 0 {
+            } else if self.white_pieces[Piece::Knight as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♞'
-            } else if (self.white_pieces[Piece::Pawn as usize].bits & (1 << i)) != 0 {
+            } else if self.white_pieces[Piece::Pawn as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♟'
-            } else if (self.white_pieces[Piece::Bishop as usize].bits & (1 << i)) != 0 {
+            } else if self.white_pieces[Piece::Bishop as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♝'
-            } else if (self.white_pieces[Piece::Rook as usize].bits & (1 << i)) != 0 {
+            } else if self.white_pieces[Piece::Rook as usize].contains(Posn { pos: i as u8 }) {
                 chars[i] = '♜'
             }
         }
@@ -482,21 +482,21 @@ impl fmt::Display for Board {
 pub fn empty_board(turn: Color) -> Board {
     Board {
         black_pieces: [
-            BitBoard { bits: 0 },
-            BitBoard { bits: 0 },
-            BitBoard { bits: 0 },
-            BitBoard { bits: 0 },
-            BitBoard { bits: 0 },
-            BitBoard { bits: 0 },
+            BitBoard::empty(),
+            BitBoard::empty(),
+            BitBoard::empty(),
+            BitBoard::empty(),
+            BitBoard::empty(),
+            BitBoard::empty(),
         ],
 
         white_pieces: [
-            BitBoard { bits: 0 },
-            BitBoard { bits: 0 },
-            BitBoard { bits: 0 },
-            BitBoard { bits: 0 },
-            BitBoard { bits: 0 },
-            BitBoard { bits: 0 },
+            BitBoard::empty(),
+            BitBoard::empty(),
+            BitBoard::empty(),
+            BitBoard::empty(),
+            BitBoard::empty(),
+            BitBoard::empty(),
         ],
 
         to_play: turn,
@@ -511,8 +511,8 @@ pub fn starting_board() -> Board {
             a8() | h8(),
             b8() | g8(),
             c8() | f8(),
-            BitBoard::from(&d8()),
-            BitBoard::from(&e8()),
+            BitBoard::from(d8()),
+            BitBoard::from(e8()),
         ],
 
         white_pieces: [
@@ -520,8 +520,8 @@ pub fn starting_board() -> Board {
             a1() | h1(),
             b1() | g1(),
             c1() | f1(),
-            BitBoard::from(&d1()),
-            BitBoard::from(&e1()),
+            BitBoard::from(d1()),
+            BitBoard::from(e1()),
         ],
 
         to_play: Color::White,
@@ -561,7 +561,7 @@ mod tests {
     fn rook_moves_empty() {
         for i in 0..64 {
             let mut board = empty_board(Color::White);
-            board.white_pieces[Piece::Rook as usize] = BitBoard { bits: 1 << i };
+            board.white_pieces[Piece::Rook as usize] = BitBoard::from(Posn{pos: i });
             let mut moves = vec![];
             board.rook_moves(Color::White, &mut moves);
             assert_eq!(moves.len(), 14);
@@ -571,7 +571,7 @@ mod tests {
     #[test]
     fn rook_moves_blocked_ally() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Rook as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Rook as usize] = BitBoard::from(d5());
         board.white_pieces[Piece::Pawn as usize] = d4() | d6() | c5() | e5();
         let mut moves = vec![];
         board.rook_moves(Color::White, &mut moves);
@@ -581,7 +581,7 @@ mod tests {
     #[test]
     fn rook_moves_blocked_opponent() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Rook as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Rook as usize] = BitBoard::from(d5());
         board.black_pieces[Piece::Pawn as usize] = d4() | d6() | c5() | e5();
         let mut moves = vec![];
         board.rook_moves(Color::White, &mut moves);
@@ -591,7 +591,7 @@ mod tests {
     #[test]
     fn bishop_moves_empty() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(&a1());
+        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(a1());
         let mut moves = vec![];
         board.bishop_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 7);
@@ -600,7 +600,7 @@ mod tests {
     #[test]
     fn bishop_moves_blocked_ally() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(d5());
         board.white_pieces[Piece::Pawn as usize] = e6() | e4() | c6() | c4();
         let mut moves = vec![];
         board.bishop_moves(Color::White, &mut moves);
@@ -610,7 +610,7 @@ mod tests {
     #[test]
     fn bishop_moves_blocked_opponent() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(d5());
         board.black_pieces[Piece::Pawn as usize] = e6() | e4() | c6() | c4();
         let mut moves = vec![];
         board.bishop_moves(Color::White, &mut moves);
@@ -620,12 +620,12 @@ mod tests {
     #[test]
     fn queen_moves_empty() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Queen as usize] = BitBoard::from(&a1());
+        board.white_pieces[Piece::Queen as usize] = BitBoard::from(a1());
         let mut moves = vec![];
         board.queen_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 21);
 
-        board.white_pieces[Piece::Queen as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Queen as usize] = BitBoard::from(d5());
         moves.clear();
         board.queen_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 27);
@@ -634,7 +634,7 @@ mod tests {
     #[test]
     fn queen_moves_blocked_ally() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Queen as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Queen as usize] = BitBoard::from(d5());
         board.white_pieces[Piece::Pawn as usize] =
             e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
         let mut moves = vec![];
@@ -645,7 +645,7 @@ mod tests {
     #[test]
     fn queen_moves_blocked_opponent() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Queen as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Queen as usize] = BitBoard::from(d5());
         board.black_pieces[Piece::Pawn as usize] =
             e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
         let mut moves = vec![];
@@ -656,12 +656,12 @@ mod tests {
     #[test]
     fn king_moves_empty() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::King as usize] = BitBoard::from(&a1());
+        board.white_pieces[Piece::King as usize] = BitBoard::from(a1());
         let mut moves = vec![];
         board.king_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 3);
 
-        board.white_pieces[Piece::King as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::King as usize] = BitBoard::from(d5());
         moves.clear();
         board.king_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 8);
@@ -670,7 +670,7 @@ mod tests {
     #[test]
     fn king_moves_blocked_ally() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::King as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::King as usize] = BitBoard::from(d5());
         board.white_pieces[Piece::Knight as usize] =
             e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
         let mut moves = vec![];
@@ -681,7 +681,7 @@ mod tests {
     #[test]
     fn king_moves_blocked_opponent() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::King as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::King as usize] = BitBoard::from(d5());
         board.black_pieces[Piece::Knight as usize] =
             e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
         let mut moves = vec![];
@@ -692,17 +692,17 @@ mod tests {
     #[test]
     fn knight_moves_empty() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a1());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(a1());
         let mut moves = vec![];
         board.knight_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 2);
 
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(d5());
         moves.clear();
         board.knight_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 8);
 
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a5());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(a5());
         moves.clear();
         board.knight_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 4);
@@ -711,7 +711,7 @@ mod tests {
     #[test]
     fn knight_moves_blocked_ally() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(d5());
         board.white_pieces[Piece::Pawn as usize] =
             e7() | e3() | c7() | c3() | f4() | f6() | b4() | b6();
         let mut moves = vec![];
@@ -722,7 +722,7 @@ mod tests {
     #[test]
     fn knight_moves_blocked_opponent() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&d5());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(d5());
         board.black_pieces[Piece::Pawn as usize] =
             e7() | e3() | c7() | c3() | f4() | f6() | b4() | b6();
         let mut moves = vec![];
@@ -735,24 +735,24 @@ mod tests {
         let mut board = empty_board(Color::White);
         let mut moves = vec![];
 
-        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a3());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(a3());
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 1);
 
         moves.clear();
-        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a2());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(a2());
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 2);
 
         board.to_play = Color::Black;
 
         moves.clear();
-        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a5());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(a5());
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 1);
 
         moves.clear();
-        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a7());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(a7());
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 2);
     }
@@ -762,40 +762,40 @@ mod tests {
         let mut board = empty_board(Color::White);
         let mut moves = vec![];
 
-        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a3());
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(a3());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(a4());
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 0);
 
         moves.clear();
-        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a2());
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a3());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(a2());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(a3());
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 0);
 
         moves.clear();
-        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a2());
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(a2());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(a4());
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 1);
 
         board.to_play = Color::Black;
 
         moves.clear();
-        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a5());
-        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(a5());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(a4());
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 0);
 
         moves.clear();
-        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a7());
-        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a6());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(a7());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(a6());
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 0);
 
         moves.clear();
-        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a7());
-        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a5());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(a7());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(a5());
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 1);
     }
@@ -805,40 +805,40 @@ mod tests {
         let mut board = empty_board(Color::White);
         let mut moves = vec![];
 
-        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a3());
-        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(a3());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(a4());
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 0);
 
         moves.clear();
-        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a2());
-        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a3());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(a2());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(a3());
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 0);
 
         moves.clear();
-        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&a2());
-        board.black_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(a2());
+        board.black_pieces[Piece::Knight as usize] = BitBoard::from(a4());
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 1);
 
         board.to_play = Color::Black;
 
         moves.clear();
-        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a5());
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a4());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(a5());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(a4());
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 0);
 
         moves.clear();
-        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a7());
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a6());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(a7());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(a6());
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 0);
 
         moves.clear();
-        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&a7());
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(&a5());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(a7());
+        board.white_pieces[Piece::Knight as usize] = BitBoard::from(a5());
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 1);
     }
@@ -848,7 +848,7 @@ mod tests {
         let mut board = empty_board(Color::White);
         let mut moves = vec![];
 
-        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(&d3());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(d3());
         board.black_pieces[Piece::Pawn as usize] = c4() | e4() | d4();
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 2);
@@ -856,7 +856,7 @@ mod tests {
         board.to_play = Color::Black;
 
         moves.clear();
-        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(&d5());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(d5());
         board.white_pieces[Piece::Pawn as usize] = c4() | e4() | d4();
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 2);

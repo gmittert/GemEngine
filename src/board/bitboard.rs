@@ -1,11 +1,11 @@
 use std::ops;
 
-use crate::board::posn::*;
 use crate::board::moves::*;
+use crate::board::posn::*;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct BitBoard {
-    pub bits: u64,
+    bits: u64,
 }
 
 impl BitBoard {
@@ -13,20 +13,20 @@ impl BitBoard {
         BitBoard { bits: 0 }
     }
 
-    pub fn from(p: &Posn) -> BitBoard {
+    pub fn from(p: Posn) -> BitBoard {
         BitBoard { bits: 1 << p.pos }
     }
 
     pub fn make_move(&mut self, m: &Move) {
-        let from = BitBoard::from(&m.from);
-        let to = BitBoard::from(&m.to);
+        let from = BitBoard::from(m.from);
+        let to = BitBoard::from(m.to);
 
         self.bits = self.bits & !from.bits | to.bits;
     }
 
     pub fn undo_move(&mut self, m: &Move) {
-        let from = BitBoard::from(&m.from);
-        let to = BitBoard::from(&m.to);
+        let from = BitBoard::from(m.from);
+        let to = BitBoard::from(m.to);
 
         self.bits = (self.bits & !to.bits) | from.bits
     }
@@ -45,7 +45,9 @@ impl Iterator for BitBoard {
         }
         let first_bit = self.bits.ilog2();
         self.bits &= !(1 << first_bit);
-        Some(Posn { pos: first_bit as u8})
+        Some(Posn {
+            pos: first_bit as u8,
+        })
     }
 }
 
@@ -53,7 +55,7 @@ impl ops::BitOr<Posn> for BitBoard {
     type Output = Self;
     fn bitor(self, rhs: Posn) -> Self::Output {
         BitBoard {
-            bits: self.bits | BitBoard::from(&rhs).bits,
+            bits: self.bits | BitBoard::from(rhs).bits,
         }
     }
 }
@@ -78,7 +80,7 @@ impl ops::BitAnd for BitBoard {
 
 impl ops::BitOrAssign<Posn> for BitBoard {
     fn bitor_assign(&mut self, rhs: Posn) {
-        self.bits |= BitBoard::from(&rhs).bits;
+        self.bits |= BitBoard::from(rhs).bits;
     }
 }
 
@@ -91,14 +93,14 @@ impl ops::BitOrAssign for BitBoard {
 impl ops::BitOr for Posn {
     type Output = BitBoard;
     fn bitor(self, rhs: Self) -> Self::Output {
-        BitBoard::from(&self) | BitBoard::from(&rhs)
+        BitBoard::from(self) | BitBoard::from(rhs)
     }
 }
 
 impl ops::BitOr<BitBoard> for Posn {
     type Output = BitBoard;
     fn bitor(self, rhs: BitBoard) -> Self::Output {
-        BitBoard::from(&self) | rhs
+        BitBoard::from(self) | rhs
     }
 }
 
