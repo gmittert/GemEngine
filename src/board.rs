@@ -5,16 +5,6 @@ pub use crate::board::bitboard::*;
 pub use crate::board::moves::*;
 pub use crate::board::posn::*;
 use std::fmt;
-use std::ops;
-
-const EIGHTH_RANK: u64 = 0x0100_0000_0000_0000;
-const SECOND_RANK: u64 = 0x0000_0000_0000_0100;
-const H_FILE: u64 = 0x0101_0101_0101_0101;
-const A_FILE: u64 = 0x8080_8080_8080_8080;
-const NOT_A_FILE: u64 = 0xFEFE_FEFE_FEFE_FEFE;
-const NOT_A_B_FILE: u64 = 0xFCFC_FCFC_FCFC_FCFC;
-const NOT_H_FILE: u64 = 0x7F7F_7F7F_7F7F_7F7F;
-const NOT_G_H_FILE: u64 = 0x3F3F_3F3F_3F3F_3F3F;
 
 #[derive(Debug, PartialEq)]
 pub struct Board {
@@ -23,22 +13,44 @@ pub struct Board {
 
     to_play: Color,
     turn_count: u16,
+    move_list: Vec<Move>,
 }
 
 impl Board {
     pub fn make_move(&mut self, m: &Move) {
+        self.move_list.push(m.clone());
         match m.turn {
-            Color::Black => self.black_pieces[m.piece as usize].make_move(m),
-            Color::White => self.white_pieces[m.piece as usize].make_move(m),
-        }
+            Color::Black => {
+                self.black_pieces[m.piece as usize] =
+                    self.black_pieces[m.piece as usize].make_move(m)
+            }
+            Color::White => {
+                self.white_pieces[m.piece as usize] =
+                    self.white_pieces[m.piece as usize].make_move(m)
+            }
+        };
+        match m.capture {
+            Some(p) => match m.turn {
+                Color::Black => self.white_pieces[p as usize] &= !BitBoard::from(m.to),
+                Color::White => self.black_pieces[p as usize] &= !BitBoard::from(m.to),
+            },
+            None => (),
+        };
         self.to_play = !self.to_play;
         self.turn_count += 1;
     }
 
     pub fn undo_move(&mut self, m: &Move) {
+        self.move_list.pop();
         match m.turn {
-            Color::Black => self.black_pieces[m.piece as usize].undo_move(m),
-            Color::White => self.white_pieces[m.piece as usize].undo_move(m),
+            Color::Black => {
+                self.black_pieces[m.piece as usize] =
+                    self.black_pieces[m.piece as usize].undo_move(m)
+            }
+            Color::White => {
+                self.white_pieces[m.piece as usize] =
+                    self.white_pieces[m.piece as usize].undo_move(m)
+            }
         };
         match m.capture {
             Some(p) => match m.turn {
@@ -49,15 +61,6 @@ impl Board {
         };
         self.to_play = !self.to_play;
         self.turn_count -= 1;
-    }
-
-    pub fn current_board(&self) -> BitBoard {
-        let mut b = BitBoard::empty();
-        for i in 0..6 {
-            b |= self.black_pieces[i];
-            b |= self.white_pieces[i];
-        }
-        b
     }
 
     pub fn query_pos(&self, p: Posn) -> Option<Piece> {
@@ -80,25 +83,19 @@ impl Board {
     }
 
     pub fn in_check(&self, color: Color) -> bool {
-        let other_pieces = match color {
-            Color::White => self.black_pieces,
-            Color::Black => self.white_pieces,
-        }[Piece::King as usize];
         let king_pos = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
         }[Piece::King as usize];
 
-        let pieces: [Piece; 6] = [
-            Piece::Pawn,
-            Piece::Rook,
-            Piece::Knight,
-            Piece::Bishop,
-            Piece::Queen,
-            Piece::King,
-        ];
-        todo!();
-        true
+        let attacked = self.queen_attacks(!color)
+            | self.rook_attacks(!color)
+            | self.bishop_attacks(!color)
+            | self.pawn_attacks(!color)
+            | self.knight_attacks(!color)
+            | self.king_attacks(!color);
+
+        king_pos & attacked != BitBoard::empty()
     }
 
     pub fn white_pieces(&self) -> BitBoard {
@@ -115,6 +112,49 @@ impl Board {
             b |= self.black_pieces[i];
         }
         b
+    }
+
+    pub fn queen_attacks(&self, color: Color) -> BitBoard {
+        let queens = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Queen as usize];
+
+        let allied_pieces = match color {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        let opponent_pieces = match color {
+            Color::Black => self.white_pieces(),
+            Color::White => self.black_pieces(),
+        };
+        queens.fold(BitBoard::empty(), |acc, i| {
+            let mut ret = acc;
+            for shift in [
+                |p: Posn| p.no(),
+                |p: Posn| p.so(),
+                |p: Posn| p.ea(),
+                |p: Posn| p.we(),
+                |p: Posn| p.ne(),
+                |p: Posn| p.se(),
+                |p: Posn| p.nw(),
+                |p: Posn| p.sw(),
+            ] {
+                let mut slide = shift(i);
+                while let Some(pos) = slide {
+                    if allied_pieces.contains(pos) {
+                        break;
+                    }
+                    ret |= pos;
+                    if opponent_pieces.contains(pos) {
+                        break;
+                    }
+                    slide = shift(pos);
+                }
+            }
+            ret
+        })
     }
 
     pub fn queen_moves(&self, color: Color, out: &mut Vec<Move>) {
@@ -166,6 +206,45 @@ impl Board {
         }
     }
 
+    pub fn rook_attacks(&self, color: Color) -> BitBoard {
+        let rooks = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Rook as usize];
+
+        let allied_pieces = match color {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        let opponent_pieces = match color {
+            Color::Black => self.white_pieces(),
+            Color::White => self.black_pieces(),
+        };
+        rooks.fold(BitBoard::empty(), |acc, i| {
+            let mut ret = acc;
+            for shift in [
+                |p: Posn| p.no(),
+                |p: Posn| p.so(),
+                |p: Posn| p.ea(),
+                |p: Posn| p.we(),
+            ] {
+                let mut slide = shift(i);
+                while let Some(pos) = slide {
+                    if allied_pieces.contains(pos) {
+                        break;
+                    }
+                    ret |= pos;
+                    if opponent_pieces.contains(pos) {
+                        break;
+                    }
+                    slide = shift(pos);
+                }
+            }
+            ret
+        })
+    }
+
     pub fn rook_moves(&self, color: Color, out: &mut Vec<Move>) {
         let rooks = match color {
             Color::White => self.white_pieces,
@@ -209,6 +288,45 @@ impl Board {
                 }
             }
         }
+    }
+
+    pub fn bishop_attacks(&self, color: Color) -> BitBoard {
+        let bishops = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Bishop as usize];
+
+        let allied_pieces = match color {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        let opponent_pieces = match color {
+            Color::Black => self.white_pieces(),
+            Color::White => self.black_pieces(),
+        };
+        bishops.fold(BitBoard::empty(), |acc, i| {
+            let mut ret = acc;
+            for shift in [
+                |p: Posn| p.nw(),
+                |p: Posn| p.ne(),
+                |p: Posn| p.sw(),
+                |p: Posn| p.se(),
+            ] {
+                let mut slide = shift(i);
+                while let Some(pos) = slide {
+                    if allied_pieces.contains(pos) {
+                        break;
+                    }
+                    ret |= pos;
+                    if opponent_pieces.contains(pos) {
+                        break;
+                    }
+                    slide = shift(pos);
+                }
+            }
+            ret
+        })
     }
 
     pub fn bishop_moves(&self, color: Color, out: &mut Vec<Move>) {
@@ -256,6 +374,29 @@ impl Board {
         }
     }
 
+    pub fn king_attacks(&self, color: Color) -> BitBoard {
+        let kings = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::King as usize];
+
+        kings.fold(BitBoard::empty(), |acc, p| {
+            acc | [
+                p.no(),
+                p.ne(),
+                p.ea(),
+                p.se(),
+                p.so(),
+                p.sw(),
+                p.we(),
+                p.nw(),
+            ]
+            .into_iter()
+            .filter_map(|p| p)
+            .fold(BitBoard::empty(), |acc, p| acc | p)
+        })
+    }
+
     pub fn king_moves(&self, color: Color, out: &mut Vec<Move>) {
         let kings = match color {
             Color::White => self.white_pieces,
@@ -286,7 +427,7 @@ impl Board {
                             to: pos,
                             turn: color,
                             piece: Piece::King,
-                            capture: None,
+                            capture: self.query_pos(pos),
                             is_check: false,
                             is_mate: false,
                         })
@@ -303,13 +444,14 @@ impl Board {
 
         knights.into_iter().fold(BitBoard::empty(), |acc, knight| {
             acc | [
-                knight.nne(),
                 knight.see(),
                 knight.sse(),
                 knight.ssw(),
                 knight.sww(),
                 knight.nww(),
                 knight.nnw(),
+                knight.nne(),
+                knight.nee(),
             ]
             .into_iter()
             .filter_map(|p| p)
@@ -329,14 +471,14 @@ impl Board {
 
         knights.into_iter().for_each(|knight| {
             [
-                knight.nne(),
-                knight.nee(),
                 knight.see(),
                 knight.sse(),
                 knight.ssw(),
                 knight.sww(),
                 knight.nww(),
                 knight.nnw(),
+                knight.nne(),
+                knight.nee(),
             ]
             .into_iter()
             .filter_map(|p| p)
@@ -347,12 +489,28 @@ impl Board {
                     to: p,
                     turn: color,
                     piece: Piece::Knight,
-                    capture: None,
+                    capture: self.query_pos(p),
                     is_check: false,
                     is_mate: false,
                 })
             })
         });
+    }
+
+    pub fn pawn_attacks(&self, color: Color) -> BitBoard {
+        (match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Pawn as usize])
+            .fold(BitBoard::empty(), |acc, p| {
+                acc | match color {
+                    Color::White => [p.ne(), p.nw()],
+                    Color::Black => [p.se(), p.sw()],
+                }
+                .into_iter()
+                .filter_map(|p| p)
+                .fold(BitBoard::empty(), |acc, p| acc | p)
+            })
     }
 
     pub fn pawn_moves(&self, color: Color, out: &mut Vec<Move>) {
@@ -501,6 +659,7 @@ pub fn empty_board(turn: Color) -> Board {
 
         to_play: turn,
         turn_count: 1,
+        move_list: vec![],
     }
 }
 
@@ -526,7 +685,75 @@ pub fn starting_board() -> Board {
 
         to_play: Color::White,
         turn_count: 1,
+        move_list: vec![],
     }
+}
+
+pub fn generate_pseudo_legal_moves(b: &Board) -> Vec<Move> {
+    let mut moves = vec![];
+
+    b.rook_moves(b.to_play, &mut moves);
+    b.bishop_moves(b.to_play, &mut moves);
+    b.queen_moves(b.to_play, &mut moves);
+    b.knight_moves(b.to_play, &mut moves);
+    b.king_moves(b.to_play, &mut moves);
+    b.pawn_moves(b.to_play, &mut moves);
+    moves
+}
+
+#[derive(Debug, PartialEq)]
+pub struct PerfResult {
+    nodes: usize,
+    captures: usize,
+    checks: usize,
+    checkmates: usize,
+}
+
+pub fn perft(b: &mut Board, depth: u8) -> PerfResult {
+    let mut result = PerfResult {
+        nodes: 0,
+        captures: 0,
+        checks: 0,
+        checkmates: 0,
+    };
+    if depth == 0 {
+        result.nodes = 1;
+
+        if b.in_check(b.to_play) {
+            result.checks += 1;
+            if perft(b, 1).nodes == 0 {
+                result.checkmates += 1;
+            }
+        }
+        if !b.move_list.is_empty() {
+            let last_move = b.move_list[b.move_list.len() - 1];
+            if last_move.capture.is_some() {
+                result.captures = 1
+            }
+        }
+        return result;
+    }
+
+    let moves = generate_pseudo_legal_moves(b);
+
+    for m in &moves {
+        let preb = b.black_pieces();
+        let prew = b.white_pieces();
+        b.make_move(&m);
+        if !b.in_check(!b.to_play) {
+            let next_res = perft(b, depth - 1);
+            result.nodes += next_res.nodes;
+            result.captures += next_res.captures;
+            result.checks += next_res.checks;
+            result.checkmates += next_res.checkmates;
+        }
+        b.undo_move(&m);
+        let postb = b.black_pieces();
+        let postw = b.white_pieces();
+        assert_eq!(preb, postb);
+        assert_eq!(prew, postw);
+    }
+    result
 }
 
 #[cfg(test)]
@@ -561,7 +788,7 @@ mod tests {
     fn rook_moves_empty() {
         for i in 0..64 {
             let mut board = empty_board(Color::White);
-            board.white_pieces[Piece::Rook as usize] = BitBoard::from(Posn{pos: i });
+            board.white_pieces[Piece::Rook as usize] = BitBoard::from(Posn { pos: i });
             let mut moves = vec![];
             board.rook_moves(Color::White, &mut moves);
             assert_eq!(moves.len(), 14);
@@ -860,5 +1087,77 @@ mod tests {
         board.white_pieces[Piece::Pawn as usize] = c4() | e4() | d4();
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 2);
+    }
+
+    #[test]
+    fn in_check_rook() {
+        let mut board = empty_board(Color::White);
+        board.white_pieces[Piece::King as usize] = BitBoard::from(e1());
+        board.black_pieces[Piece::Rook as usize] = BitBoard::from(e2());
+        assert_eq!(board.in_check(Color::White), true);
+
+        board.white_pieces[Piece::King as usize] = BitBoard::from(e1());
+        board.black_pieces[Piece::Rook as usize] = BitBoard::from(g1());
+        assert_eq!(board.in_check(Color::White), true);
+    }
+
+    #[test]
+    fn in_check_bishop() {
+        let mut board = empty_board(Color::White);
+        board.black_pieces[Piece::King as usize] = BitBoard::from(e1());
+        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(f2());
+        assert_eq!(board.in_check(Color::Black), true);
+    }
+
+    #[test]
+    fn in_check_pawn() {
+        let mut board = empty_board(Color::White);
+        board.black_pieces[Piece::King as usize] = BitBoard::from(e4());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(f3());
+        assert_eq!(board.in_check(Color::Black), true);
+
+        board.black_pieces[Piece::King as usize] = BitBoard::from(e4());
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(e3());
+        assert_eq!(board.in_check(Color::Black), false);
+    }
+
+    #[test]
+    fn perft0() {
+        let mut b = starting_board();
+        assert_eq!(perft(&mut b, 0).nodes, 1);
+    }
+    #[test]
+    fn perft1() {
+        let mut b = starting_board();
+        assert_eq!(perft(&mut b, 1).nodes, 20);
+    }
+
+    #[test]
+    fn perft2() {
+        let mut b = starting_board();
+        assert_eq!(perft(&mut b, 2).nodes, 400);
+    }
+
+    #[test]
+    fn perft3() {
+        let mut b = starting_board();
+        let res = perft(&mut b, 3);
+        assert_eq!(res.nodes, 8902);
+        assert_eq!(res.captures, 34);
+        assert_eq!(res.checks, 12);
+    }
+
+    #[test]
+    fn perft4() {
+        let mut b = starting_board();
+        let res = perft(&mut b, 4);
+        println!("Checks: {}", res.checks);
+        println!("Capture: {}", res.captures);
+        println!("Nodes: {}", res.nodes);
+        println!("Checkmates: {}", res.checkmates);
+        assert_eq!(res.checks, 469);
+        assert_eq!(res.captures, 1576);
+        assert_eq!(res.nodes, 197281);
+        assert_eq!(res.checkmates, 8);
     }
 }

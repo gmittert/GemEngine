@@ -17,18 +17,18 @@ impl BitBoard {
         BitBoard { bits: 1 << p.pos }
     }
 
-    pub fn make_move(&mut self, m: &Move) {
+    pub fn make_move(&self, m: &Move) -> BitBoard {
         let from = BitBoard::from(m.from);
         let to = BitBoard::from(m.to);
 
-        self.bits = self.bits & !from.bits | to.bits;
+        (*self & !from) | to
     }
 
-    pub fn undo_move(&mut self, m: &Move) {
+    pub fn undo_move(&self, m: &Move) -> BitBoard {
         let from = BitBoard::from(m.from);
         let to = BitBoard::from(m.to);
 
-        self.bits = (self.bits & !to.bits) | from.bits
+        (*self & !to) | from
     }
 
     pub fn contains(&self, p: Posn) -> bool {
@@ -60,6 +60,13 @@ impl ops::BitOr<Posn> for BitBoard {
     }
 }
 
+impl ops::Not for BitBoard {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        BitBoard { bits: !self.bits }
+    }
+}
+
 impl ops::BitOr for BitBoard {
     type Output = Self;
     fn bitor(self, rhs: BitBoard) -> Self::Output {
@@ -87,6 +94,12 @@ impl ops::BitOrAssign<Posn> for BitBoard {
 impl ops::BitOrAssign for BitBoard {
     fn bitor_assign(&mut self, rhs: BitBoard) {
         self.bits |= rhs.bits;
+    }
+}
+
+impl ops::BitAndAssign for BitBoard {
+    fn bitand_assign(&mut self, rhs: BitBoard) {
+        self.bits &= rhs.bits;
     }
 }
 

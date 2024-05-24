@@ -5,30 +5,5 @@ fn main() {
     let mut b = board::starting_board();
     println!("{}", b);
 
-    let m1 = board::Move {
-        from: board::e2(),
-        to: board::e4(),
-        turn: board::Color::White,
-        piece: board::Piece::Pawn,
-        capture: None,
-        is_check: false,
-        is_mate: false,
-    };
-    println!("1.{}", m1);
-    b.make_move(&m1);
-    println!("{}", b);
-
-    let m2 = board::Move {
-        from: board::e7(),
-        to: board::e5(),
-        turn: board::Color::Black,
-        piece: board::Piece::Pawn,
-        capture: None,
-        is_check: false,
-        is_mate: false,
-    };
-
-    println!("..{}", m2);
-    b.make_move(&m2);
-    println!("{}", b);
+    println!("Perft3: {:?}", board::perft(&mut b, 3));
 }

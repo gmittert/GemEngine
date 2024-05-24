@@ -31,7 +31,7 @@ impl Not for Color {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Move {
     pub from: Posn,
     pub to: Posn,
@@ -91,71 +91,4 @@ impl fmt::Display for Move {
             is_check
         )
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::board::*;
-
-    pub fn generate_legal_moves(b: &Board) -> Vec<Move> {
-        let mut moves = vec![];
-
-        b.rook_moves(b.to_play, &mut moves);
-        b.bishop_moves(b.to_play, &mut moves);
-        b.queen_moves(b.to_play, &mut moves);
-        b.knight_moves(b.to_play, &mut moves);
-        b.king_moves(b.to_play, &mut moves);
-        b.pawn_moves(b.to_play, &mut moves);
-        moves
-    }
-
-    fn perft(b: &mut Board, depth: u8, should_print: bool) -> u64 {
-        let mut nodes = 0;
-        if depth == 0 {
-            return 1;
-        }
-
-        let moves = generate_legal_moves(b);
-
-        for m in &moves {
-            b.make_move(&m);
-            if should_print {
-                println!("{}, ", m);
-                println!("{}", b);
-            }
-            nodes += perft(b, depth - 1, should_print);
-            b.undo_move(&m);
-        }
-        nodes
-    }
-
-    #[test]
-    fn perft0() {
-        let mut b = starting_board();
-        assert_eq!(perft(&mut b, 0, false), 1);
-    }
-    #[test]
-    fn perft1() {
-        let mut b = starting_board();
-        assert_eq!(perft(&mut b, 1, false), 20);
-    }
-
-    #[test]
-    fn perft2() {
-        let mut b = starting_board();
-        assert_eq!(perft(&mut b, 2, false), 400);
-    }
-
-    #[test]
-    fn perft3() {
-        let mut b = starting_board();
-        assert_eq!(perft(&mut b, 3, false), 8902);
-    }
-    /*
-    #[test]
-    fn perft4() {
-        let mut b = starting_board();
-        assert_eq!(perft(&mut b, 4, true), 197281);
-    }
-    */
 }
