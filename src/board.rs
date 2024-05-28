@@ -614,7 +614,7 @@ impl Board {
             }
             // En Passant
             if ((color == Color::White && i.rank() == Rank::Five)
-                || (color == Color::Black && i.rank() == Rank::Three))
+                || (color == Color::Black && i.rank() == Rank::Four))
                 && !self.move_list.is_empty()
             {
                 let prev_move = self.move_list.last().unwrap();
@@ -1179,7 +1179,7 @@ mod tests {
     }
 
     #[test]
-    fn pawn_en_passants() {
+    fn pawn_en_passants_white() {
         let mut board = empty_board(Color::White);
         let mut moves = vec![];
 
@@ -1200,6 +1200,31 @@ mod tests {
         assert_eq!(moves.last().unwrap().is_en_passant, true);
         assert_eq!(moves.last().unwrap().from, d5());
         assert_eq!(moves.last().unwrap().to, e6());
+    }
+
+    #[test]
+    fn pawn_en_passants_black() {
+        let mut board = empty_board(Color::White);
+        let mut moves = vec![];
+        board.to_play = Color::Black;
+
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(e4());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(d4());
+        board.move_list.push(Move {
+            from: e2(),
+            to: e4(),
+            capture: None,
+            is_check: false,
+            is_mate: false,
+            is_en_passant: false,
+            piece: Piece::Pawn,
+            turn: Color::White,
+        });
+        board.pawn_moves(Color::Black, &mut moves);
+        assert_eq!(moves.len(), 2);
+        assert_eq!(moves.last().unwrap().is_en_passant, true);
+        assert_eq!(moves.last().unwrap().from, d4());
+        assert_eq!(moves.last().unwrap().to, e3());
     }
 
     #[test]
@@ -1276,15 +1301,27 @@ mod tests {
     fn perft5() {
         let mut b = starting_board();
         let res = perft(&mut b, 5);
-        println!("Checks: {}", res.checks);
-        println!("Capture: {}", res.captures);
-        println!("Nodes: {}", res.nodes);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En passants : {}", res.enpassants);
         assert_eq!(res.nodes, 4865609);
         assert_eq!(res.checks, 27351);
         assert_eq!(res.captures, 82719);
         assert_eq!(res.checkmates, 347);
         assert_eq!(res.enpassants, 258);
+    }
+
+    #[test]
+    fn perft6() {
+        let mut b = starting_board();
+        let res = perft(&mut b, 6);
+
+        println!("Nodes: {}", res.nodes);
+        println!("Checks: {}", res.checks);
+        println!("Captures: {}", res.captures);
+        println!("Checkmates: {}", res.checkmates);
+        println!("En Passants: {}", res.enpassants);
+        assert_eq!(res.nodes, 119060324);
+        assert_eq!(res.checks, 809099);
+        assert_eq!(res.captures, 2812008);
+        assert_eq!(res.checkmates, 10828);
+        assert_eq!(res.enpassants, 5248);
     }
 }
