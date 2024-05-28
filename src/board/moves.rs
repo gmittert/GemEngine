@@ -40,6 +40,7 @@ pub struct Move {
     pub capture: Option<Piece>,
     pub is_check: bool,
     pub is_mate: bool,
+    pub is_en_passant: bool,
 }
 
 impl fmt::Display for Move {

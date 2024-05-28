@@ -54,8 +54,20 @@ impl Board {
         };
         match m.capture {
             Some(p) => match m.turn {
-                Color::Black => self.white_pieces[p as usize] |= m.to,
-                Color::White => self.black_pieces[p as usize] |= m.to,
+                Color::Black => {
+                    if m.is_en_passant {
+                        self.white_pieces[p as usize] |= m.to.no().unwrap()
+                    } else {
+                        self.white_pieces[p as usize] |= m.to
+                    }
+                }
+                Color::White => {
+                    if m.is_en_passant {
+                        self.black_pieces[p as usize] |= m.to.so().unwrap()
+                    } else {
+                        self.black_pieces[p as usize] |= m.to
+                    }
+                }
             },
             None => (),
         };
@@ -196,6 +208,7 @@ impl Board {
                         capture: self.query_pos(pos),
                         is_check: false,
                         is_mate: false,
+                        is_en_passant: false,
                     });
                     if opponent_pieces.contains(pos) {
                         break;
@@ -280,6 +293,7 @@ impl Board {
                         capture: self.query_pos(pos),
                         is_check: false,
                         is_mate: false,
+                        is_en_passant: false,
                     });
                     if opponent_pieces.contains(pos) {
                         break;
@@ -364,6 +378,7 @@ impl Board {
                         capture: self.query_pos(pos),
                         is_check: false,
                         is_mate: false,
+                        is_en_passant: false,
                     });
                     if opponent_pieces.contains(pos) {
                         break;
@@ -430,6 +445,7 @@ impl Board {
                             capture: self.query_pos(pos),
                             is_check: false,
                             is_mate: false,
+                            is_en_passant: false,
                         })
                     });
             }
@@ -492,6 +508,7 @@ impl Board {
                     capture: self.query_pos(p),
                     is_check: false,
                     is_mate: false,
+                    is_en_passant: false,
                 })
             })
         });
@@ -545,6 +562,7 @@ impl Board {
                         capture: None,
                         is_check: false,
                         is_mate: false,
+                        is_en_passant: false,
                     });
                     let can_double_push = match color {
                         Color::White => i.rank() == Rank::Two,
@@ -567,6 +585,7 @@ impl Board {
                                     capture: None,
                                     is_check: false,
                                     is_mate: false,
+                                    is_en_passant: false,
                                 });
                             }
                         }
@@ -589,8 +608,72 @@ impl Board {
                             capture: self.query_pos(pos),
                             is_check: false,
                             is_mate: false,
+                            is_en_passant: false,
                         })
                     });
+            }
+            // En Passant
+            if ((color == Color::White && i.rank() == Rank::Five)
+                || (color == Color::Black && i.rank() == Rank::Three))
+                && !self.move_list.is_empty()
+            {
+                let prev_move = self.move_list.last().unwrap();
+                if prev_move.piece == Piece::Pawn
+                    && prev_move.from.rank() == Rank::Seven
+                    && prev_move.to.rank() == Rank::Five
+                {
+                    if Some(prev_move.to) == i.we() {
+                        out.push(Move {
+                            from: i,
+                            to: prev_move.to.no().unwrap(),
+                            turn: color,
+                            piece: Piece::Pawn,
+                            capture: Some(Piece::Pawn),
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: true,
+                        })
+                    } else if Some(prev_move.to) == i.ea() {
+                        out.push(Move {
+                            from: i,
+                            to: prev_move.to.no().unwrap(),
+                            turn: color,
+                            piece: Piece::Pawn,
+                            capture: Some(Piece::Pawn),
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: true,
+                        })
+                    }
+                }
+                if prev_move.piece == Piece::Pawn
+                    && prev_move.from.rank() == Rank::Two
+                    && prev_move.to.rank() == Rank::Four
+                {
+                    if Some(prev_move.to) == i.we() {
+                        out.push(Move {
+                            from: i,
+                            to: prev_move.to.so().unwrap(),
+                            turn: color,
+                            piece: Piece::Pawn,
+                            capture: Some(Piece::Pawn),
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: true,
+                        })
+                    } else if Some(prev_move.to) == i.ea() {
+                        out.push(Move {
+                            from: i,
+                            to: prev_move.to.so().unwrap(),
+                            turn: color,
+                            piece: Piece::Pawn,
+                            capture: Some(Piece::Pawn),
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: true,
+                        })
+                    }
+                }
             }
         }
     }
@@ -707,6 +790,7 @@ pub struct PerfResult {
     captures: usize,
     checks: usize,
     checkmates: usize,
+    enpassants: usize,
 }
 
 pub fn perft(b: &mut Board, depth: u8) -> PerfResult {
@@ -715,6 +799,7 @@ pub fn perft(b: &mut Board, depth: u8) -> PerfResult {
         captures: 0,
         checks: 0,
         checkmates: 0,
+        enpassants: 0,
     };
     if depth == 0 {
         result.nodes = 1;
@@ -725,10 +810,12 @@ pub fn perft(b: &mut Board, depth: u8) -> PerfResult {
                 result.checkmates += 1;
             }
         }
-        if !b.move_list.is_empty() {
-            let last_move = b.move_list[b.move_list.len() - 1];
+        if let Some(last_move) = b.move_list.last() {
             if last_move.capture.is_some() {
                 result.captures = 1
+            }
+            if last_move.is_en_passant {
+                result.enpassants = 1
             }
         }
         return result;
@@ -746,6 +833,7 @@ pub fn perft(b: &mut Board, depth: u8) -> PerfResult {
             result.captures += next_res.captures;
             result.checks += next_res.checks;
             result.checkmates += next_res.checkmates;
+            result.enpassants += next_res.enpassants;
         }
         b.undo_move(&m);
         let postb = b.black_pieces();
@@ -778,6 +866,7 @@ mod tests {
             capture: None,
             is_check: false,
             is_mate: false,
+            is_en_passant: false,
         };
         board.make_move(&m);
         board.undo_move(&m);
@@ -1090,6 +1179,30 @@ mod tests {
     }
 
     #[test]
+    fn pawn_en_passants() {
+        let mut board = empty_board(Color::White);
+        let mut moves = vec![];
+
+        board.white_pieces[Piece::Pawn as usize] = BitBoard::from(d5());
+        board.black_pieces[Piece::Pawn as usize] = BitBoard::from(e5());
+        board.move_list.push(Move {
+            from: e7(),
+            to: e5(),
+            capture: None,
+            is_check: false,
+            is_mate: false,
+            is_en_passant: false,
+            piece: Piece::Pawn,
+            turn: Color::Black,
+        });
+        board.pawn_moves(Color::White, &mut moves);
+        assert_eq!(moves.len(), 2);
+        assert_eq!(moves.last().unwrap().is_en_passant, true);
+        assert_eq!(moves.last().unwrap().from, d5());
+        assert_eq!(moves.last().unwrap().to, e6());
+    }
+
+    #[test]
     fn in_check_rook() {
         let mut board = empty_board(Color::White);
         board.white_pieces[Piece::King as usize] = BitBoard::from(e1());
@@ -1145,19 +1258,33 @@ mod tests {
         assert_eq!(res.nodes, 8902);
         assert_eq!(res.captures, 34);
         assert_eq!(res.checks, 12);
+        assert_eq!(res.enpassants, 0);
     }
 
     #[test]
     fn perft4() {
         let mut b = starting_board();
         let res = perft(&mut b, 4);
-        println!("Checks: {}", res.checks);
-        println!("Capture: {}", res.captures);
-        println!("Nodes: {}", res.nodes);
-        println!("Checkmates: {}", res.checkmates);
         assert_eq!(res.checks, 469);
         assert_eq!(res.captures, 1576);
         assert_eq!(res.nodes, 197281);
         assert_eq!(res.checkmates, 8);
+        assert_eq!(res.enpassants, 0);
+    }
+
+    #[test]
+    fn perft5() {
+        let mut b = starting_board();
+        let res = perft(&mut b, 5);
+        println!("Checks: {}", res.checks);
+        println!("Capture: {}", res.captures);
+        println!("Nodes: {}", res.nodes);
+        println!("Checkmates: {}", res.checkmates);
+        println!("En passants : {}", res.enpassants);
+        assert_eq!(res.nodes, 4865609);
+        assert_eq!(res.checks, 27351);
+        assert_eq!(res.captures, 82719);
+        assert_eq!(res.checkmates, 347);
+        assert_eq!(res.enpassants, 258);
     }
 }
