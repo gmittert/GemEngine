@@ -7,22 +7,228 @@ pub use crate::board::posn::*;
 use std::fmt;
 
 #[derive(Debug, PartialEq)]
+// We only use 4 bits:
+// 1 = White king side
+// 2 = White queen side
+// 4 = Black king side
+// 8 = Black queen side
+pub struct CastlingAbility(u8);
+
+impl CastlingAbility {
+    pub fn from_fen(s: &str) -> Option<CastlingAbility> {
+        if s == "-" {
+            return Some(CastlingAbility(0));
+        }
+        let mut out: u8 = 0;
+        for c in s.chars() {
+            match c {
+                'K' => out |= 1,
+                'Q' => out |= 2,
+                'k' => out |= 4,
+                'q' => out |= 8,
+                _ => return None,
+            }
+        }
+        Some(CastlingAbility(out))
+    }
+
+    pub fn can_castle_king(&self, c: Color) -> bool {
+        let CastlingAbility(inner) = &self;
+        match c {
+            Color::White => (inner & 1) != 0,
+            Color::Black => (inner & 4) != 0,
+        }
+    }
+    pub fn can_castle_queen(&self, c: Color) -> bool {
+        let CastlingAbility(inner) = &self;
+        match c {
+            Color::White => (inner & 2) != 0,
+            Color::Black => (inner & 8) != 0,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct MoveRights {
+    pub castling_ability: CastlingAbility,
+    pub ep_target: Option<Posn>,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Board {
     pub black_pieces: [BitBoard; 6],
     pub white_pieces: [BitBoard; 6],
 
     pub to_play: Color,
-    pub turn_count: u16,
+    pub half_move: u16,
+    pub full_move: u16,
+    pub move_rights: Vec<MoveRights>,
     pub move_list: Vec<Move>,
 }
 
 impl Board {
+    pub fn from_fen(s: &str) -> Option<Board> {
+        let mut sections = s.split(" ");
+        let placement = sections.next()?;
+        let to_move = sections.next()?;
+        let mut out = empty_board(match to_move {
+            "w" => Color::White,
+            "b" => Color::Black,
+            _ => return None,
+        });
+        let castling_ability = CastlingAbility::from_fen(sections.next()?)?;
+        let ep_target = sections.next()?;
+        let move_rights = MoveRights {
+            castling_ability,
+            ep_target: if ep_target == "-" {
+                None
+            } else {
+                let mut ep_chars = ep_target.chars();
+                let file = match ep_chars.next()? {
+                    'a' => File::A,
+                    'b' => File::B,
+                    'c' => File::C,
+                    'd' => File::D,
+                    'e' => File::E,
+                    'f' => File::F,
+                    'g' => File::G,
+                    'h' => File::H,
+                    _ => return None,
+                };
+                let rank = match ep_chars.next()? {
+                    '3' => Rank::Three,
+                    '6' => Rank::Six,
+                    _ => return None,
+                };
+                Some(Posn::from(rank, file))
+            },
+        };
+        out.move_rights.push(move_rights);
+        out.half_move = sections.next()?.parse::<u16>().ok()?;
+        out.full_move = sections.next()?.parse::<u16>().ok()?;
+        out.move_list = vec![];
+        if sections.next() != None {
+            return None;
+        }
+
+        let ranks = std::iter::zip(
+            [
+                Rank::Eight,
+                Rank::Seven,
+                Rank::Six,
+                Rank::Five,
+                Rank::Four,
+                Rank::Three,
+                Rank::Two,
+                Rank::One,
+            ],
+            placement.split("/"),
+        );
+        for (rank, placement) in ranks {
+            let mut files = [
+                File::A,
+                File::B,
+                File::C,
+                File::D,
+                File::E,
+                File::F,
+                File::G,
+                File::H,
+            ]
+            .into_iter();
+            for c in placement.chars() {
+                match c {
+                    'p' => {
+                        out.black_pieces[Piece::Pawn as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'n' => {
+                        out.black_pieces[Piece::Knight as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'b' => {
+                        out.black_pieces[Piece::Bishop as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'r' => {
+                        out.black_pieces[Piece::Rook as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'q' => {
+                        out.black_pieces[Piece::Queen as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'k' => {
+                        out.black_pieces[Piece::King as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'P' => {
+                        out.white_pieces[Piece::Pawn as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'N' => {
+                        out.white_pieces[Piece::Knight as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'B' => {
+                        out.white_pieces[Piece::Bishop as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'R' => {
+                        out.white_pieces[Piece::Rook as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'Q' => {
+                        out.white_pieces[Piece::Queen as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    'K' => {
+                        out.white_pieces[Piece::King as usize] |= Posn::from(rank, files.next()?)
+                    }
+                    '1' => {
+                        for _ in 0..1 {
+                            files.next()?;
+                        }
+                    }
+                    '2' => {
+                        for _ in 0..2 {
+                            files.next()?;
+                        }
+                    }
+                    '3' => {
+                        for _ in 0..3 {
+                            files.next()?;
+                        }
+                    }
+                    '4' => {
+                        for _ in 0..4 {
+                            files.next()?;
+                        }
+                    }
+                    '5' => {
+                        for _ in 0..5 {
+                            files.next()?;
+                        }
+                    }
+                    '6' => {
+                        for _ in 0..6 {
+                            files.next()?;
+                        }
+                    }
+                    '7' => {
+                        for _ in 0..7 {
+                            files.next()?;
+                        }
+                    }
+                    '8' => {
+                        for _ in 0..8 {
+                            files.next()?;
+                        }
+                    }
+                    _ => return None,
+                };
+            }
+        }
+
+        Some(out)
+    }
+
     pub fn make_move(&mut self, m: &Move) {
-        self.move_list.push(m.clone());
+        self.move_list.push(*m);
         match m.turn {
             Color::Black => {
                 self.black_pieces[m.piece as usize] =
-                    self.black_pieces[m.piece as usize].make_move(m)
+                    self.black_pieces[m.piece as usize].make_move(m);
+                self.full_move += 1;
             }
             Color::White => {
                 self.white_pieces[m.piece as usize] =
@@ -37,15 +243,30 @@ impl Board {
             None => (),
         };
         self.to_play = !self.to_play;
-        self.turn_count += 1;
+        self.half_move += 1;
+        let ep_target =
+            if m.piece == Piece::Pawn && m.from.rank() == Rank::Two && m.to.rank() == Rank::Four {
+                Some(Posn::from(Rank::Three, m.from.file()))
+            } else if m.piece == Piece::Pawn
+                && m.from.rank() == Rank::Seven
+                && m.to.rank() == Rank::Five
+            {
+                Some(Posn::from(Rank::Six, m.from.file()))
+            } else {
+                None
+            };
+        self.move_rights.push(MoveRights {
+            castling_ability: CastlingAbility(0xff),
+            ep_target,
+        });
     }
 
     pub fn undo_move(&mut self, m: &Move) {
-        self.move_list.pop();
         match m.turn {
             Color::Black => {
                 self.black_pieces[m.piece as usize] =
-                    self.black_pieces[m.piece as usize].undo_move(m)
+                    self.black_pieces[m.piece as usize].undo_move(m);
+                self.full_move -= 1;
             }
             Color::White => {
                 self.white_pieces[m.piece as usize] =
@@ -56,14 +277,14 @@ impl Board {
             Some(p) => match m.turn {
                 Color::Black => {
                     if m.is_en_passant {
-                        self.white_pieces[p as usize] |= m.to.no().unwrap()
+                        self.white_pieces[p as usize] |= m.to.no().unwrap();
                     } else {
                         self.white_pieces[p as usize] |= m.to
                     }
                 }
                 Color::White => {
                     if m.is_en_passant {
-                        self.black_pieces[p as usize] |= m.to.so().unwrap()
+                        self.black_pieces[p as usize] |= m.to.so().unwrap();
                     } else {
                         self.black_pieces[p as usize] |= m.to
                     }
@@ -72,7 +293,9 @@ impl Board {
             None => (),
         };
         self.to_play = !self.to_play;
-        self.turn_count -= 1;
+        self.move_rights.pop();
+        self.move_list.pop();
+        self.half_move -= 1;
     }
 
     pub fn query_pos(&self, p: Posn) -> Option<Piece> {
@@ -613,66 +836,22 @@ impl Board {
                     });
             }
             // En Passant
-            if ((color == Color::White && i.rank() == Rank::Five)
-                || (color == Color::Black && i.rank() == Rank::Four))
-                && !self.move_list.is_empty()
-            {
-                let prev_move = self.move_list.last().unwrap();
-                if prev_move.piece == Piece::Pawn
-                    && prev_move.from.rank() == Rank::Seven
-                    && prev_move.to.rank() == Rank::Five
+            if let Some(ep_target) = self.move_rights.last().and_then(|x| x.ep_target) {
+                if (color == Color::White
+                    && (i.nw() == Some(ep_target) || i.ne() == Some(ep_target)))
+                    || (color == Color::Black
+                        && (i.sw() == Some(ep_target) || i.se() == Some(ep_target)))
                 {
-                    if Some(prev_move.to) == i.we() {
-                        out.push(Move {
-                            from: i,
-                            to: prev_move.to.no().unwrap(),
-                            turn: color,
-                            piece: Piece::Pawn,
-                            capture: Some(Piece::Pawn),
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: true,
-                        })
-                    } else if Some(prev_move.to) == i.ea() {
-                        out.push(Move {
-                            from: i,
-                            to: prev_move.to.no().unwrap(),
-                            turn: color,
-                            piece: Piece::Pawn,
-                            capture: Some(Piece::Pawn),
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: true,
-                        })
-                    }
-                }
-                if prev_move.piece == Piece::Pawn
-                    && prev_move.from.rank() == Rank::Two
-                    && prev_move.to.rank() == Rank::Four
-                {
-                    if Some(prev_move.to) == i.we() {
-                        out.push(Move {
-                            from: i,
-                            to: prev_move.to.so().unwrap(),
-                            turn: color,
-                            piece: Piece::Pawn,
-                            capture: Some(Piece::Pawn),
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: true,
-                        })
-                    } else if Some(prev_move.to) == i.ea() {
-                        out.push(Move {
-                            from: i,
-                            to: prev_move.to.so().unwrap(),
-                            turn: color,
-                            piece: Piece::Pawn,
-                            capture: Some(Piece::Pawn),
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: true,
-                        })
-                    }
+                    out.push(Move {
+                        from: i,
+                        to: ep_target,
+                        turn: color,
+                        piece: Piece::Pawn,
+                        capture: Some(Piece::Pawn),
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: true,
+                    })
                 }
             }
         }
@@ -741,35 +920,19 @@ pub fn empty_board(turn: Color) -> Board {
         ],
 
         to_play: turn,
-        turn_count: 1,
+        half_move: 0,
+        full_move: 1,
+        move_rights: vec![MoveRights {
+            ep_target: None,
+            castling_ability: CastlingAbility(0xff),
+        }],
         move_list: vec![],
     }
 }
 
 pub fn starting_board() -> Board {
-    Board {
-        black_pieces: [
-            a7() | b7() | c7() | d7() | e7() | f7() | g7() | h7(),
-            a8() | h8(),
-            b8() | g8(),
-            c8() | f8(),
-            BitBoard::from(d8()),
-            BitBoard::from(e8()),
-        ],
-
-        white_pieces: [
-            a2() | b2() | c2() | d2() | e2() | f2() | g2() | h2(),
-            a1() | h1(),
-            b1() | g1(),
-            c1() | f1(),
-            BitBoard::from(d1()),
-            BitBoard::from(e1()),
-        ],
-
-        to_play: Color::White,
-        turn_count: 1,
-        move_list: vec![],
-    }
+    Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+        .expect("Failed to parse starting fen")
 }
 
 pub fn generate_pseudo_legal_moves(b: &Board) -> Vec<Move> {
@@ -1125,15 +1288,9 @@ mod tests {
 
         board.white_pieces[Piece::Pawn as usize] = BitBoard::from(d5());
         board.black_pieces[Piece::Pawn as usize] = BitBoard::from(e5());
-        board.move_list.push(Move {
-            from: e7(),
-            to: e5(),
-            capture: None,
-            is_check: false,
-            is_mate: false,
-            is_en_passant: false,
-            piece: Piece::Pawn,
-            turn: Color::Black,
+        board.move_rights.push(MoveRights {
+            castling_ability: CastlingAbility(0xff),
+            ep_target: Some(e6()),
         });
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 2);
@@ -1150,15 +1307,9 @@ mod tests {
 
         board.white_pieces[Piece::Pawn as usize] = BitBoard::from(e4());
         board.black_pieces[Piece::Pawn as usize] = BitBoard::from(d4());
-        board.move_list.push(Move {
-            from: e2(),
-            to: e4(),
-            capture: None,
-            is_check: false,
-            is_mate: false,
-            is_en_passant: false,
-            piece: Piece::Pawn,
-            turn: Color::White,
+        board.move_rights.push(MoveRights {
+            castling_ability: CastlingAbility(0xff),
+            ep_target: Some(e3()),
         });
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 2);
