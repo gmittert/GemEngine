@@ -46,9 +46,21 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
     for m in &moves {
         let preb = b.black_pieces();
         let prew = b.white_pieces();
-        assert!(preb & prew == board::BitBoard::empty());
+        assert!(preb & prew == board::BitBoard::empty(),
+            "Before making move: {m}, black ({:?}) overlapped with white ({:?})",
+            preb,
+            prew,
+            );
         //println!("{b}");
         b.make_move(&m);
+        let mb = b.black_pieces();
+        let mw = b.white_pieces();
+        assert!(
+            mb & mw == board::BitBoard::empty(),
+            "After making move: {m}, black ({:?}) overlapped with white ({:?})",
+            mb,
+            mw
+        );
         //println!("{b}");
         if !b.in_check(!b.to_play) {
             let next_res = perft(b, depth - 1);
@@ -62,7 +74,11 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
         b.undo_move(&m);
         let postb = b.black_pieces();
         let postw = b.white_pieces();
-        assert!(postb & postw == board::BitBoard::empty());
+        assert!(postb & postw == board::BitBoard::empty(),
+            "After undoing move: {m}, black ({:?}) overlapped with white ({:?})",
+            postb,
+            postw,
+            );
         if preb != postb {
             println!("Undo_move failed for move: {m}");
             println!("board:\n{b}");
@@ -140,6 +156,44 @@ mod tests {
         assert_eq!(res.captures, 2812008);
         assert_eq!(res.checkmates, 10828);
         assert_eq!(res.enpassants, 5248);
+    }
+
+    #[test]
+    fn perft7() {
+        let mut b = starting_board();
+        let res = perft(&mut b, 7);
+
+        println!("Nodes: {}", res.nodes);
+        println!("Checks: {}", res.checks);
+        println!("Captures: {}", res.captures);
+        println!("Checkmates: {}", res.checkmates);
+        println!("En Passants: {}", res.enpassants);
+        println!("Castles: {}", res.castles);
+        assert_eq!(res.nodes, 3_195_901_860);
+        assert_eq!(res.checks, 33_103_848);
+        assert_eq!(res.captures, 108_329_926);
+        assert_eq!(res.checkmates, 435_767);
+        assert_eq!(res.enpassants, 319_617);
+        assert_eq!(res.castles, 883_453);
+    }
+
+    #[test]
+    fn perft8() {
+        let mut b = starting_board();
+        let res = perft(&mut b, 8);
+
+        println!("Nodes: {}", res.nodes);
+        println!("Checks: {}", res.checks);
+        println!("Captures: {}", res.captures);
+        println!("Checkmates: {}", res.checkmates);
+        println!("En Passants: {}", res.enpassants);
+        println!("Castles: {}", res.castles);
+        assert_eq!(res.nodes, 84_998_978_956);
+        assert_eq!(res.checks, 968_981_593);
+        assert_eq!(res.captures, 3_523_740_106);
+        assert_eq!(res.checkmates, 9_852_036);
+        assert_eq!(res.enpassants, 7_187_977);
+        assert_eq!(res.castles, 23_605_205);
     }
 
     #[test]

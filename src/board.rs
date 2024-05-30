@@ -835,6 +835,8 @@ impl Board {
             Color::Black => self.black_pieces(),
         };
 
+        let all_pieces = self.white_pieces() | self.black_pieces();
+
         for i in kings {
             for pos in [
                 i.no(),
@@ -872,8 +874,8 @@ impl Board {
                 if !self.in_check_pos(i.ea().unwrap(), color)
                     && !self.in_check_pos(i.ea().and_then(|x| x.ea()).unwrap(), color)
                     && !self.in_check(color)
-                    && !allied_pieces.contains(i.ea().unwrap())
-                    && !allied_pieces.contains(i.ea().and_then(|x| x.ea()).unwrap())
+                    && !all_pieces.contains(i.ea().unwrap())
+                    && !all_pieces.contains(i.ea().and_then(|x| x.ea()).unwrap())
                 {
                     out.push(Move {
                         from: i,
@@ -898,9 +900,9 @@ impl Board {
                 if !self.in_check_pos(i.we().unwrap(), color)
                     && !self.in_check_pos(i.we().and_then(|x| x.we()).unwrap(), color)
                     && !self.in_check(color)
-                    && !allied_pieces.contains(i.we().unwrap())
-                    && !allied_pieces.contains(i.we().and_then(|x| x.we()).unwrap())
-                    && !allied_pieces.contains(i.we().and_then(|x| x.we()).and_then(|x| x.we()).unwrap())
+                    && !all_pieces.contains(i.we().unwrap())
+                    && !all_pieces.contains(i.we().and_then(|x| x.we()).unwrap())
+                    && !all_pieces.contains(i.we().and_then(|x| x.we()).and_then(|x| x.we()).unwrap())
                 {
                     out.push(Move {
                         from: i,
