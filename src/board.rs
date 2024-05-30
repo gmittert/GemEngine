@@ -900,6 +900,7 @@ impl Board {
                     && !self.in_check(color)
                     && !allied_pieces.contains(i.we().unwrap())
                     && !allied_pieces.contains(i.we().and_then(|x| x.we()).unwrap())
+                    && !allied_pieces.contains(i.we().and_then(|x| x.we()).and_then(|x| x.we()).unwrap())
                 {
                     out.push(Move {
                         from: i,
@@ -1766,6 +1767,111 @@ mod tests {
             board.king_moves(Color::Black, &mut moves);
             let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
             assert_eq!(only_castles.len(), 0);
+        }
+    }
+    #[test]
+    fn no_castle_through_check() {
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/4b3/R3K2R w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/b7/8/8/8/8/R3K2R w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert!(only_castles[0].is_castle_queen);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/7b/8/8/8/8/R3K2R w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert!(only_castles[0].is_castle_king);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/8/7b/8/8/8/R3K2R w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert!(only_castles[0].is_castle_king);
+        }
+    }
+    #[test]
+    fn no_castle_while_check() {
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/4r3/R3K2R w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
+    }
+    #[test]
+    fn no_castle_through_pieces() {
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/R2NKB1R w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/R3KB1R w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert!(only_castles[0].is_castle_queen);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/R3K1BR w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert!(only_castles[0].is_castle_queen);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/R2NK2R w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert!(only_castles[0].is_castle_king);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/R1N1K2R w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert!(only_castles[0].is_castle_king);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/RN2K2R w KQkQ - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king || x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert!(only_castles[0].is_castle_king);
         }
     }
 }
