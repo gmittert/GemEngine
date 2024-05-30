@@ -12,6 +12,7 @@ use std::fmt;
 // 2 = White queen side
 // 4 = Black king side
 // 8 = Black queen side
+#[derive(Copy, Clone)]
 pub struct CastlingAbility(u8);
 
 impl CastlingAbility {
@@ -35,20 +36,20 @@ impl CastlingAbility {
     pub fn can_castle_king(&self, c: Color) -> bool {
         let CastlingAbility(inner) = &self;
         match c {
-            Color::White => (inner & 1) != 0,
-            Color::Black => (inner & 4) != 0,
+            Color::White => (inner & 0b0001) != 0,
+            Color::Black => (inner & 0b0100) != 0,
         }
     }
     pub fn can_castle_queen(&self, c: Color) -> bool {
         let CastlingAbility(inner) = &self;
         match c {
-            Color::White => (inner & 2) != 0,
-            Color::Black => (inner & 8) != 0,
+            Color::White => (inner & 0b0010) != 0,
+            Color::Black => (inner & 0b1000) != 0,
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct MoveRights {
     pub castling_ability: CastlingAbility,
     pub ep_target: Option<Posn>,
@@ -242,7 +243,74 @@ impl Board {
             },
             None => (),
         };
-        self.to_play = !self.to_play;
+        if m.is_castle_king {
+            match m.turn {
+                Color::Black => {
+                    self.black_pieces[Piece::Rook as usize] =
+                        self.black_pieces[Piece::Rook as usize].make_move(&Move {
+                            from: h8(),
+                            to: f8(),
+                            turn: Color::Black,
+                            piece: Piece::Rook,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
+                        });
+                }
+                Color::White => {
+                    self.white_pieces[Piece::Rook as usize] =
+                        self.white_pieces[Piece::Rook as usize].make_move(&Move {
+                            from: h1(),
+                            to: f1(),
+                            turn: Color::White,
+                            piece: Piece::Rook,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
+                        });
+                }
+            }
+        }
+        if m.is_castle_queen {
+            match m.turn {
+                Color::Black => {
+                    self.black_pieces[Piece::Rook as usize] =
+                        self.black_pieces[Piece::Rook as usize].make_move(&Move {
+                            from: a8(),
+                            to: d8(),
+                            turn: Color::Black,
+                            piece: Piece::Rook,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
+                        });
+                }
+                Color::White => {
+                    self.white_pieces[Piece::Rook as usize] =
+                        self.white_pieces[Piece::Rook as usize].make_move(&Move {
+                            from: a1(),
+                            to: d1(),
+                            turn: Color::White,
+                            piece: Piece::Rook,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
+                        });
+                }
+            }
+        }
         self.half_move += 1;
         let ep_target =
             if m.piece == Piece::Pawn && m.from.rank() == Rank::Two && m.to.rank() == Rank::Four {
@@ -255,10 +323,33 @@ impl Board {
             } else {
                 None
             };
+        let CastlingAbility(mut inner) = self
+            .move_rights
+            .last()
+            .map(|x| x.castling_ability)
+            .unwrap_or(CastlingAbility(0xff));
+        if m.piece == Piece::King {
+            match m.turn {
+                Color::Black => inner &= 0b0011,
+                Color::White => inner &= 0b1100,
+            }
+        }
+        if m.piece == Piece::Rook {
+            if m.from == h1() {
+                inner &= 0b1110
+            } else if m.from == h8() {
+                inner &= 0b1011
+            } else if m.from == a1() {
+                inner &= 0b1101
+            } else if m.from == a8() {
+                inner &= 0b0111
+            }
+        }
         self.move_rights.push(MoveRights {
-            castling_ability: CastlingAbility(0xff),
+            castling_ability: CastlingAbility(inner),
             ep_target,
         });
+        self.to_play = !self.to_play;
     }
 
     pub fn undo_move(&mut self, m: &Move) {
@@ -292,6 +383,74 @@ impl Board {
             },
             None => (),
         };
+        if m.is_castle_king {
+            match m.turn {
+                Color::Black => {
+                    self.black_pieces[Piece::Rook as usize] =
+                        self.black_pieces[Piece::Rook as usize].make_move(&Move {
+                            from: f8(),
+                            to: h8(),
+                            turn: Color::Black,
+                            piece: Piece::Rook,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
+                        });
+                }
+                Color::White => {
+                    self.white_pieces[Piece::Rook as usize] =
+                        self.white_pieces[Piece::Rook as usize].make_move(&Move {
+                            from: f1(),
+                            to: h1(),
+                            turn: Color::White,
+                            piece: Piece::Rook,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
+                        });
+                }
+            }
+        }
+        if m.is_castle_queen {
+            match m.turn {
+                Color::Black => {
+                    self.black_pieces[Piece::Rook as usize] =
+                        self.black_pieces[Piece::Rook as usize].make_move(&Move {
+                            from: d8(),
+                            to: a8(),
+                            turn: Color::Black,
+                            piece: Piece::Rook,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
+                        });
+                }
+                Color::White => {
+                    self.white_pieces[Piece::Rook as usize] =
+                        self.white_pieces[Piece::Rook as usize].make_move(&Move {
+                            from: d1(),
+                            to: a1(),
+                            turn: Color::White,
+                            piece: Piece::Rook,
+                            capture: None,
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
+                        });
+                }
+            }
+        }
         self.to_play = !self.to_play;
         self.move_rights.pop();
         self.move_list.pop();
@@ -331,6 +490,17 @@ impl Board {
             | self.king_attacks(!color);
 
         king_pos & attacked != BitBoard::empty()
+    }
+
+    pub fn in_check_pos(&self, pos: Posn, color: Color) -> bool {
+        let attacked = self.queen_attacks(!color)
+            | self.rook_attacks(!color)
+            | self.bishop_attacks(!color)
+            | self.knight_attacks(!color)
+            | self.pawn_attacks(!color)
+            | self.king_attacks(!color);
+
+        attacked.contains(pos)
     }
 
     pub fn white_pieces(&self) -> BitBoard {
@@ -432,6 +602,8 @@ impl Board {
                         is_check: false,
                         is_mate: false,
                         is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
                     });
                     if opponent_pieces.contains(pos) {
                         break;
@@ -517,6 +689,8 @@ impl Board {
                         is_check: false,
                         is_mate: false,
                         is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
                     });
                     if opponent_pieces.contains(pos) {
                         break;
@@ -602,6 +776,8 @@ impl Board {
                         is_check: false,
                         is_mate: false,
                         is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
                     });
                     if opponent_pieces.contains(pos) {
                         break;
@@ -669,8 +845,62 @@ impl Board {
                             is_check: false,
                             is_mate: false,
                             is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
                         })
                     });
+            }
+            if self
+                .move_rights
+                .last()
+                .and_then(|x| Some(x.castling_ability.can_castle_king(color)))
+                .unwrap_or(false)
+            {
+                if !self.in_check_pos(i.ea().unwrap(), color)
+                    && !self.in_check_pos(i.ea().and_then(|x| x.ea()).unwrap(), color)
+                    && !self.in_check(color)
+                    && !allied_pieces.contains(i.ea().unwrap())
+                    && !allied_pieces.contains(i.ea().and_then(|x| x.ea()).unwrap())
+                {
+                    out.push(Move {
+                        from: i,
+                        to: i.ea().and_then(|x| x.ea()).unwrap(),
+                        turn: color,
+                        piece: Piece::King,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: true,
+                        is_castle_queen: false,
+                    });
+                }
+            }
+            if self
+                .move_rights
+                .last()
+                .and_then(|x| Some(x.castling_ability.can_castle_queen(color)))
+                .unwrap_or(false)
+            {
+                if !self.in_check_pos(i.we().unwrap(), color)
+                    && !self.in_check_pos(i.we().and_then(|x| x.we()).unwrap(), color)
+                    && !self.in_check(color)
+                    && !allied_pieces.contains(i.we().unwrap())
+                    && !allied_pieces.contains(i.we().and_then(|x| x.we()).unwrap())
+                {
+                    out.push(Move {
+                        from: i,
+                        to: i.ea().and_then(|x| x.ea()).unwrap(),
+                        turn: color,
+                        piece: Piece::King,
+                        capture: None,
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: true,
+                    });
+                }
             }
         }
     }
@@ -732,6 +962,8 @@ impl Board {
                     is_check: false,
                     is_mate: false,
                     is_en_passant: false,
+                    is_castle_king: false,
+                    is_castle_queen: false,
                 })
             })
         });
@@ -786,6 +1018,8 @@ impl Board {
                         is_check: false,
                         is_mate: false,
                         is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
                     });
                     let can_double_push = match color {
                         Color::White => i.rank() == Rank::Two,
@@ -809,6 +1043,8 @@ impl Board {
                                     is_check: false,
                                     is_mate: false,
                                     is_en_passant: false,
+                                    is_castle_king: false,
+                                    is_castle_queen: false,
                                 });
                             }
                         }
@@ -832,6 +1068,8 @@ impl Board {
                             is_check: false,
                             is_mate: false,
                             is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
                         })
                     });
             }
@@ -851,6 +1089,8 @@ impl Board {
                         is_check: false,
                         is_mate: false,
                         is_en_passant: true,
+                        is_castle_king: false,
+                        is_castle_queen: false,
                     })
                 }
             }
@@ -970,6 +1210,8 @@ mod tests {
             is_check: false,
             is_mate: false,
             is_en_passant: false,
+            is_castle_king: false,
+            is_castle_queen: false,
         };
         board.make_move(&m);
         board.undo_move(&m);
@@ -1075,6 +1317,10 @@ mod tests {
     #[test]
     fn king_moves_empty() {
         let mut board = empty_board(Color::White);
+        board.move_rights.push(MoveRights {
+            castling_ability: CastlingAbility(0),
+            ep_target: None,
+        });
         board.white_pieces[Piece::King as usize] = BitBoard::from(a1());
         let mut moves = vec![];
         board.king_moves(Color::White, &mut moves);
@@ -1348,5 +1594,165 @@ mod tests {
         board.black_pieces[Piece::King as usize] = BitBoard::from(e4());
         board.white_pieces[Piece::Pawn as usize] = BitBoard::from(e3());
         assert_eq!(board.in_check(Color::Black), false);
+    }
+    #[test]
+    fn castle_king_white_queen() {
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/R3K3 w KQkq - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/R3K3 w Q - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
+        }
+    }
+    #[test]
+    fn castle_king_white_king() {
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/4K2R w KQkq - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert_eq!(only_castles.last().unwrap().is_castle_king, true);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/4K2R w K - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert_eq!(only_castles.last().unwrap().is_castle_king, true);
+        }
+    }
+    #[test]
+    fn castle_king_black_queen() {
+        {
+            let board =
+                Board::from_fen("r3k3/8/8/8/8/8/8/8 w KQkq - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::Black, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
+        }
+        {
+            let board =
+                Board::from_fen("r3k3/8/8/8/8/8/8/8 w q - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::Black, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
+        }
+    }
+    #[test]
+    fn castle_king_black_king() {
+        {
+            let board =
+                Board::from_fen("4k2r/8/8/8/8/8/8/8 b KQkq - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::Black, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert_eq!(only_castles.last().unwrap().is_castle_king, true);
+        }
+        {
+            let board =
+                Board::from_fen("4k2r/8/8/8/8/8/8/8 b k - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::Black, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            assert_eq!(only_castles.len(), 1);
+            assert_eq!(only_castles.last().unwrap().is_castle_king, true);
+        }
+    }
+    #[test]
+    fn no_castle_king_white_queen() {
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/R3K3 b - - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/R3K3 b Kkq - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
+    }
+    #[test]
+    fn no_castle_king_white_king() {
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/4K2R w - - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
+        {
+            let board =
+                Board::from_fen("8/8/8/8/8/8/8/4K2R w Qkq - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::White, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
+    }
+    #[test]
+    fn no_castle_king_black_queen() {
+        {
+            let board =
+                Board::from_fen("r3k3/8/8/8/8/8/8/8 b - - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::Black, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
+        {
+            let board =
+                Board::from_fen("r3k3/8/8/8/8/8/8/8 b KQk - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::Black, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
+    }
+    #[test]
+    fn no_castle_king_black_king() {
+        {
+            let board =
+                Board::from_fen("4k2r/8/8/8/8/8/8/8 b - - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::Black, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
+        {
+            let board =
+                Board::from_fen("4k2r/8/8/8/8/8/8/8 b KQq - 0 1").expect("Failed to parse fen");
+            let mut moves = vec![];
+            board.king_moves(Color::Black, &mut moves);
+            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            assert_eq!(only_castles.len(), 0);
+        }
     }
 }

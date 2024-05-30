@@ -41,6 +41,8 @@ pub struct Move {
     pub is_check: bool,
     pub is_mate: bool,
     pub is_en_passant: bool,
+    pub is_castle_queen: bool,
+    pub is_castle_king: bool,
 }
 
 impl fmt::Display for Move {

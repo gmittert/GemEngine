@@ -7,6 +7,7 @@ pub struct PerfResult {
     checks: usize,
     checkmates: usize,
     enpassants: usize,
+    castles: usize,
 }
 
 pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
@@ -16,14 +17,14 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
         checks: 0,
         checkmates: 0,
         enpassants: 0,
+        castles: 0,
     };
     if depth == 0 {
         result.nodes = 1;
-
         if b.in_check(b.to_play) {
-            result.checks += 1;
+            result.checks = 1;
             if perft(b, 1).nodes == 0 {
-                result.checkmates += 1;
+                result.checkmates = 1;
             }
         }
         if let Some(last_move) = b.move_list.last() {
@@ -32,6 +33,9 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
             }
             if last_move.is_en_passant {
                 result.enpassants = 1
+            }
+            if last_move.is_castle_queen || last_move.is_castle_king {
+                result.castles = 1
             }
         }
         return result;
@@ -50,6 +54,7 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
             result.checks += next_res.checks;
             result.checkmates += next_res.checkmates;
             result.enpassants += next_res.enpassants;
+            result.castles += next_res.castles;
         }
         b.undo_move(&m);
         let postb = b.black_pieces();
@@ -127,5 +132,120 @@ mod tests {
         assert_eq!(res.captures, 2812008);
         assert_eq!(res.checkmates, 10828);
         assert_eq!(res.enpassants, 5248);
+    }
+
+    #[test]
+    fn kiwipete1() {
+        let mut b =
+            Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+                .expect("failed to parse fen");
+        let res = perft(&mut b, 1);
+        println!("Nodes: {}", res.nodes);
+        println!("Checks: {}", res.checks);
+        println!("Captures: {}", res.captures);
+        println!("Checkmates: {}", res.checkmates);
+        println!("En Passants: {}", res.enpassants);
+        println!("Castles : {}", res.castles);
+        assert_eq!(res.nodes, 48);
+        assert_eq!(res.checks, 0);
+        assert_eq!(res.captures, 8);
+        assert_eq!(res.castles, 2);
+        assert_eq!(res.checkmates, 0);
+        assert_eq!(res.enpassants, 0);
+    }
+    #[test]
+    fn kiwipete2() {
+        let mut b =
+            Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+                .expect("failed to parse fen");
+        let res = perft(&mut b, 2);
+        println!("Nodes: {}", res.nodes);
+        println!("Checks: {}", res.checks);
+        println!("Captures: {}", res.captures);
+        println!("Checkmates: {}", res.checkmates);
+        println!("En Passants: {}", res.enpassants);
+        println!("Castles : {}", res.castles);
+        assert_eq!(res.nodes, 2039);
+        assert_eq!(res.checks, 3);
+        assert_eq!(res.captures, 351);
+        assert_eq!(res.castles, 91);
+        assert_eq!(res.checkmates, 0);
+        assert_eq!(res.enpassants, 1);
+    }
+    #[test]
+    fn kiwipete3() {
+        let mut b =
+            Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+                .expect("failed to parse fen");
+        let res = perft(&mut b, 3);
+        println!("Nodes: {}", res.nodes);
+        println!("Checks: {}", res.checks);
+        println!("Captures: {}", res.captures);
+        println!("Checkmates: {}", res.checkmates);
+        println!("En Passants: {}", res.enpassants);
+        println!("Castles : {}", res.castles);
+        assert_eq!(res.nodes, 97862);
+        assert_eq!(res.checks, 993);
+        assert_eq!(res.captures, 17102);
+        assert_eq!(res.castles, 3162);
+        assert_eq!(res.checkmates, 1);
+        assert_eq!(res.enpassants, 45);
+    }
+    #[test]
+    fn kiwipete4() {
+        let mut b =
+            Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+                .expect("failed to parse fen");
+        let res = perft(&mut b, 4);
+        println!("Nodes: {}", res.nodes);
+        println!("Checks: {}", res.checks);
+        println!("Captures: {}", res.captures);
+        println!("Checkmates: {}", res.checkmates);
+        println!("En Passants: {}", res.enpassants);
+        println!("Castles : {}", res.castles);
+        assert_eq!(res.nodes, 4085603);
+        assert_eq!(res.checks, 25523);
+        assert_eq!(res.captures, 757163);
+        assert_eq!(res.castles, 128013);
+        assert_eq!(res.checkmates, 43);
+        assert_eq!(res.enpassants, 1929);
+    }
+    #[test]
+    fn kiwipete5() {
+        let mut b =
+            Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+                .expect("failed to parse fen");
+        let res = perft(&mut b, 5);
+        println!("Nodes: {}", res.nodes);
+        println!("Checks: {}", res.checks);
+        println!("Captures: {}", res.captures);
+        println!("Checkmates: {}", res.checkmates);
+        println!("En Passants: {}", res.enpassants);
+        println!("Castles : {}", res.castles);
+        assert_eq!(res.nodes, 193690690);
+        assert_eq!(res.checks, 3309887);
+        assert_eq!(res.captures, 35043416);
+        assert_eq!(res.castles, 4993637);
+        assert_eq!(res.checkmates, 30171);
+        assert_eq!(res.enpassants, 73365);
+    }
+    #[test]
+    fn kiwipete6() {
+        let mut b =
+            Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+                .expect("failed to parse fen");
+        let res = perft(&mut b, 6);
+        println!("Nodes: {}", res.nodes);
+        println!("Checks: {}", res.checks);
+        println!("Captures: {}", res.captures);
+        println!("Checkmates: {}", res.checkmates);
+        println!("En Passants: {}", res.enpassants);
+        println!("Castles : {}", res.castles);
+        assert_eq!(res.nodes, 8031647685);
+        assert_eq!(res.checks, 92238050);
+        assert_eq!(res.captures, 1558445089);
+        assert_eq!(res.castles, 184513607);
+        assert_eq!(res.checkmates, 360003);
+        assert_eq!(res.enpassants, 3577504);
     }
 }
