@@ -46,7 +46,10 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
     for m in &moves {
         let preb = b.black_pieces();
         let prew = b.white_pieces();
+        assert!(preb & prew == board::BitBoard::empty());
+        //println!("{b}");
         b.make_move(&m);
+        //println!("{b}");
         if !b.in_check(!b.to_play) {
             let next_res = perft(b, depth - 1);
             result.nodes += next_res.nodes;
@@ -59,7 +62,12 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
         b.undo_move(&m);
         let postb = b.black_pieces();
         let postw = b.white_pieces();
-        assert_eq!(preb, postb);
+        assert!(postb & postw == board::BitBoard::empty());
+        if preb != postb {
+            println!("Undo_move failed for move: {m}");
+            println!("board:\n{b}");
+            assert_eq!(preb, postb);
+        }
         assert_eq!(prew, postw);
     }
     result

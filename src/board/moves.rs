@@ -47,6 +47,9 @@ pub struct Move {
 
 impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.turn == Color::Black {
+            write!(f, "..")?;
+        }
         let is_check = if self.is_check {
             "+"
         } else if self.is_mate {
@@ -64,8 +67,22 @@ impl fmt::Display for Move {
             (Piece::Bishop, Color::White) => "♝",
             (Piece::Queen, Color::Black) => "♕",
             (Piece::Queen, Color::White) => "♛",
-            (Piece::King, Color::Black) => "♔",
-            (Piece::King, Color::White) => "♚",
+            (Piece::King, Color::Black) => {
+                if self.is_castle_king {
+                    return write!(f, "O-O{}", is_check);
+                } else if self.is_castle_queen {
+                    return write!(f, "O-O-O{}", is_check);
+                }
+                "♔"
+            }
+            (Piece::King, Color::White) => {
+                if self.is_castle_king {
+                    return write!(f, "O-O{}", is_check);
+                } else if self.is_castle_queen {
+                    return write!(f, "O-O-O{}", is_check);
+                }
+                "♚"
+            }
             (Piece::Pawn, _) => match self.capture {
                 Some(_) => {
                     return write!(
@@ -80,6 +97,7 @@ impl fmt::Display for Move {
                 None => return write!(f, "{}{}{}", self.to.file(), self.to.rank(), is_check),
             },
         };
+
         let capture = match self.capture {
             Some(_) => "x",
             None => "",

@@ -18,6 +18,12 @@ impl BitBoard {
     }
 
     pub fn make_move(&self, m: &Move) -> BitBoard {
+        assert_eq!(
+            true,
+            self.contains(m.from),
+            "Tried to make move: {m} on board {:x}",
+            self.bits
+        );
         let from = BitBoard::from(m.from);
         let to = BitBoard::from(m.to);
 

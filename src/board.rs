@@ -236,13 +236,6 @@ impl Board {
                     self.white_pieces[m.piece as usize].make_move(m)
             }
         };
-        match m.capture {
-            Some(p) => match m.turn {
-                Color::Black => self.white_pieces[p as usize] &= !BitBoard::from(m.to),
-                Color::White => self.black_pieces[p as usize] &= !BitBoard::from(m.to),
-            },
-            None => (),
-        };
         if m.is_castle_king {
             match m.turn {
                 Color::Black => {
@@ -345,6 +338,26 @@ impl Board {
                 inner &= 0b0111
             }
         }
+        match m.capture {
+            Some(p) => {
+                match m.turn {
+                    Color::Black => self.white_pieces[p as usize] &= !BitBoard::from(m.to),
+                    Color::White => self.black_pieces[p as usize] &= !BitBoard::from(m.to),
+                };
+                if p == Piece::Rook {
+                    if m.to == h1() {
+                        inner &= 0b1110
+                    } else if m.to == h8() {
+                        inner &= 0b1011
+                    } else if m.to == a1() {
+                        inner &= 0b1101
+                    } else if m.to == a8() {
+                        inner &= 0b0111
+                    }
+                }
+            }
+            None => (),
+        };
         self.move_rights.push(MoveRights {
             castling_ability: CastlingAbility(inner),
             ep_target,
@@ -890,7 +903,7 @@ impl Board {
                 {
                     out.push(Move {
                         from: i,
-                        to: i.ea().and_then(|x| x.ea()).unwrap(),
+                        to: i.we().and_then(|x| x.we()).unwrap(),
                         turn: color,
                         piece: Piece::King,
                         capture: None,
