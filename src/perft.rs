@@ -1,18 +1,31 @@
 use crate::board;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
-pub struct PerfResult {
+pub struct PerftResult {
     nodes: usize,
     captures: usize,
-    checks: usize,
-    checkmates: usize,
     enpassants: usize,
     castles: usize,
     promotions: usize,
+    checks: usize,
+    checkmates: usize,
 }
 
-pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
-    let mut result = PerfResult {
+impl fmt::Display for PerftResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Nodes: {}", self.nodes)?;
+        writeln!(f, "Captures: {}", self.captures)?;
+        writeln!(f, "En Passants: {}", self.enpassants)?;
+        writeln!(f, "Castles: {}", self.castles)?;
+        writeln!(f, "Promotions: {}", self.promotions)?;
+        writeln!(f, "Checks: {}", self.checks)?;
+        writeln!(f, "Checkmates: {}", self.checkmates)
+    }
+}
+
+pub fn perft(b: &mut board::Board, depth: u8) -> PerftResult {
+    let mut result = PerftResult {
         nodes: 0,
         captures: 0,
         checks: 0,
@@ -57,14 +70,7 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
             preb,
             prew,
         );
-        if m.capture.is_some() && depth == 1 {
-            println!("{m}\n");
-            println!("{b}");
-        }
         b.make_move(&m);
-        if m.capture.is_some() && depth == 1 {
-            println!("{b}");
-        }
         let mb = b.black_pieces();
         let mw = b.white_pieces();
         assert!(
@@ -159,13 +165,8 @@ mod tests {
     fn perft6() {
         let mut b = starting_board();
         let res = perft(&mut b, 6);
+        println!("{res}");
 
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles: {}", res.castles);
         assert_eq!(res.nodes, 119060324);
         assert_eq!(res.checks, 809099);
         assert_eq!(res.captures, 2812008);
@@ -179,13 +180,8 @@ mod tests {
     fn perft7() {
         let mut b = starting_board();
         let res = perft(&mut b, 7);
+        println!("{res}");
 
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles: {}", res.castles);
         assert_eq!(res.nodes, 3_195_901_860);
         assert_eq!(res.checks, 33_103_848);
         assert_eq!(res.captures, 108_329_926);
@@ -199,13 +195,8 @@ mod tests {
     fn perft8() {
         let mut b = starting_board();
         let res = perft(&mut b, 8);
+        println!("{res}");
 
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles: {}", res.castles);
         assert_eq!(res.nodes, 84_998_978_956);
         assert_eq!(res.checks, 968_981_593);
         assert_eq!(res.captures, 3_523_740_106);
@@ -220,12 +211,7 @@ mod tests {
             Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
                 .expect("failed to parse fen");
         let res = perft(&mut b, 1);
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles : {}", res.castles);
+        println!("{res}");
         assert_eq!(res.nodes, 48);
         assert_eq!(res.checks, 0);
         assert_eq!(res.captures, 8);
@@ -239,12 +225,7 @@ mod tests {
             Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
                 .expect("failed to parse fen");
         let res = perft(&mut b, 2);
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles : {}", res.castles);
+        println!("{res}");
         assert_eq!(res.nodes, 2039);
         assert_eq!(res.checks, 3);
         assert_eq!(res.captures, 351);
@@ -258,13 +239,7 @@ mod tests {
             Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
                 .expect("failed to parse fen");
         let res = perft(&mut b, 3);
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles: {}", res.castles);
-        println!("Promotions: {}", res.promotions);
+        println!("{res}");
         assert_eq!(res.nodes, 97862);
         assert_eq!(res.checks, 993);
         assert_eq!(res.captures, 17102);
@@ -279,13 +254,7 @@ mod tests {
             Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
                 .expect("failed to parse fen");
         let res = perft(&mut b, 4);
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles : {}", res.castles);
-        println!("Promotions: {}", res.promotions);
+        println!("{res}");
         assert_eq!(res.nodes, 4085603);
         assert_eq!(res.checks, 25523);
         assert_eq!(res.captures, 757163);
@@ -295,19 +264,12 @@ mod tests {
         assert_eq!(res.promotions, 15172);
     }
     #[test]
-    #[ignore]
     fn kiwipete5() {
         let mut b =
             Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
                 .expect("failed to parse fen");
         let res = perft(&mut b, 5);
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles : {}", res.castles);
-        println!("Promotions: {}", res.promotions);
+        println!("{res}");
         assert_eq!(res.nodes, 193690690);
         assert_eq!(res.checks, 3309887);
         assert_eq!(res.captures, 35043416);
@@ -317,19 +279,12 @@ mod tests {
         assert_eq!(res.promotions, 8392);
     }
     #[test]
-    #[ignore]
     fn kiwipete6() {
         let mut b =
             Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
                 .expect("failed to parse fen");
         let res = perft(&mut b, 6);
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles : {}", res.castles);
-        println!("Promotions: {}", res.promotions);
+        println!("{res}");
         assert_eq!(res.nodes, 8031647685);
         assert_eq!(res.checks, 92238050);
         assert_eq!(res.captures, 1558445089);
@@ -342,60 +297,48 @@ mod tests {
     fn pos3_1() {
         let mut b = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1")
             .expect("failed to parse fen");
-        let res = perft(&mut b, 1);
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles : {}", res.castles);
-        println!("Promotions: {}", res.promotions);
-        assert_eq!(res.nodes, 14);
-        assert_eq!(res.captures, 1);
-        assert_eq!(res.enpassants, 0);
-        assert_eq!(res.castles, 0);
-        assert_eq!(res.promotions, 0);
-        assert_eq!(res.checks, 2);
-        assert_eq!(res.checkmates, 0);
+        let exp = PerftResult {
+            nodes: 14,
+            captures: 1,
+            enpassants: 0,
+            castles: 0,
+            promotions: 0,
+            checks: 2,
+            checkmates: 0,
+        };
+        let actual = perft(&mut b, 1);
+        assert_eq!(actual, exp);
     }
     #[test]
     fn pos3_2() {
         let mut b = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1")
             .expect("failed to parse fen");
-        let res = perft(&mut b, 2);
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles : {}", res.castles);
-        println!("Promotions: {}", res.promotions);
-        assert_eq!(res.nodes, 191);
-        assert_eq!(res.captures, 14);
-        assert_eq!(res.enpassants, 0);
-        assert_eq!(res.castles, 0);
-        assert_eq!(res.promotions, 0);
-        assert_eq!(res.checks, 10);
-        assert_eq!(res.checkmates, 0);
+        let exp = PerftResult {
+            nodes: 191,
+            captures: 14,
+            enpassants: 0,
+            castles: 0,
+            promotions: 0,
+            checks: 10,
+            checkmates: 0,
+        };
+        let actual = perft(&mut b, 2);
+        assert_eq!(actual, exp);
     }
     #[test]
     fn pos3_3() {
         let mut b = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1")
             .expect("failed to parse fen");
-        let res = perft(&mut b, 3);
-        println!("Nodes: {}", res.nodes);
-        println!("Checks: {}", res.checks);
-        println!("Captures: {}", res.captures);
-        println!("Checkmates: {}", res.checkmates);
-        println!("En Passants: {}", res.enpassants);
-        println!("Castles : {}", res.castles);
-        println!("Promotions: {}", res.promotions);
-        assert_eq!(res.nodes, 2812);
-        assert_eq!(res.captures, 3348);
-        assert_eq!(res.enpassants, 123);
-        assert_eq!(res.castles, 0);
-        assert_eq!(res.promotions, 0);
-        assert_eq!(res.checks, 1680);
-        assert_eq!(res.checkmates, 17);
+        let exp = PerftResult {
+            nodes: 2812,
+            captures: 3348,
+            enpassants: 123,
+            castles: 0,
+            promotions: 0,
+            checks: 1680,
+            checkmates: 17,
+        };
+        let actual = perft(&mut b, 3);
+        assert_eq!(actual, exp);
     }
 }
