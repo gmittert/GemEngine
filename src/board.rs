@@ -344,10 +344,21 @@ impl Board {
         }
         match m.capture {
             Some(p) => {
-                match m.turn {
-                    Color::Black => self.white_pieces[p as usize] &= !BitBoard::from(m.to),
-                    Color::White => self.black_pieces[p as usize] &= !BitBoard::from(m.to),
-                };
+                if m.is_en_passant {
+                    match m.turn {
+                        Color::Black => {
+                            self.white_pieces[p as usize] &= !BitBoard::from(m.to.no().unwrap())
+                        }
+                        Color::White => {
+                            self.black_pieces[p as usize] &= !BitBoard::from(m.to.so().unwrap())
+                        }
+                    }
+                } else {
+                    match m.turn {
+                        Color::Black => self.white_pieces[p as usize] &= !BitBoard::from(m.to),
+                        Color::White => self.black_pieces[p as usize] &= !BitBoard::from(m.to),
+                    };
+                }
                 if p == Piece::Rook {
                     if m.to == h1() {
                         inner &= 0b1110
