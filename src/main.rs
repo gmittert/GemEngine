@@ -6,5 +6,5 @@ fn main() {
     let mut b = board::starting_board();
     println!("{}", b);
 
-    println!("Perft3: {:?}", perft::perft(&mut b, 3));
+    println!("Perft3: {:?}", perft::perft(&mut b, 7));
 }
