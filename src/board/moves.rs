@@ -38,6 +38,7 @@ pub struct Move {
     pub turn: Color,
     pub piece: Piece,
     pub capture: Option<Piece>,
+    pub promotion: Option<Piece>,
     pub is_check: bool,
     pub is_mate: bool,
     pub is_en_passant: bool,
@@ -56,6 +57,11 @@ impl fmt::Display for Move {
             "#"
         } else {
             ""
+        };
+        let promo = if let Some(piece) = self.promotion {
+            format!("={piece:?}")
+        } else {
+            format!("")
         };
 
         let icon = match (self.piece, self.turn) {
@@ -87,14 +93,24 @@ impl fmt::Display for Move {
                 Some(_) => {
                     return write!(
                         f,
-                        "{}x{}{}{}",
+                        "{}x{}{}{}{}",
                         self.from.file(),
                         self.to.file(),
                         self.to.rank(),
+                        promo,
                         is_check
                     )
                 }
-                None => return write!(f, "{}{}{}", self.to.file(), self.to.rank(), is_check),
+                None => {
+                    return write!(
+                        f,
+                        "{}{}{}{}",
+                        self.to.file(),
+                        self.to.rank(),
+                        promo,
+                        is_check
+                    )
+                }
             },
         };
 
@@ -104,11 +120,12 @@ impl fmt::Display for Move {
         };
         write!(
             f,
-            "{}{}{}{}{}",
+            "{}{}{}{}{}{}",
             icon,
             capture,
             self.to.file(),
             self.to.rank(),
+            promo,
             is_check
         )
     }

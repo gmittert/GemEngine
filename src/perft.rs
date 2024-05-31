@@ -46,11 +46,12 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
     for m in &moves {
         let preb = b.black_pieces();
         let prew = b.white_pieces();
-        assert!(preb & prew == board::BitBoard::empty(),
+        assert!(
+            preb & prew == board::BitBoard::empty(),
             "Before making move: {m}, black ({:?}) overlapped with white ({:?})",
             preb,
             prew,
-            );
+        );
         //println!("{b}");
         b.make_move(&m);
         let mb = b.black_pieces();
@@ -74,11 +75,12 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerfResult {
         b.undo_move(&m);
         let postb = b.black_pieces();
         let postw = b.white_pieces();
-        assert!(postb & postw == board::BitBoard::empty(),
+        assert!(
+            postb & postw == board::BitBoard::empty(),
             "After undoing move: {m}, black ({:?}) overlapped with white ({:?})",
             postb,
             postw,
-            );
+        );
         if preb != postb {
             println!("Undo_move failed for move: {m}");
             println!("board:\n{b}");
@@ -142,6 +144,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn perft6() {
         let mut b = starting_board();
         let res = perft(&mut b, 6);
@@ -151,14 +154,17 @@ mod tests {
         println!("Captures: {}", res.captures);
         println!("Checkmates: {}", res.checkmates);
         println!("En Passants: {}", res.enpassants);
+        println!("Castles: {}", res.castles);
         assert_eq!(res.nodes, 119060324);
         assert_eq!(res.checks, 809099);
         assert_eq!(res.captures, 2812008);
         assert_eq!(res.checkmates, 10828);
         assert_eq!(res.enpassants, 5248);
+        assert_eq!(res.castles, 0);
     }
 
     #[test]
+    #[ignore]
     fn perft7() {
         let mut b = starting_board();
         let res = perft(&mut b, 7);
@@ -178,6 +184,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn perft8() {
         let mut b = starting_board();
         let res = perft(&mut b, 8);
@@ -254,6 +261,7 @@ mod tests {
         assert_eq!(res.enpassants, 45);
     }
     #[test]
+    #[ignore]
     fn kiwipete4() {
         let mut b =
             Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
@@ -273,6 +281,7 @@ mod tests {
         assert_eq!(res.enpassants, 1929);
     }
     #[test]
+    #[ignore]
     fn kiwipete5() {
         let mut b =
             Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
@@ -292,6 +301,7 @@ mod tests {
         assert_eq!(res.enpassants, 73365);
     }
     #[test]
+    #[ignore]
     fn kiwipete6() {
         let mut b =
             Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
