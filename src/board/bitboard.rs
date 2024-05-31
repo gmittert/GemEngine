@@ -3,7 +3,7 @@ use std::ops;
 use crate::board::moves::*;
 use crate::board::posn::*;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub struct BitBoard {
     bits: u64,
 }
@@ -14,7 +14,7 @@ impl BitBoard {
     }
 
     pub fn from(p: Posn) -> BitBoard {
-        BitBoard { bits: 1 << p.pos }
+        BitBoard { bits: p.pos }
     }
 
     pub fn make_move(&self, m: &Move) -> BitBoard {
@@ -38,7 +38,7 @@ impl BitBoard {
     }
 
     pub fn contains(&self, p: Posn) -> bool {
-        self.bits & (1 << p.pos) != 0
+        self.bits & p.pos != 0
     }
 }
 
@@ -49,11 +49,14 @@ impl Iterator for BitBoard {
         if self.bits == 0 {
             return None;
         }
-        let first_bit = self.bits.ilog2();
-        self.bits &= !(1 << first_bit);
-        Some(Posn {
-            pos: first_bit as u8,
-        })
+        if self.bits == 0x8000_0000_0000_0000 {
+            let res = self.bits;
+            self.bits = 0;
+            return Some(Posn { pos: res });
+        }
+        let lsb = (self.bits as i64) & -(self.bits as i64);
+        self.bits &= self.bits - 1;
+        Some(Posn { pos: lsb as u64 })
     }
 }
 
@@ -130,10 +133,10 @@ mod tests {
     pub fn bitboard_iter() {
         let b = a1() | a2() | b1() | b2();
         let mut b_it = b.into_iter();
-        assert_eq!(Some(a2()), b_it.next());
-        assert_eq!(Some(b2()), b_it.next());
-        assert_eq!(Some(a1()), b_it.next());
         assert_eq!(Some(b1()), b_it.next());
+        assert_eq!(Some(a1()), b_it.next());
+        assert_eq!(Some(b2()), b_it.next());
+        assert_eq!(Some(a2()), b_it.next());
         assert_eq!(None, b_it.next());
     }
 }

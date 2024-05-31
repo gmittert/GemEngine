@@ -427,8 +427,9 @@ mod tests {
     }
     #[test]
     fn pos4_1() {
-        let mut b = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 6,
             captures: 0,
@@ -443,8 +444,9 @@ mod tests {
     }
     #[test]
     fn pos4_2() {
-        let mut b = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 264,
             captures: 87,
@@ -459,8 +461,9 @@ mod tests {
     }
     #[test]
     fn pos4_3() {
-        let mut b = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 9467,
             captures: 1021,
@@ -475,8 +478,9 @@ mod tests {
     }
     #[test]
     fn pos4_4() {
-        let mut b = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 422333,
             captures: 131393,
@@ -491,8 +495,9 @@ mod tests {
     }
     #[test]
     fn pos4_5() {
-        let mut b = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 15833292,
             captures: 2046173,
@@ -508,8 +513,9 @@ mod tests {
     #[test]
     #[ignore]
     fn pos4_6() {
-        let mut b = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 706045033,
             captures: 210369132,
@@ -525,8 +531,9 @@ mod tests {
 
     #[test]
     fn pos4_1b() {
-        let mut b = Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 6,
             captures: 0,
@@ -541,8 +548,9 @@ mod tests {
     }
     #[test]
     fn pos4_2b() {
-        let mut b = Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 264,
             captures: 87,
@@ -557,8 +565,9 @@ mod tests {
     }
     #[test]
     fn pos4_3b() {
-        let mut b = Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 9467,
             captures: 1021,
@@ -573,8 +582,9 @@ mod tests {
     }
     #[test]
     fn pos4_4b() {
-        let mut b = Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 422333,
             captures: 131393,
@@ -589,8 +599,9 @@ mod tests {
     }
     #[test]
     fn pos4_5b() {
-        let mut b = Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 15833292,
             captures: 2046173,
@@ -606,8 +617,9 @@ mod tests {
     #[test]
     #[ignore]
     fn pos4_6b() {
-        let mut b = Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
+                .expect("failed to parse fen");
         let exp = PerftResult {
             nodes: 706045033,
             captures: 210369132,
@@ -658,71 +670,88 @@ mod tests {
     }
     #[test]
     fn pos6_1() {
-        let mut b = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen(
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+        )
+        .expect("failed to parse fen");
         let actual = perft(&mut b, 1);
         assert_eq!(actual.nodes, 46);
     }
     #[test]
     fn pos6_2() {
-        let mut b = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen(
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+        )
+        .expect("failed to parse fen");
         let actual = perft(&mut b, 2);
         assert_eq!(actual.nodes, 2_079);
     }
     #[test]
     fn pos6_3() {
-        let mut b = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen(
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+        )
+        .expect("failed to parse fen");
         let actual = perft(&mut b, 3);
         assert_eq!(actual.nodes, 89_890);
     }
     #[test]
     fn pos6_4() {
-        let mut b = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen(
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+        )
+        .expect("failed to parse fen");
         let actual = perft(&mut b, 4);
         assert_eq!(actual.nodes, 3_894_594);
     }
     #[test]
     #[ignore]
     fn pos6_5() {
-        let mut b = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen(
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+        )
+        .expect("failed to parse fen");
         let actual = perft(&mut b, 5);
         assert_eq!(actual.nodes, 164_075_551);
     }
     #[test]
     #[ignore]
     fn pos6_6() {
-        let mut b = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen(
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+        )
+        .expect("failed to parse fen");
         let actual = perft(&mut b, 6);
         assert_eq!(actual.nodes, 6_923_051_137);
     }
     #[test]
     #[ignore]
     fn pos6_7() {
-        let mut b = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen(
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+        )
+        .expect("failed to parse fen");
         let actual = perft(&mut b, 7);
         assert_eq!(actual.nodes, 287_188_994_746);
     }
     #[test]
     #[ignore]
     fn pos6_8() {
-        let mut b = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen(
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+        )
+        .expect("failed to parse fen");
         let actual = perft(&mut b, 8);
         assert_eq!(actual.nodes, 11_923_589_843_526);
     }
     #[test]
     #[ignore]
     fn pos6_9() {
-        let mut b = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen(
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+        )
+        .expect("failed to parse fen");
         let actual = perft(&mut b, 9);
-        assert_eq!(actual.nodes, 490_154_852_788_714
-);
+        assert_eq!(actual.nodes, 490_154_852_788_714);
     }
 }

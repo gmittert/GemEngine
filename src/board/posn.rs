@@ -53,18 +53,19 @@ impl fmt::Display for File {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Posn {
-    pub pos: u8,
+    pub pos: u64,
 }
 
 impl Posn {
     pub fn from(rank: Rank, file: File) -> Posn {
         Posn {
-            pos: (8 * rank as u8) + file as u8,
+            pos: 1 << ((8 * (rank as u8)) + (file as u8)),
         }
     }
 
     pub fn rank(&self) -> Rank {
-        match (self.pos >> 3) & 0x7 {
+        let first_bit = self.pos.ilog2();
+        match (first_bit >> 3) & 0x7 {
             0 => Rank::One,
             1 => Rank::Two,
             2 => Rank::Three,
@@ -77,7 +78,8 @@ impl Posn {
     }
 
     pub fn file(&self) -> File {
-        match self.pos & 0x7 {
+        let first_bit = self.pos.ilog2();
+        match first_bit & 0x7 {
             0 => File::H,
             1 => File::G,
             2 => File::F,
@@ -89,69 +91,78 @@ impl Posn {
         }
     }
 
-    pub fn no(&self) -> Option<Posn> {
-        if self.rank() == Rank::Eight {
-            None
-        } else {
-            Some(Posn { pos: self.pos + 8 })
+    fn check(&self) -> Option<Posn> {
+        if self.pos == 0 {
+            return None;
         }
+        Some(*self)
+    }
+    pub fn no_unchecked(&self) -> Posn {
+        Posn { pos: self.pos << 8 }
+    }
+    pub fn so_unchecked(&self) -> Posn {
+        Posn { pos: self.pos >> 8 }
+    }
+    pub fn ea_unchecked(&self) -> Posn {
+        const A_FILE: u64 = 0x8080_8080_8080_8080;
+        Posn {
+            pos: (self.pos >> 1) & !A_FILE,
+        }
+    }
+    pub fn we_unchecked(&self) -> Posn {
+        const H_FILE: u64 = 0x0101_0101_0101_0101;
+        Posn {
+            pos: (self.pos << 1) & !H_FILE,
+        }
+    }
+
+    pub fn no(&self) -> Option<Posn> {
+        self.no_unchecked().check()
     }
     pub fn so(&self) -> Option<Posn> {
-        if self.rank() == Rank::One {
-            None
-        } else {
-            Some(Posn { pos: self.pos - 8 })
-        }
+        self.so_unchecked().check()
     }
     pub fn ea(&self) -> Option<Posn> {
-        if self.file() == File::H {
-            None
-        } else {
-            Some(Posn { pos: self.pos - 1 })
-        }
+        self.ea_unchecked().check()
     }
     pub fn we(&self) -> Option<Posn> {
-        if self.file() == File::A {
-            None
-        } else {
-            Some(Posn { pos: self.pos + 1 })
-        }
+        self.we_unchecked().check()
     }
     pub fn nw(&self) -> Option<Posn> {
-        self.no().and_then(|p| p.we())
+        self.no_unchecked().we_unchecked().check()
     }
     pub fn ne(&self) -> Option<Posn> {
-        self.no().and_then(|p| p.ea())
+        self.no_unchecked().ea_unchecked().check()
     }
     pub fn sw(&self) -> Option<Posn> {
-        self.so().and_then(|p| p.we())
+        self.so_unchecked().we_unchecked().check()
     }
     pub fn se(&self) -> Option<Posn> {
-        self.so().and_then(|p| p.ea())
+        self.so_unchecked().ea_unchecked().check()
     }
     pub fn nnw(&self) -> Option<Posn> {
-        self.no().and_then(|p| p.no()).and_then(|p| p.we())
+        self.no_unchecked().no_unchecked().we_unchecked().check()
     }
     pub fn nne(&self) -> Option<Posn> {
-        self.no().and_then(|p| p.no()).and_then(|p| p.ea())
+        self.no_unchecked().no_unchecked().ea_unchecked().check()
     }
     pub fn nww(&self) -> Option<Posn> {
-        self.no().and_then(|p| p.we()).and_then(|p| p.we())
+        self.no_unchecked().we_unchecked().we_unchecked().check()
     }
     pub fn nee(&self) -> Option<Posn> {
-        self.no().and_then(|p| p.ea()).and_then(|p| p.ea())
+        self.no_unchecked().ea_unchecked().ea_unchecked().check()
     }
     pub fn ssw(&self) -> Option<Posn> {
-        self.so().and_then(|p| p.so()).and_then(|p| p.we())
+        self.so_unchecked().so_unchecked().we_unchecked().check()
     }
     pub fn sse(&self) -> Option<Posn> {
-        self.so().and_then(|p| p.so()).and_then(|p| p.ea())
+        self.so_unchecked().so_unchecked().ea_unchecked().check()
     }
     pub fn sww(&self) -> Option<Posn> {
-        self.so().and_then(|p| p.we()).and_then(|p| p.we())
+        self.so_unchecked().we_unchecked().we_unchecked().check()
     }
     pub fn see(&self) -> Option<Posn> {
-        self.so().and_then(|p| p.ea()).and_then(|p| p.ea())
+        self.so_unchecked().ea_unchecked().ea_unchecked().check()
     }
 }
 

@@ -55,7 +55,7 @@ pub struct MoveRights {
     pub ep_target: Option<Posn>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Board {
     pub black_pieces: [BitBoard; 6],
     pub white_pieces: [BitBoard; 6],
@@ -686,8 +686,8 @@ impl Board {
             Color::Black => self.white_pieces(),
             Color::White => self.black_pieces(),
         };
-        rooks.fold(BitBoard::empty(), |acc, i| {
-            let mut ret = acc;
+        let mut acc = BitBoard::empty();
+        for i in rooks {
             for shift in [
                 |p: Posn| p.no(),
                 |p: Posn| p.so(),
@@ -699,15 +699,15 @@ impl Board {
                     if allied_pieces.contains(pos) {
                         break;
                     }
-                    ret |= pos;
+                    acc |= pos;
                     if opponent_pieces.contains(pos) {
                         break;
                     }
                     slide = shift(pos);
                 }
             }
-            ret
-        })
+        }
+        acc
     }
 
     pub fn rook_moves(&self, color: Color, out: &mut Vec<Move>) {
@@ -1227,29 +1227,29 @@ impl fmt::Display for Board {
         let mut chars: [char; 64] = ['.'; 64];
 
         for i in 0..64 as usize {
-            if self.black_pieces[Piece::King as usize].contains(Posn { pos: i as u8 }) {
+            if self.black_pieces[Piece::King as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♔'
-            } else if self.black_pieces[Piece::Queen as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.black_pieces[Piece::Queen as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♕'
-            } else if self.black_pieces[Piece::Knight as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.black_pieces[Piece::Knight as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♘'
-            } else if self.black_pieces[Piece::Pawn as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.black_pieces[Piece::Pawn as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♙'
-            } else if self.black_pieces[Piece::Bishop as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.black_pieces[Piece::Bishop as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♗'
-            } else if self.black_pieces[Piece::Rook as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.black_pieces[Piece::Rook as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♖'
-            } else if self.white_pieces[Piece::King as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.white_pieces[Piece::King as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♚'
-            } else if self.white_pieces[Piece::Queen as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.white_pieces[Piece::Queen as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♛'
-            } else if self.white_pieces[Piece::Knight as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.white_pieces[Piece::Knight as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♞'
-            } else if self.white_pieces[Piece::Pawn as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.white_pieces[Piece::Pawn as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♟'
-            } else if self.white_pieces[Piece::Bishop as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.white_pieces[Piece::Bishop as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♝'
-            } else if self.white_pieces[Piece::Rook as usize].contains(Posn { pos: i as u8 }) {
+            } else if self.white_pieces[Piece::Rook as usize].contains(Posn { pos: 1 << i }) {
                 chars[i] = '♜'
             }
         }
@@ -1347,7 +1347,7 @@ mod tests {
     fn rook_moves_empty() {
         for i in 0..64 {
             let mut board = empty_board(Color::White);
-            board.white_pieces[Piece::Rook as usize] = BitBoard::from(Posn { pos: i });
+            board.white_pieces[Piece::Rook as usize] = BitBoard::from(Posn { pos: 1 << i });
             let mut moves = vec![];
             board.rook_moves(Color::White, &mut moves);
             assert_eq!(moves.len(), 14);
