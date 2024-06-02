@@ -40,6 +40,16 @@ impl BitBoard {
     pub fn contains(&self, p: Posn) -> bool {
         self.bits & p.pos != 0
     }
+
+    pub fn len(&self) -> usize {
+        let mut acc = self.bits as u64;
+        let mut count = 0;
+        while acc != 0 {
+            count += 1;
+            acc &= acc - 1
+        }
+        count
+    }
 }
 
 impl Iterator for BitBoard {

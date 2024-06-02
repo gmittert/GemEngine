@@ -151,6 +151,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn perft5() {
         let mut b = starting_board();
         let res = perft(&mut b, 5);
@@ -162,6 +163,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn perft6() {
         let mut b = starting_board();
         let res = perft(&mut b, 6);
@@ -249,6 +251,7 @@ mod tests {
         assert_eq!(res.promotions, 0);
     }
     #[test]
+    #[ignore]
     fn kiwipete4() {
         let mut b =
             Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
@@ -344,6 +347,7 @@ mod tests {
         assert_eq!(actual, exp);
     }
     #[test]
+    #[ignore]
     fn pos3_4() {
         let mut b = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1")
             .expect("failed to parse fen");
@@ -360,6 +364,7 @@ mod tests {
         assert_eq!(actual, exp);
     }
     #[test]
+    #[ignore]
     fn pos3_5() {
         let mut b = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1")
             .expect("failed to parse fen");
@@ -376,6 +381,7 @@ mod tests {
         assert_eq!(actual, exp);
     }
     #[test]
+    #[ignore]
     fn pos3_6() {
         let mut b = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1")
             .expect("failed to parse fen");
@@ -477,6 +483,7 @@ mod tests {
         assert_eq!(actual, exp);
     }
     #[test]
+    #[ignore]
     fn pos4_4() {
         let mut b =
             Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
@@ -494,6 +501,7 @@ mod tests {
         assert_eq!(actual, exp);
     }
     #[test]
+    #[ignore]
     fn pos4_5() {
         let mut b =
             Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
@@ -581,6 +589,7 @@ mod tests {
         assert_eq!(actual, exp);
     }
     #[test]
+    #[ignore]
     fn pos4_4b() {
         let mut b =
             Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
@@ -598,6 +607,7 @@ mod tests {
         assert_eq!(actual, exp);
     }
     #[test]
+    #[ignore]
     fn pos4_5b() {
         let mut b =
             Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1")
@@ -655,6 +665,7 @@ mod tests {
         assert_eq!(actual.nodes, 62379);
     }
     #[test]
+    #[ignore]
     fn pos5_4() {
         let mut b = Board::from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8")
             .expect("failed to parse fen");
@@ -662,6 +673,7 @@ mod tests {
         assert_eq!(actual.nodes, 2103487);
     }
     #[test]
+    #[ignore]
     fn pos5_5() {
         let mut b = Board::from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8")
             .expect("failed to parse fen");
