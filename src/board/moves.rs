@@ -13,6 +13,20 @@ pub enum Piece {
     King,
 }
 
+impl Piece {
+    pub fn from(c: char) -> Option<Piece> {
+        match c {
+            'p' | 'P' => Some(Piece::Pawn),
+            'r' | 'R' => Some(Piece::Rook),
+            'n' | 'N' => Some(Piece::Knight),
+            'b' | 'B' => Some(Piece::Bishop),
+            'q' | 'Q' => Some(Piece::Queen),
+            'k' | 'K' => Some(Piece::King),
+            _ => None,
+        }
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Color {
@@ -28,6 +42,53 @@ impl Not for Color {
             Color::White => Color::Black,
             Color::Black => Color::White,
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct AlgebraicMove {
+    pub from: Posn,
+    pub to: Posn,
+    pub promotion: Option<Piece>,
+}
+
+impl AlgebraicMove {
+    pub fn from(s: &str) -> Option<AlgebraicMove> {
+        let mut chars = s.chars();
+        let from_file = File::from(chars.next()?)?;
+        let from_rank = Rank::from(chars.next()?)?;
+        let to_file = File::from(chars.next()?)?;
+        let to_rank = Rank::from(chars.next()?)?;
+        let promo = chars.next().and_then(|c| Piece::from(c));
+        Some(AlgebraicMove {
+            from: Posn::from(from_rank, from_file),
+            to: Posn::from(to_rank, to_file),
+            promotion: promo,
+        })
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::board::*;
+
+    #[test]
+    pub fn parse_alg_move() {
+        assert_eq!(
+            AlgebraicMove::from("e2e4"),
+            Some(AlgebraicMove {
+                from: e2(),
+                to: e4(),
+                promotion: None
+            })
+        );
+        assert_eq!(
+            AlgebraicMove::from("b7b8q"),
+            Some(AlgebraicMove {
+                from: b7(),
+                to: b8(),
+                promotion: Some(Piece::Queen)
+           })
+        );
     }
 }
 

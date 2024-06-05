@@ -13,6 +13,22 @@ pub enum Rank {
     Eight,
 }
 
+impl Rank {
+    pub fn from(s: char) -> Option<Rank> {
+        match s {
+            '1' => Some(Rank::One),
+            '2' => Some(Rank::Two),
+            '3' => Some(Rank::Three),
+            '4' => Some(Rank::Four),
+            '5' => Some(Rank::Five),
+            '6' => Some(Rank::Six),
+            '7' => Some(Rank::Seven),
+            '8' => Some(Rank::Eight),
+            _ => None,
+        }
+    }
+}
+
 impl fmt::Display for Rank {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", (*self as u8) + 1)
@@ -30,6 +46,48 @@ pub enum File {
     C,
     B,
     A,
+}
+
+impl File {
+    pub fn from(c: char) -> Option<File> {
+        let lower = c;
+        match lower {
+            'a' | 'A' => Some(File::A),
+            'b' | 'B' => Some(File::B),
+            'c' | 'C' => Some(File::C),
+            'd' | 'D' => Some(File::D),
+            'e' | 'E' => Some(File::E),
+            'f' | 'F' => Some(File::F),
+            'g' | 'G' => Some(File::G),
+            'h' | 'H' => Some(File::H),
+            _ => None,
+        }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::board::Rank;
+    use crate::board::File;
+
+    #[test]
+    pub fn parse_rank() {
+        assert_eq!(Some(Rank::One), Rank::from('1'));
+        assert_eq!(Some(Rank::Two), Rank::from('2'));
+        assert_eq!(Some(Rank::Three), Rank::from('3'));
+        assert_eq!(Some(Rank::Four), Rank::from('4'));
+        assert_eq!(Some(Rank::Five), Rank::from('5'));
+        assert_eq!(Some(Rank::Six), Rank::from('6'));
+        assert_eq!(Some(Rank::Seven), Rank::from('7'));
+        assert_eq!(Some(Rank::Eight), Rank::from('8'));
+        assert_eq!(None, Rank::from('9'));
+    }
+
+    #[test]
+    pub fn parse_file() {
+        assert_eq!(Some(File::A), File::from('a'));
+        assert_eq!(Some(File::A), File::from('A'));
+        assert_eq!(None, File::from('9'));
+    }
 }
 
 impl fmt::Display for File {

@@ -1,5 +1,6 @@
 mod board;
 mod perft;
+mod uci;
 
 fn main() {
     println!("Starting Chess Board:");
