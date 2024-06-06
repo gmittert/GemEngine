@@ -83,55 +83,92 @@ fn read_uci_line(line: String, dispatch: &dyn UciEngine) -> Result<(), String> {
                     "searchmoves" => {
                         let mut moves = vec![];
                         while let Some(m) = words.next() {
-                            let parsed = AlgebraicMove::from(m).ok_or(format!("Invalid move: {}", m))?;
+                            let parsed =
+                                AlgebraicMove::from(m).ok_or(format!("Invalid move: {}", m))?;
                             moves.push(parsed);
                         }
                         options.search_moves = Some(moves)
                     }
                     "ponder" => options.ponder = true,
                     "wtime" => {
-                        let time = words.next().ok_or(format!("Missing wtime value in: {}", line))?;
-                        let ms: usize = time.parse().map_err(|e|format!("Invalid wtime value: {}", e))?;
+                        let time = words
+                            .next()
+                            .ok_or(format!("Missing wtime value in: {}", line))?;
+                        let ms: usize = time
+                            .parse()
+                            .map_err(|e| format!("Invalid wtime value: {}", e))?;
                         options.wtime = Some(ms);
                     }
                     "btime" => {
-                        let time = words.next().ok_or(format!("Missing btime value in: {}", line))?;
-                        let ms: usize = time.parse().map_err(|e|format!("Invalid btime value: {}", e))?;
+                        let time = words
+                            .next()
+                            .ok_or(format!("Missing btime value in: {}", line))?;
+                        let ms: usize = time
+                            .parse()
+                            .map_err(|e| format!("Invalid btime value: {}", e))?;
                         options.wtime = Some(ms);
                     }
                     "winc" => {
-                        let time = words.next().ok_or(format!("Missing wincvalue in: {}", line))?;
-                        let ms: usize = time.parse().map_err(|e|format!("Invalid winc value: {}", e))?;
+                        let time = words
+                            .next()
+                            .ok_or(format!("Missing wincvalue in: {}", line))?;
+                        let ms: usize = time
+                            .parse()
+                            .map_err(|e| format!("Invalid winc value: {}", e))?;
                         options.winc = Some(ms);
                     }
                     "binc" => {
-                        let time = words.next().ok_or(format!("Missing binc value in: {}", line))?;
-                        let ms: usize = time.parse().map_err(|e|format!("Invalid binc value: {}", e))?;
+                        let time = words
+                            .next()
+                            .ok_or(format!("Missing binc value in: {}", line))?;
+                        let ms: usize = time
+                            .parse()
+                            .map_err(|e| format!("Invalid binc value: {}", e))?;
                         options.btime = Some(ms);
                     }
                     "movestogo" => {
-                        let moves = words.next().ok_or(format!("Missing movestogo value in: {}", line))?;
-                        let moves: usize = moves.parse().map_err(|e|format!("Invalid movestogo value: {}", e))?;
+                        let moves = words
+                            .next()
+                            .ok_or(format!("Missing movestogo value in: {}", line))?;
+                        let moves: usize = moves
+                            .parse()
+                            .map_err(|e| format!("Invalid movestogo value: {}", e))?;
                         options.moves_to_go = Some(moves);
                     }
                     "depth" => {
-                        let depth = words.next().ok_or(format!("Missing depth value in: {}", line))?;
-                        let depth: usize = depth.parse().map_err(|e|format!("Invalid depth value: {}", e))?;
+                        let depth = words
+                            .next()
+                            .ok_or(format!("Missing depth value in: {}", line))?;
+                        let depth: usize = depth
+                            .parse()
+                            .map_err(|e| format!("Invalid depth value: {}", e))?;
                         options.depth = Some(depth);
                     }
                     "nodes" => {
-                        let nodes = words.next().ok_or(format!("Missing nodes value in: {}", line))?;
-                        let nodes: usize = nodes.parse().map_err(|e|format!("Invalid nodes value: {}", e))?;
+                        let nodes = words
+                            .next()
+                            .ok_or(format!("Missing nodes value in: {}", line))?;
+                        let nodes: usize = nodes
+                            .parse()
+                            .map_err(|e| format!("Invalid nodes value: {}", e))?;
                         options.nodes = Some(nodes);
                     }
                     "mate" => {
-                        let mate = words.next().ok_or(format!("Missing mate value in: {}", line))?;
-                        let mate : usize = mate.parse().map_err(|e|format!("Invalid mate value: {}", e))?;
+                        let mate = words
+                            .next()
+                            .ok_or(format!("Missing mate value in: {}", line))?;
+                        let mate: usize = mate
+                            .parse()
+                            .map_err(|e| format!("Invalid mate value: {}", e))?;
                         options.mate = Some(mate);
                     }
                     "movetime" => {
-                        let time = words.next().ok_or(format!("Missing movetime value in: {}", line))?;
-                        let time : usize = time.parse().map_err(|e|format!("Invalid movetime value: {}", e))?;
+                        let time = words
+                            .next()
+                            .ok_or(format!("Missing movetime value in: {}", line))?;
+                        let time: usize = time
+                            .parse()
+                            .map_err(|e| format!("Invalid movetime value: {}", e))?;
                         options.move_time = Some(time);
                     }
                     "infinite" => {

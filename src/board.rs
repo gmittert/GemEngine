@@ -1,8 +1,8 @@
 mod bitboard;
+pub mod evaluation;
 mod move_generation;
 mod moves;
 mod posn;
-pub mod evaluation;
 pub use crate::board::bitboard::*;
 pub use crate::board::moves::*;
 pub use crate::board::posn::*;

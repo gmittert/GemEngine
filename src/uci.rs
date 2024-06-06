@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::board::{evaluation::Evaluation, AlgebraicMove, Move};
 pub mod reader;
 
@@ -34,12 +36,28 @@ pub struct Score {
     is_lower_bound: bool,
 }
 
-enum EngineOptionType {
-    Chec,
+pub enum EngineOptionType {
+    Check,
     Spin,
     Combo(Vec<String>),
     Button,
     String,
+}
+
+impl fmt::Display for EngineOptionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                EngineOptionType::Check => "check",
+                EngineOptionType::Spin => "spin",
+                EngineOptionType::Combo(_) => "combo",
+                EngineOptionType::Button => "button",
+                EngineOptionType::String => "string",
+            }
+        )
+    }
 }
 
 pub struct EngineOption {
@@ -60,7 +78,10 @@ pub struct Info {
     // number of  nodes searched
     nodes: Option<usize>,
     // The best line(s) found
-    pv: Option<Vec<Vec<Move>>>,
+    pv: Option<Vec<Move>>,
+
+    // When sending multiple lines, used to index which line is sent
+    multipv: usize,
 
     // The score from the engine's point of view in centipawns
     score: Option<Score>,
@@ -86,7 +107,7 @@ pub struct Info {
     refutation: Option<Vec<Move>>,
 
     // the current lines engine is calculating on each cpu
-    curr_lines: Option<Vec<Move>>,
+    curr_line: Option<(usize, Vec<Move>)>,
 }
 
 pub enum RegistrationStatus {
@@ -95,7 +116,7 @@ pub enum RegistrationStatus {
     Checking,
 }
 
-pub trait UciEngine{
+pub trait UciEngine {
     //	After receiving the uci command the engine must
     //	- identify itself with the "id" command
     //	- send the "option" commands to tell the GUI which engine settings the engine supports if any
@@ -164,27 +185,135 @@ pub trait UciEngine{
     fn quit(&self);
 }
 
-pub trait UciWriter{
-    // Identify the engine to the GUI
-    fn id(&self, name: str, author: str);
+// Identify the engine to the GUI
+fn id(name: &str, author: &str) {
+    println!("id name {}", name);
+    println!("id author {}", author);
+}
 
-    // Let the GUI know that we have identified ourself and are in UCI mode
-    fn uci_ok(&self);
+// Let the GUI know that we have identified ourself and are in UCI mode
+fn uci_ok() {
+    println!("uciok");
+}
 
-    // After recieiving a "is_ready", the engine should respond with "ready_ok()" after processing
-    // all input.
-    fn ready_ok(&self);
+// After recieiving a "is_ready", the engine should respond with "ready_ok()" after processing
+// all input.
+fn ready_ok() {
+    println!("readyok");
+}
 
-    // The engine has stopped searching and found the move <move> best in this position. The engine
-    // can optionally send the move it likes to ponder on.
-    fn best_move(&self, m: Move, ponder: Option<Move>);
+// The engine has stopped searching and found the move <move> best in this position. The engine
+// can optionally send the move it likes to ponder on.
+pub fn best_move(m: Move, ponder: Option<Move>) {
+    if let Some(ponder_move) = ponder {
+        println!(
+            "bestmove {}{} ponder {}{}",
+            m.from, m.to, ponder_move.from, ponder_move.to
+        );
+    } else {
+        println!("bestmove {}{}", m.from, m.to);
+    }
+}
 
-    // Inform the gui of if registration is needed
-    fn registration(&self, status: RegistrationStatus);
+// Inform the gui of if registration is needed
+pub fn registration(status: RegistrationStatus) {
+    match status {
+        RegistrationStatus::Ok => println!("registration ok"),
+        RegistrationStatus::Err => println!("registration error"),
+        RegistrationStatus::Checking => println!("registration checking"),
+    }
+}
 
-    // The engine wishes to send information to the GUI.
-    fn info(&self, info_block: Info);
+// The engine wishes to send information to the GUI.
+pub fn info(info_block: Info) {
+    print!("info");
+    if let Some(depth) = info_block.depth {
+        print!(" depth {depth}");
+    }
+    if let Some(seldepth) = info_block.seldepth {
+        print!(" seldepth {seldepth}");
+    }
+    if let Some(time) = info_block.time {
+        print!(" time {time}");
+    }
+    if let Some(pv) = info_block.pv {
+        print!(" pv");
+        for m in pv {
+            print!(" {m}");
+        }
+    }
+    if let Some(score) = info_block.score {
+        print!(" score");
+        let eval = score.eval;
+        if let Some(m) = eval.mate_in() {
+            print!(" mate {m}")
+        } else if let Some(m) = eval.mated_in() {
+            print!(" mate -{m}")
+        } else {
+            print!(" {eval}")
+        }
+        if score.is_upper_bound {
+            print!(" upperbound")
+        }
+        if score.is_lower_bound {
+            print!(" lowerbound")
+        }
+    }
+    if let Some(currmove) = info_block.curr_move {
+        print!(" currmove {}{}", currmove.from, currmove.to)
+    }
+    if let Some(currmovenum) = info_block.curr_move_number {
+        print!(" currmovenumber {}", currmovenum)
+    }
+    if let Some(hashfull) = info_block.hash_full {
+        print!(" hashfull {}", hashfull)
+    }
+    if let Some(nps) = info_block.nodes_per_sec {
+        print!(" nps {}", nps)
+    }
+    if let Some(tbhits) = info_block.table_base_hits {
+        print!(" tbhits {}", tbhits)
+    }
+    if let Some(sbhits) = info_block.shredder_ending_hits {
+        print!(" sbhits {}", sbhits)
+    }
+    if let Some(cpuload) = info_block.cpuload {
+        print!(" cpuload {}", cpuload)
+    }
+    if let Some(string) = info_block.string {
+        print!(" string {}", string)
+    }
+    if let Some(refutation) = info_block.refutation {
+        print!(" refutation");
+        for m in refutation {
+            print!(" {m}");
+        }
+    }
+    if let Some((cpu, currline)) = info_block.curr_line {
+        print!(" refutation {}", cpu);
+        for m in currline {
+            print!(" {m}");
+        }
+    }
+}
 
-    // This command tells the GUI which parameters can be changed in the engine.
-    fn option(&self, name: str);
+// This command tells the GUI which parameters can be changed in the engine.
+pub fn option(opt: EngineOption) {
+    print!("option {}", opt.name);
+    print!(" type {}", opt.ty);
+    if let Some(default) = opt.default {
+        print!(" default {default}");
+    }
+    if let Some(min) = opt.min {
+        print!(" min {min}");
+    }
+    if let Some(max) = opt.max {
+        print!(" max {max}");
+    }
+    if let EngineOptionType::Combo(vars) = opt.ty {
+        for var in vars {
+            print!(" var {var}");
+        }
+    }
+    println!("");
 }

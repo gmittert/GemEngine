@@ -11,6 +11,7 @@ pub struct Evaluation(i64);
 //   2 and so on.
 // - We treat i64::MIN as having lost the game, i64::MIN + 1 as the opponent having mate in 1,
 //   i64::MAX -2 as the opponent having mate in 2 and so on.
+// - Everything else is an evalutation in centipawns
 impl Evaluation {
     fn won() -> Evaluation {
         Evaluation(std::i64::MAX)
@@ -36,14 +37,22 @@ impl Evaluation {
     fn m5() -> Evaluation {
         Evaluation(std::i64::MAX - 5)
     }
-    fn is_mate(&self) -> bool {
-        self.0 >= Self::won().0 - 100
+    pub fn mate_in(&self) -> Option<usize> {
+        if self.0 >= Self::won().0 - 100 {
+            Some(Self::won().0 as usize - 100)
+        } else {
+            None
+        }
     }
     fn dec_mate(&self) -> Evaluation {
         Evaluation(self.0 - 1)
     }
-    fn is_mated(&self) -> bool {
-        self.0 <= Self::lost().0 + 100
+    pub fn mated_in(&self) -> Option<usize> {
+        if self.0 <= Self::lost().0 + 100 {
+            Some((Self::lost().0 - self.0) as usize)
+        } else {
+            None
+        }
     }
     fn dec_mated(&self) -> Evaluation {
         Evaluation(self.0 + 1)
@@ -102,9 +111,9 @@ impl Board {
             self.undo_move(&m);
         }
         if let Some(score) = best_score {
-            let adjusted_max = if score.is_mate() {
+            let adjusted_max = if score.mate_in().is_some() {
                 score.dec_mate()
-            } else if score.is_mated() {
+            } else if score.mated_in().is_some() {
                 score.dec_mated()
             } else {
                 score
@@ -129,7 +138,7 @@ impl Board {
         for m in &moves {
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
-                let eval = -self.nega_max(depth-1);
+                let eval = -self.nega_max(depth - 1);
                 if let Some(prev) = max {
                     max = Some(std::cmp::max(eval, prev));
                 } else {
@@ -139,9 +148,9 @@ impl Board {
             self.undo_move(&m);
         }
         if let Some(max) = max {
-            if max.is_mate() {
+            if max.mate_in().is_some() {
                 max.dec_mate()
-            } else if max.is_mated() {
+            } else if max.mated_in().is_some() {
                 max.dec_mated()
             } else {
                 max
@@ -171,12 +180,12 @@ impl Board {
         let pawn_diff: i64 = self.white_pieces[Piece::Pawn as usize].len() as i64
             - self.black_pieces[Piece::Pawn as usize].len() as i64;
 
-        let materialistic = 2000 * king_diff
-            + 90 * queen_diff
-            + 50 * rook_diff
-            + 31 * bishop_diff
-            + 30 * knight_diff
-            + 1 * pawn_diff;
+        let materialistic = 20000 * king_diff
+            + 900 * queen_diff
+            + 500 * rook_diff
+            + 310 * bishop_diff
+            + 300 * knight_diff
+            + 100 * pawn_diff;
         match to_play {
             Color::Black => -Evaluation(materialistic),
             Color::White => Evaluation(materialistic),
@@ -186,8 +195,8 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use crate::board::*;
     use crate::board::evaluation::*;
+    use crate::board::*;
     #[test]
     fn white_better() {
         let b = Board::from_fen("rkb1kbkr/pppppppp/8/8/8/8/PPPPPPPP/RKBQKBKR w - - 0 1")
@@ -236,8 +245,8 @@ mod tests {
     }
     #[test]
     fn m1() {
-        let mut b = Board::from_fen("1k6/ppp5/8/8/8/8/8/K6R w - - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("1k6/ppp5/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
         let (best_move, eval) = b.best_move();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -250,44 +259,41 @@ mod tests {
     }
     #[test]
     fn won() {
-        let mut b = Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 w - - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let (best_move, eval) = b.best_move();
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::won());
     }
     #[test]
     fn lost() {
-        let mut b = Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let (best_move, eval) = b.best_move();
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::lost());
     }
     #[test]
     fn stalemate() {
-        let mut b = Board::from_fen("k7/2Q5/8/8/8/8/8/K7 b - - 0 1")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen("k7/2Q5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let (best_move, eval) = b.best_move();
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::draw());
     }
     #[test]
     fn draw() {
-        let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 b - - 0 1")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let (_, eval) = b.best_move();
         assert_eq!(eval, Evaluation::draw());
 
-        let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 w - - 0 1")
-            .expect("failed to parse fen");
+        let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let (_, eval) = b.best_move();
         assert_eq!(eval, Evaluation::draw());
     }
     #[test]
     fn mates() {
-        let mut b = Board::from_fen("1k6/pppr4/8/8/8/8/8/K6R w - - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("1k6/pppr4/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
         let (best_move, eval) = b.best_move();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -299,8 +305,8 @@ mod tests {
         assert_eq!(best_move.capture, None);
         assert_eq!(eval, Evaluation::m3());
 
-        let mut b = Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let (best_move, eval) = b.best_move();
         println!("Eval: {}", eval);
         assert!(best_move.is_some());
@@ -311,9 +317,9 @@ mod tests {
         assert_eq!(best_move.to, g8());
         assert_eq!(best_move.capture, None);
         assert_eq!(eval, Evaluation::m1());
-        
-        let mut b = Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 b - - 0 1")
-            .expect("failed to parse fen");
+
+        let mut b =
+            Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let (best_move, eval) = b.best_move();
         println!("Eval: {}", eval);
         assert!(best_move.is_some());
@@ -325,13 +331,13 @@ mod tests {
     }
     #[test]
     fn bishop_knight_mate() {
-        let mut b = Board::from_fen("8/8/8/1B6/5N2/6K1/8/6k1 w - - 0 1")
-            .expect("failed to parse fen");
+        let mut b =
+            Board::from_fen("8/8/8/1B6/5N2/6K1/8/6k1 w - - 0 1").expect("failed to parse fen");
         let (best_move, eval) = b.best_move();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
         println!("Eval: {}", eval);
-        assert!(eval.is_mate());
+        assert!(eval.mate_in().is_some());
     }
 }

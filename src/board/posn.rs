@@ -66,8 +66,8 @@ impl File {
 }
 #[cfg(test)]
 mod tests {
-    use crate::board::Rank;
     use crate::board::File;
+    use crate::board::Rank;
 
     #[test]
     pub fn parse_rank() {
@@ -221,6 +221,12 @@ impl Posn {
     }
     pub fn see(&self) -> Option<Posn> {
         self.so_unchecked().ea_unchecked().ea_unchecked().check()
+    }
+}
+
+impl fmt::Display for Posn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", self.file(), self.rank())
     }
 }
 

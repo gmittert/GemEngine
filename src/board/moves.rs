@@ -87,7 +87,7 @@ mod tests {
                 from: b7(),
                 to: b8(),
                 promotion: Some(Piece::Queen)
-           })
+            })
         );
     }
 }
