@@ -1,11 +1,19 @@
 mod board;
 mod perft;
 mod uci;
+mod gem;
+use std::io;
 
-fn main() {
-    println!("Starting Chess Board:");
-    let mut b = board::starting_board();
-    println!("{}", b);
-
-    println!("Perft6: {:?}", perft::perft(&mut b, 6));
+fn main() -> io::Result<()> {
+    let mut gem = gem::Gem{board: board::starting_board()};
+    let mut buffer = String::new();
+    loop {
+        io::stdin().read_line(&mut buffer)?;
+        if let Err(e) = uci::reader::read_uci_line(&buffer, &mut gem) {
+            println!("{}", e);
+            break;
+        }
+        buffer.clear();
+    }
+    Ok(())
 }

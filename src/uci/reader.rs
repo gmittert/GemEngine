@@ -2,24 +2,24 @@ use crate::{board::AlgebraicMove, uci::UciEngine};
 
 use super::GoOptions;
 
-fn read_uci_line(line: String, dispatch: &dyn UciEngine) -> Result<(), String> {
+pub fn read_uci_line(line: &str, dispatch: &mut dyn UciEngine) -> Result<(), String> {
     let mut words = line.split_whitespace();
     let Some(command) = words.next() else {
         return Err(format!("Invalid uci command: {line}"));
     };
     match command {
-        "uci" => Ok(dispatch.uci()),
+        "uci" => dispatch.uci(),
         "debug" => {
             let Some(mode) = words.next() else {
                 return Err(format!("Missing debug mode in: {line}"));
             };
             match mode {
-                "on" => Ok(dispatch.debug(true)),
-                "off" => Ok(dispatch.debug(true)),
+                "on" => dispatch.debug(true),
+                "off" => dispatch.debug(false),
                 _ => Err(format!("Invalid debug mode in: {line}")),
             }
         }
-        "isready" => Ok(dispatch.is_ready()),
+        "isready" => dispatch.is_ready(),
         "setoption" => {
             let Some(name_literal) = words.next() else {
                 return Err(format!("Invalid setoption line: {line}"));
@@ -31,7 +31,7 @@ fn read_uci_line(line: String, dispatch: &dyn UciEngine) -> Result<(), String> {
                 return Err(format!("Missing 'name' value in : {line}"));
             };
             let Some(option_literal) = words.next() else {
-                return Ok(dispatch.set_option(option_name, None));
+                return dispatch.set_option(option_name, None);
             };
             if option_literal != "option" {
                 return Err(format!("Invalid 'option' parameter in: {line}"));
@@ -39,13 +39,13 @@ fn read_uci_line(line: String, dispatch: &dyn UciEngine) -> Result<(), String> {
             let Some(option) = words.next() else {
                 return Err(format!("Missing 'option' value in : {line}"));
             };
-            Ok(dispatch.set_option(option_name, Some(option)))
+            dispatch.set_option(option_name, Some(option))
         }
         "register" => {
             // todo, actually implement the parameters to this
-            Ok(dispatch.register())
+            dispatch.register()
         }
-        "ucinewgame" => Ok(dispatch.uci_new_game()),
+        "ucinewgame" => dispatch.uci_new_game(),
         "position" => {
             let Some(position_type) = words.next() else {
                 return Err(format!("Missing position arguments: {line}"));
@@ -72,7 +72,7 @@ fn read_uci_line(line: String, dispatch: &dyn UciEngine) -> Result<(), String> {
                 let parsed = AlgebraicMove::from(m).ok_or(format!("Invalid move: {}", m))?;
                 moves.push(parsed);
             }
-            Ok(dispatch.position(fen, moves))
+            dispatch.position(fen, moves)
         }
         "go" => {
             let mut options = GoOptions {
@@ -177,11 +177,11 @@ fn read_uci_line(line: String, dispatch: &dyn UciEngine) -> Result<(), String> {
                     _ => return Err(format!("Invalid go option: {}", option)),
                 }
             }
-            Ok(dispatch.go(options))
+            dispatch.go(options)
         }
-        "stop" => Ok(dispatch.stop()),
-        "ponderhit" => Ok(dispatch.ponder_hit()),
-        "quit" => Ok(dispatch.quit()),
+        "stop" => dispatch.stop(),
+        "ponderhit" => dispatch.ponder_hit(),
+        "quit" => dispatch.quit(),
         _ => Err(format!("Invalid uci command: {line}")),
     }
 }

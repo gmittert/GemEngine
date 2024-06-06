@@ -121,20 +121,20 @@ pub trait UciEngine {
     //	- identify itself with the "id" command
     //	- send the "option" commands to tell the GUI which engine settings the engine supports if any
     //	- the engine should send "uciok" to acknowledge the uci mode
-    fn uci(&self);
+    fn uci(&mut self) -> Result<(), String>;
 
     // switch the debug mode of the engine on and off. In debug mode the engine should send
     // additional infos to the GUI, e.g. with the "info string" command, to help debugging, e.g.
     // the commands that the engine has received etc. This mode should be switched off by default
     // and this command can be sent any time, also when the engine is thinking.
-    fn debug(&self, on: bool);
+    fn debug(&mut self, on: bool) -> Result<(), String>;
 
     // Allow the GUI to synchronize with the engine. The engine should respond with ready_ok() to
     // indicate to the GUI that it has completed processing any remaining input
-    fn is_ready(&self);
+    fn is_ready(&mut self) -> Result<(), String>;
 
     // Allow various configuration options exposed by the engine to be set
-    fn set_option(&self, name: &str, value: Option<&str>);
+    fn set_option(&mut self, name: &str, value: Option<&str>) -> Result<(), String>;
 
     //this is the command to try to register an engine or to tell the engine that registration
     //will be done later. This command should always be sent if the engine	has sent "registration error"
@@ -150,7 +150,7 @@ pub trait UciEngine {
     //   "register later"
     //   "register name Stefan MK code 4359874324"
 
-    fn register(&self);
+    fn register(&mut self) -> Result<(), String>;
 
     // this is sent to the engine when the next search (started with "position" and "go") will be from
     // a different game. This can be a new game the engine should play or a new game it should analyse but
@@ -160,45 +160,45 @@ pub trait UciEngine {
     // So the engine should not rely on this command even though all new GUIs should support it.
     // As the engine's reaction to "ucinewgame" can take some time the GUI should always send "isready"
     // after "ucinewgame" to wait for the engine to finish its operation.
-    fn uci_new_game(&self);
+    fn uci_new_game(&mut self) -> Result<(), String>;
 
     // set up the position described in fenstring on the internal board and
     // play the moves on the internal chess board.
     // if the game was played  from the start position the string "startpos" will be sent
     // Note: no "new" command is needed. However, if this position is from a different game than
     // the last position sent to the engine, the GUI should have sent a "ucinewgame" inbetween.
-    fn position(&self, fen: &str, moves: Vec<AlgebraicMove>);
+    fn position(&mut self, fen: &str, moves: Vec<AlgebraicMove>) -> Result<(), String>;
 
     // Start calculating on the current position set up with the "position" command.
-    fn go(&self, options: GoOptions);
+    fn go(&mut self, options: GoOptions) -> Result<(), String>;
 
     // Stop calculating as soon as possible,
     //
     // The engine should send "bestmove" and possibly the "ponder" token when finishing the search
-    fn stop(&self);
+    fn stop(&mut self) -> Result<(), String>;
 
     // The user has played the expected move. This will be sent if the engine was told to ponder on the same move
     // the user has played. The engine should continue searching but switch from pondering to normal search.
-    fn ponder_hit(&self);
+    fn ponder_hit(&mut self) -> Result<(), String>;
 
     // quit the program
-    fn quit(&self);
+    fn quit(&mut self) -> Result<(), String>;
 }
 
 // Identify the engine to the GUI
-fn id(name: &str, author: &str) {
+pub fn id(name: &str, author: &str) {
     println!("id name {}", name);
     println!("id author {}", author);
 }
 
 // Let the GUI know that we have identified ourself and are in UCI mode
-fn uci_ok() {
+pub fn uci_ok() {
     println!("uciok");
 }
 
 // After recieiving a "is_ready", the engine should respond with "ready_ok()" after processing
 // all input.
-fn ready_ok() {
+pub fn ready_ok() {
     println!("readyok");
 }
 
