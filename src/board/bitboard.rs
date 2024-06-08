@@ -41,6 +41,10 @@ impl BitBoard {
         self.bits & p.pos != 0
     }
 
+    pub fn clear(&mut self, p: Posn) {
+        self.bits &= !p.pos
+    }
+
     pub fn len(&self) -> usize {
         let mut acc = self.bits as u64;
         let mut count = 0;

@@ -31,9 +31,9 @@ pub struct GoOptions {
 }
 
 pub struct Score {
-    eval: Evaluation,
-    is_upper_bound: bool,
-    is_lower_bound: bool,
+    pub eval: Evaluation,
+    pub is_upper_bound: bool,
+    pub is_lower_bound: bool,
 }
 
 pub enum EngineOptionType {
@@ -68,46 +68,47 @@ pub struct EngineOption {
     max: Option<i64>,
 }
 
+#[derive(Default)]
 pub struct Info {
     // search depth in plies
-    depth: Option<usize>,
+    pub depth: Option<usize>,
     // selective search depth in plies,
-    seldepth: Option<usize>,
+    pub seldepth: Option<usize>,
     // the time searched in ms
-    time: Option<usize>,
+    pub time: Option<usize>,
     // number of  nodes searched
-    nodes: Option<usize>,
+    pub nodes: Option<usize>,
     // The best line(s) found
-    pv: Option<Vec<Move>>,
+    pub pv: Option<Vec<Move>>,
 
     // When sending multiple lines, used to index which line is sent
-    multipv: usize,
+    pub multipv: usize,
 
     // The score from the engine's point of view in centipawns
-    score: Option<Score>,
+    pub score: Option<Score>,
     // currently searching this move
-    curr_move: Option<Move>,
+    pub curr_move: Option<Move>,
 
     // currently searching move number x, for the first move x should be 1 not 0.
-    curr_move_number: Option<usize>,
+    pub curr_move_number: Option<usize>,
     // the hash is `hash_full` permill full
-    hash_full: Option<usize>,
+    pub hash_full: Option<usize>,
     // x nodes per second searched
-    nodes_per_sec: Option<usize>,
+    pub nodes_per_sec: Option<usize>,
     // x positions where found in the endgame table bases
-    table_base_hits: Option<usize>,
+    pub table_base_hits: Option<usize>,
     // x positions where found in the shredder endgame databases
-    shredder_ending_hits: Option<usize>,
+    pub shredder_ending_hits: Option<usize>,
     // the cpu usage of the engine is x permill.
-    cpuload: Option<usize>,
+    pub cpuload: Option<usize>,
     // any string str which will be displayed
-    string: Option<String>,
+    pub string: Option<String>,
 
     // move <move1> is refuted by the line <move2> ... <movei>
-    refutation: Option<Vec<Move>>,
+    pub refutation: Option<Vec<Move>>,
 
     // the current lines engine is calculating on each cpu
-    curr_line: Option<(usize, Vec<Move>)>,
+    pub curr_line: Option<(usize, Vec<Move>)>,
 }
 
 pub enum RegistrationStatus {
@@ -295,6 +296,7 @@ pub fn info(info_block: Info) {
             print!(" {m}");
         }
     }
+    println!("");
 }
 
 // This command tells the GUI which parameters can be changed in the engine.

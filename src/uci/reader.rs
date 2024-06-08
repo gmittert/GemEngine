@@ -62,7 +62,7 @@ pub fn read_uci_line(line: &str, dispatch: &mut dyn UciEngine) -> Result<(), Str
                 _ => return Err(format!("Invalid position type argument in: {line}")),
             };
             let Some(moves_literal) = words.next() else {
-                return Err(format!("Missing position moves: {line}"));
+                return dispatch.position(fen, vec![]);
             };
             if moves_literal != "moves" {
                 return Err(format!("Missing position moves: {line}"));

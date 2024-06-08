@@ -1,4 +1,4 @@
-use crate::{board::Board, uci::*};
+use crate::{board::Board, uci::{self, *}};
 
 pub struct Gem {
     pub board: Board
@@ -39,10 +39,23 @@ impl UciEngine for Gem {
 
     fn position(&mut self, fen: &str, moves: Vec<crate::board::AlgebraicMove>)  -> Result<(), String>{
         self.board = Board::from_fen(fen).ok_or(format!("Failed to parse fen: {}", fen))?;
+        for m in &moves {
+            self.board.make_alg_move(m);
+        }
         Ok(())
     }
 
     fn go(&mut self, options: crate::uci::GoOptions)  -> Result<(), String>{
+        let (m, eval) = self.board.best_move();
+        let Some(best_move) = m else {
+            return Err(format!("Failed to find best move on board: {}", self.board));
+        };
+        uci::best_move(best_move, None);
+        let info = uci::Info {
+            score: Some(Score{eval, is_upper_bound: false, is_lower_bound: false}),
+            ..Default::default()
+        };
+        uci::info(info);
         Ok(())
     }
 

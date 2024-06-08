@@ -9,8 +9,9 @@ fn main() -> io::Result<()> {
     let mut buffer = String::new();
     loop {
         io::stdin().read_line(&mut buffer)?;
+        eprintln!("Line: {}", buffer);
         if let Err(e) = uci::reader::read_uci_line(&buffer, &mut gem) {
-            println!("{}", e);
+            eprintln!("{}", e);
             break;
         }
         buffer.clear();
