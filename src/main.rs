@@ -1,11 +1,13 @@
 mod board;
+mod gem;
 mod perft;
 mod uci;
-mod gem;
 use std::io;
 
 fn main() -> io::Result<()> {
-    let mut gem = gem::Gem{board: board::starting_board()};
+    let mut gem = gem::Gem {
+        board: board::starting_board(),
+    };
     let mut buffer = String::new();
     loop {
         io::stdin().read_line(&mut buffer)?;

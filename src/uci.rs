@@ -251,7 +251,8 @@ pub fn info(info_block: Info) {
         } else if let Some(m) = eval.mated_in() {
             print!(" mate -{m}")
         } else {
-            print!(" {eval}")
+            let Evaluation(cp) = eval;
+            print!(" cp {}", (cp * 100) as i64)
         }
         if score.is_upper_bound {
             print!(" upperbound")

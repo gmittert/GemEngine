@@ -234,10 +234,10 @@ impl Board {
             && ((m.from == e1() && m.to == g1()) || (m.from == e8() && m.to == g8()));
         let is_castle_queen = piece == Piece::King
             && ((m.from == e1() && m.to == c1()) || (m.from == e8() && m.to == c8()));
-        let ep_target = self.move_rights.last().and_then(|x|x.ep_target);
+        let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
         let is_en_passant = if let Some(target) = ep_target {
             piece == Piece::Pawn && m.to == target
-        }else {
+        } else {
             false
         };
         let m = Move {

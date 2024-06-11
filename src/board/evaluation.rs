@@ -3,7 +3,7 @@ use std::fmt;
 use std::ops::Neg;
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy)]
-pub struct Evaluation(i64);
+pub struct Evaluation(pub i64);
 
 // An evaluation is simply an i64 with a few caveats:
 // - We limit the range to (std::i64::MIN, std::i64::MAX] to not run into negation errors
@@ -102,7 +102,7 @@ impl Board {
         let mut best_move = None;
         let mut best_score = Evaluation::lost();
         let mut had_legal_move = false;
-        const DEFAULT_DEPTH: usize = 6;
+        const DEFAULT_DEPTH: usize = 4;
 
         for m in &moves {
             if Some(Piece::King) == m.capture {
@@ -111,11 +111,9 @@ impl Board {
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
                 had_legal_move = true;
-                println!("making move: {m}");
                 let eval = -self
                     .alpha_beta(Evaluation::lost(), -best_score.inc_mate(), DEFAULT_DEPTH)
                     .dec_mate();
-                println!("move: {}, eval at depth {}: {}", m, DEFAULT_DEPTH, eval);
 
                 if eval > best_score {
                     best_move = Some(m);
@@ -137,7 +135,6 @@ impl Board {
     }
 
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
-        println!("quiesce a: {}, b: {}", alpha, beta);
         let mut alpha = alpha;
         let stand_pat = self.eval(self.to_play);
         if stand_pat >= beta {
@@ -167,7 +164,6 @@ impl Board {
     }
 
     pub fn alpha_beta(&mut self, alpha: Evaluation, beta: Evaluation, depth: usize) -> Evaluation {
-        println!("alphabeta a: {}, b: {}", alpha, beta);
         if depth == 0 {
             return self.quiesce(alpha, beta);
         }
@@ -178,30 +174,24 @@ impl Board {
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
                 had_legal_move = true;
-                println!("making move: {m}");
                 let eval = -self
                     .alpha_beta(-beta, -alpha.inc_mate(), depth - 1)
                     .dec_mate();
-                println!("move: {}, eval at depth {}: {}", m, depth - 1, eval);
                 if eval >= beta {
                     self.undo_move(&m);
-                    println!("Returning beta = {beta}");
                     return beta;
                 }
                 if eval > alpha {
-                    println!("Setting alpha = {eval}");
                     alpha = eval;
                 }
             }
             self.undo_move(&m);
         }
         if had_legal_move {
-            println!("Returning alpha = {alpha}");
             alpha
         } else {
             // We have no legal moves. If we are in check, it's checkmate. If not, it's stalemate
             if self.in_check(self.to_play) {
-                println!("No legal, that's lost!");
                 Evaluation::lost()
             } else {
                 Evaluation::draw()
@@ -224,12 +214,27 @@ impl Board {
         let pawn_diff: i64 = self.white_pieces[Piece::Pawn as usize].len() as i64
             - self.black_pieces[Piece::Pawn as usize].len() as i64;
 
+        let attacks_white = self.rook_attacks(Color::White)
+            | self.queen_attacks(Color::White)
+            | self.king_attacks(Color::White)
+            | self.pawn_attacks(Color::White)
+            | self.knight_attacks(Color::White);
+
+        let attacks_black = self.rook_attacks(Color::Black)
+            | self.queen_attacks(Color::Black)
+            | self.king_attacks(Color::Black)
+            | self.pawn_attacks(Color::Black)
+            | self.knight_attacks(Color::Black);
+
+        let attacks_diff = attacks_white.len() - attacks_black.len();
+
         let materialistic = 20000 * king_diff
             + 900 * queen_diff
             + 500 * rook_diff
             + 310 * bishop_diff
             + 300 * knight_diff
-            + 100 * pawn_diff;
+            + 100 * pawn_diff
+            + attacks_diff as i64;
         match to_play {
             Color::Black => -Evaluation(materialistic),
             Color::White => Evaluation(materialistic),
