@@ -40,7 +40,7 @@ impl UciEngine for Gem {
     fn position(&mut self, fen: &str, moves: Vec<crate::board::AlgebraicMove>)  -> Result<(), String>{
         self.board = Board::from_fen(fen).ok_or(format!("Failed to parse fen: {}", fen))?;
         for m in &moves {
-            self.board.make_alg_move(m);
+            self.board.make_alg_move(m)?;
         }
         Ok(())
     }

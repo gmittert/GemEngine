@@ -44,9 +44,6 @@ impl Evaluation {
             None
         }
     }
-    fn dec_mate(&self) -> Evaluation {
-        Evaluation(self.0 - 1)
-    }
     pub fn mated_in(&self) -> Option<usize> {
         if self.0 <= Self::lost().0 + 100 {
             Some((Self::lost().0 - self.0) as usize)
@@ -54,8 +51,23 @@ impl Evaluation {
             None
         }
     }
-    fn dec_mated(&self) -> Evaluation {
-        Evaluation(self.0 + 1)
+    fn dec_mate(&self) -> Evaluation {
+        if self.0 >= Self::won().0 - 100 {
+            Evaluation(self.0 - 1)
+        } else if self.0 <= Self::lost().0 + 100 {
+            Evaluation(self.0 + 1)
+        } else {
+            *self
+        }
+    }
+    fn inc_mate(&self) -> Evaluation {
+        if (self.0 >= Self::won().0 - 100) && *self != Self::won() {
+            Evaluation(self.0 + 1)
+        } else if self.0 <= Self::lost().0 + 100 && *self != Self::lost() {
+            Evaluation(self.0 - 1)
+        } else {
+            *self
+        }
     }
 }
 
@@ -78,7 +90,7 @@ impl fmt::Display for Evaluation {
         } else if self.0 <= (-Evaluation::m1().0 + 100) {
             write!(f, "-M{}", self.0 + Evaluation::m1().0 + 1)?;
         } else {
-            write!(f, "{}", self.0)?;
+            write!(f, "{}", self.0 as f64 / 100.0)?;
         }
         Ok(())
     }
@@ -88,8 +100,9 @@ impl Board {
     pub fn best_move(&mut self) -> (Option<Move>, Evaluation) {
         let moves = generate_pseudo_legal_moves(self);
         let mut best_move = None;
-        let mut best_score = None;
-        const DEFAULT_DEPTH: usize = 4;
+        let mut best_score = Evaluation::lost();
+        let mut had_legal_move = false;
+        const DEFAULT_DEPTH: usize = 6;
 
         for m in &moves {
             if Some(Piece::King) == m.capture {
@@ -97,28 +110,22 @@ impl Board {
             }
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
-                let score = -self.nega_max(DEFAULT_DEPTH);
-                if let Some(prev_best) = best_score {
-                    if score > prev_best {
-                        best_score = Some(score);
-                        best_move = Some(m)
-                    }
-                } else {
-                    best_score = Some(score);
+                had_legal_move = true;
+                println!("making move: {m}");
+                let eval = -self
+                    .alpha_beta(Evaluation::lost(), -best_score.inc_mate(), DEFAULT_DEPTH)
+                    .dec_mate();
+                println!("move: {}, eval at depth {}: {}", m, DEFAULT_DEPTH, eval);
+
+                if eval > best_score {
                     best_move = Some(m);
+                    best_score = eval;
                 }
             }
             self.undo_move(&m);
         }
-        if let Some(score) = best_score {
-            let adjusted_max = if score.mate_in().is_some() {
-                score.dec_mate()
-            } else if score.mated_in().is_some() {
-                score.dec_mated()
-            } else {
-                score
-            };
-            (best_move.copied(), adjusted_max)
+        if had_legal_move {
+            (best_move.copied(), best_score)
         } else {
             // We have no legal moves. If we are in check, it's checkmate. If not, it's stalemate
             if self.in_check(self.to_play) {
@@ -129,35 +136,72 @@ impl Board {
         }
     }
 
-    pub fn nega_max(&mut self, depth: usize) -> Evaluation {
-        if depth == 0 {
-            return self.eval(self.to_play);
+    pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
+        println!("quiesce a: {}, b: {}", alpha, beta);
+        let mut alpha = alpha;
+        let stand_pat = self.eval(self.to_play);
+        if stand_pat >= beta {
+            return beta;
         }
-        let mut max = None;
+        if alpha < stand_pat {
+            alpha = stand_pat;
+        }
+        let captures = generate_pseudo_legal_moves(self)
+            .into_iter()
+            .filter(|x| x.capture.is_some());
+        for capture in captures {
+            self.make_move(&capture);
+            if !self.in_check(!self.to_play) {
+                let eval = -self.quiesce(-beta, -alpha.inc_mate()).dec_mate();
+                if eval >= beta {
+                    self.undo_move(&capture);
+                    return beta;
+                }
+                if eval > alpha {
+                    alpha = eval;
+                }
+            }
+            self.undo_move(&capture);
+        }
+        alpha
+    }
+
+    pub fn alpha_beta(&mut self, alpha: Evaluation, beta: Evaluation, depth: usize) -> Evaluation {
+        println!("alphabeta a: {}, b: {}", alpha, beta);
+        if depth == 0 {
+            return self.quiesce(alpha, beta);
+        }
+        let mut alpha = alpha;
+        let mut had_legal_move = false;
         let moves = generate_pseudo_legal_moves(self);
         for m in &moves {
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
-                let eval = -self.nega_max(depth - 1);
-                if let Some(prev) = max {
-                    max = Some(std::cmp::max(eval, prev));
-                } else {
-                    max = Some(eval);
+                had_legal_move = true;
+                println!("making move: {m}");
+                let eval = -self
+                    .alpha_beta(-beta, -alpha.inc_mate(), depth - 1)
+                    .dec_mate();
+                println!("move: {}, eval at depth {}: {}", m, depth - 1, eval);
+                if eval >= beta {
+                    self.undo_move(&m);
+                    println!("Returning beta = {beta}");
+                    return beta;
+                }
+                if eval > alpha {
+                    println!("Setting alpha = {eval}");
+                    alpha = eval;
                 }
             }
             self.undo_move(&m);
         }
-        if let Some(max) = max {
-            if max.mate_in().is_some() {
-                max.dec_mate()
-            } else if max.mated_in().is_some() {
-                max.dec_mated()
-            } else {
-                max
-            }
+        if had_legal_move {
+            println!("Returning alpha = {alpha}");
+            alpha
         } else {
             // We have no legal moves. If we are in check, it's checkmate. If not, it's stalemate
             if self.in_check(self.to_play) {
+                println!("No legal, that's lost!");
                 Evaluation::lost()
             } else {
                 Evaluation::draw()
@@ -318,6 +362,23 @@ mod tests {
         assert_eq!(best_move.capture, None);
         assert_eq!(eval, Evaluation::m1());
 
+        let mut b = Board::from_fen("k5RN/7R/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
+        let (best_move, eval) = b.best_move();
+        println!("Eval: {}", eval);
+        assert!(best_move.is_none());
+        assert_eq!(eval, Evaluation::lost());
+
+        let mut b =
+            Board::from_fen("k6N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
+        let (best_move, eval) = b.best_move();
+        println!("Eval: {}", eval);
+        assert!(best_move.is_some());
+        let best_move = best_move.unwrap();
+        assert_eq!(best_move.piece, Piece::Rook);
+        assert_eq!(best_move.from, g6());
+        assert_eq!(best_move.to, g8());
+        assert_eq!(eval, Evaluation::m1());
+
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let (best_move, eval) = b.best_move();
@@ -339,5 +400,21 @@ mod tests {
         println!("Best Move: {}", best_move);
         println!("Eval: {}", eval);
         assert!(eval.mate_in().is_some());
+    }
+    #[test]
+    fn eval_flipped() {
+        assert_eq!(Evaluation::won(), -Evaluation::lost());
+        assert_eq!(Evaluation::lost(), -Evaluation::won());
+        assert_eq!(Evaluation::won().dec_mate(), Evaluation::m1());
+        assert_eq!(Evaluation::lost().dec_mate(), -Evaluation::m1());
+        assert_eq!(-Evaluation::won().dec_mate(), -Evaluation::m1());
+        assert_eq!(-Evaluation::lost().dec_mate(), Evaluation::m1());
+    }
+    #[test]
+    fn eval_formatted() {
+        assert_eq!("M1", format!("{}", Evaluation::m1()));
+        assert_eq!("-M1", format!("{}", -Evaluation::m1()));
+        assert_eq!("M2", format!("{}", Evaluation::m2()));
+        assert_eq!("-M2", format!("{}", -Evaluation::m2()));
     }
 }
