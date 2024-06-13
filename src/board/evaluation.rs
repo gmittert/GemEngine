@@ -1,6 +1,7 @@
 pub use crate::board::*;
 use std::fmt;
 use std::ops::Neg;
+use std::sync::mpsc;
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy)]
 pub struct Evaluation(pub i64);
@@ -97,13 +98,12 @@ impl fmt::Display for Evaluation {
 }
 
 impl Board {
-    pub fn best_move(&mut self) -> (Option<Move>, Evaluation) {
+    pub fn best_move(&mut self, queue: &threadpool::ThreadPool) -> (Option<Move>, Evaluation) {
         let moves = generate_pseudo_legal_moves(self);
-        let mut best_move = None;
-        let mut best_score = Evaluation::lost();
         let mut had_legal_move = false;
         const DEFAULT_DEPTH: usize = 4;
 
+        let (tx, rx) = mpsc::channel();
         for m in &moves {
             if Some(Piece::King) == m.capture {
                 return (None, Evaluation::won());
@@ -111,19 +111,31 @@ impl Board {
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
                 had_legal_move = true;
-                let eval = -self
-                    .alpha_beta(Evaluation::lost(), -best_score.inc_mate(), DEFAULT_DEPTH)
-                    .dec_mate();
+                let tx = tx.clone();
+                let mut new_b = self.clone();
+                let m = *m;
+                queue.execute(move || {
+                    let best_score = Evaluation::lost();
+                    let eval = -new_b
+                        .alpha_beta(Evaluation::lost(), -best_score.inc_mate(), DEFAULT_DEPTH)
+                        .dec_mate();
 
+                    let _ = tx.send((eval, m));
+                });
+            }
+            self.undo_move(&m);
+        }
+        drop(tx);
+        if had_legal_move {
+            let mut best_move = None;
+            let mut best_score = Evaluation::lost();
+            while let Ok((eval, m)) = rx.recv() {
                 if eval > best_score {
                     best_move = Some(m);
                     best_score = eval;
                 }
             }
-            self.undo_move(&m);
-        }
-        if had_legal_move {
-            (best_move.copied(), best_score)
+            (best_move, best_score)
         } else {
             // We have no legal moves. If we are in check, it's checkmate. If not, it's stalemate
             if self.in_check(self.to_play) {
@@ -214,6 +226,7 @@ impl Board {
         let pawn_diff: i64 = self.white_pieces[Piece::Pawn as usize].len() as i64
             - self.black_pieces[Piece::Pawn as usize].len() as i64;
 
+/*
         let attacks_white = self.rook_attacks(Color::White)
             | self.queen_attacks(Color::White)
             | self.king_attacks(Color::White)
@@ -226,7 +239,9 @@ impl Board {
             | self.pawn_attacks(Color::Black)
             | self.knight_attacks(Color::Black);
 
-        let attacks_diff = attacks_white.len() - attacks_black.len();
+        let attacks_diff = attacks_white.len() as i64 - attacks_black.len() as i64;
+        */
+        let attacks_diff = 0;
 
         let materialistic = 20000 * king_diff
             + 900 * queen_diff
@@ -270,7 +285,8 @@ mod tests {
     fn find_queen_take() {
         let mut b = Board::from_fen("4k3/pppppppp/8/8/7q/8/PPPPPPP1/RKBQKBKR w - - 0 1")
             .expect("failed to parse fen");
-        let (best_move, _) = b.best_move();
+        let pool = threadpool::ThreadPool::new(1);
+        let (best_move, _) = b.best_move(&pool);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
@@ -283,7 +299,8 @@ mod tests {
     fn take_back_trade() {
         let mut b = Board::from_fen("rk1qkbkr/ppp2ppp/3pB3/4p3/4P3/5K2/PPPP1PPP/RKBQK2R b - - 0 1")
             .expect("failed to parse fen");
-        let (best_move, _) = b.best_move();
+        let pool = threadpool::ThreadPool::new(1);
+        let (best_move, _) = b.best_move(&pool);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
@@ -296,7 +313,8 @@ mod tests {
     fn m1() {
         let mut b =
             Board::from_fen("1k6/ppp5/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move();
+        let pool = threadpool::ThreadPool::new(1);
+        let (best_move, eval) = b.best_move(&pool);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
@@ -310,7 +328,8 @@ mod tests {
     fn won() {
         let mut b =
             Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move();
+        let pool = threadpool::ThreadPool::new(1);
+        let (best_move, eval) = b.best_move(&pool);
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::won());
     }
@@ -318,32 +337,37 @@ mod tests {
     fn lost() {
         let mut b =
             Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move();
+        let pool = threadpool::ThreadPool::new(1);
+        let (best_move, eval) = b.best_move(&pool);
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::lost());
     }
     #[test]
     fn stalemate() {
         let mut b = Board::from_fen("k7/2Q5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move();
+        let pool = threadpool::ThreadPool::new(1);
+        let (best_move, eval) = b.best_move(&pool);
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::draw());
     }
     #[test]
     fn draw() {
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let (_, eval) = b.best_move();
+        let pool = threadpool::ThreadPool::new(1);
+        let (_, eval) = b.best_move(&pool);
         assert_eq!(eval, Evaluation::draw());
 
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let (_, eval) = b.best_move();
+        let pool = threadpool::ThreadPool::new(1);
+        let (_, eval) = b.best_move(&pool);
         assert_eq!(eval, Evaluation::draw());
     }
     #[test]
     fn mates() {
         let mut b =
             Board::from_fen("1k6/pppr4/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move();
+        let pool = threadpool::ThreadPool::new(1);
+        let (best_move, eval) = b.best_move(&pool);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
@@ -356,7 +380,7 @@ mod tests {
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move();
+        let (best_move, eval) = b.best_move(&pool);
         println!("Eval: {}", eval);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -368,14 +392,14 @@ mod tests {
         assert_eq!(eval, Evaluation::m1());
 
         let mut b = Board::from_fen("k5RN/7R/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move();
+        let (best_move, eval) = b.best_move(&pool);
         println!("Eval: {}", eval);
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::lost());
 
         let mut b =
             Board::from_fen("k6N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move();
+        let (best_move, eval) = b.best_move(&pool);
         println!("Eval: {}", eval);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -386,7 +410,7 @@ mod tests {
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move();
+        let (best_move, eval) = b.best_move(&pool);
         println!("Eval: {}", eval);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -399,7 +423,8 @@ mod tests {
     fn bishop_knight_mate() {
         let mut b =
             Board::from_fen("8/8/8/1B6/5N2/6K1/8/6k1 w - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move();
+        let pool = threadpool::ThreadPool::new(1);
+        let (best_move, eval) = b.best_move(&pool);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);

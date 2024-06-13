@@ -1,16 +1,67 @@
 use crate::{
+    board,
     board::Board,
     uci::{self, *},
 };
 
+struct GemOptions {
+    num_threads: usize,
+
+}
+
+const DEFAULT_THREADS: usize = 64;
+
+impl GemOptions {
+    fn default() -> GemOptions {
+        GemOptions { num_threads: DEFAULT_THREADS }
+    }
+
+    fn report() {
+        uci::option(EngineOption {
+            name: String::from("NumThreads"),
+            ty: EngineOptionType::Spin,
+            default: Some(String::from("64")),
+            min: Some(1),
+            max: Some(512),
+        });
+    }
+
+    fn set_option(&mut self, name: &str, value: Option<&str>) -> Result<String, String> {
+        match name {
+            "NumThreads" => {
+                if let Some(Ok(threads)) = value.map(|x| x.parse()) {
+                    self.num_threads = threads;
+                    Ok(String::from("NumThreads"))
+                } else {
+                    Err(format!("Bad argument for NumThreads"))
+                }
+            }
+            _ => Err(format!("No such Option: {name}")),
+        }
+    }
+}
+
 pub struct Gem {
-    pub board: Board,
+    board: Board,
+    work_queue: threadpool::ThreadPool,
+    options: GemOptions,
+}
+
+impl Gem {
+    pub fn new() -> Gem {
+        Gem {
+            board: board::starting_board(),
+            work_queue: threadpool::ThreadPool::new(DEFAULT_THREADS),
+            options: GemOptions::default(),
+        }
+    }
 }
 
 impl UciEngine for Gem {
     fn uci(&mut self) -> Result<(), String> {
         id("gem", "Gwen Mittertreiner");
         // TODO: Implement options
+        GemOptions::report();
         uci_ok();
         Ok(())
     }
@@ -26,8 +77,15 @@ impl UciEngine for Gem {
     }
 
     fn set_option(&mut self, name: &str, value: Option<&str>) -> Result<(), String> {
-        // TODO setup options
-        Ok(())
+        self.options.set_option(name, value).and_then(
+        |name| match name.as_str() {
+            "NumThreads" => {
+                self.work_queue.set_num_threads(self.options.num_threads);
+                Ok(())
+            }
+            _ => panic!("Bad option set")
+        }
+        )
     }
 
     fn register(&mut self) -> Result<(), String> {
@@ -53,14 +111,14 @@ impl UciEngine for Gem {
     }
 
     fn go(&mut self, options: crate::uci::GoOptions) -> Result<(), String> {
-        let (m, eval) = self.board.best_move();
+        let (m, eval) = self.board.best_move(&self.work_queue);
         let Some(best_move) = m else {
             return Err(format!("Failed to find best move on board: {}", self.board));
         };
         let info = uci::Info {
             score: Some(Score {
                 eval,
-                is_upper_bound: false,
+                is_upper_bound: true,
                 is_lower_bound: false,
             }),
             ..Default::default()

@@ -61,11 +61,11 @@ impl fmt::Display for EngineOptionType {
 }
 
 pub struct EngineOption {
-    name: String,
-    ty: EngineOptionType,
-    default: Option<String>,
-    min: Option<i64>,
-    max: Option<i64>,
+    pub name: String,
+    pub ty: EngineOptionType,
+    pub default: Option<String>,
+    pub min: Option<i64>,
+    pub max: Option<i64>,
 }
 
 #[derive(Default)]
