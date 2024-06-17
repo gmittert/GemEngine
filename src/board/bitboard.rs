@@ -1,6 +1,5 @@
 use std::ops;
 
-use crate::board::moves::*;
 use crate::board::posn::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
@@ -9,43 +8,19 @@ pub struct BitBoard {
 }
 
 impl BitBoard {
-    pub fn empty() -> BitBoard {
+    pub const fn empty() -> BitBoard {
         BitBoard { bits: 0 }
     }
 
-    pub fn from(p: Posn) -> BitBoard {
+    pub const fn from(p: Posn) -> BitBoard {
         BitBoard { bits: p.pos }
     }
 
-    pub fn make_move(&self, m: &Move) -> BitBoard {
-        assert_eq!(
-            true,
-            self.contains(m.from),
-            "Tried to make move: {m} on board {:x}",
-            self.bits
-        );
-        let from = BitBoard::from(m.from);
-        let to = BitBoard::from(m.to);
-
-        (*self & !from) | to
-    }
-
-    pub fn undo_move(&self, m: &Move) -> BitBoard {
-        let from = BitBoard::from(m.from);
-        let to = BitBoard::from(m.to);
-
-        (*self & !to) | from
-    }
-
-    pub fn contains(&self, p: Posn) -> bool {
+    pub const fn contains(&self, p: Posn) -> bool {
         self.bits & p.pos != 0
     }
 
-    pub fn clear(&mut self, p: Posn) {
-        self.bits &= !p.pos
-    }
-
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         let mut acc = self.bits as u64;
         let mut count = 0;
         while acc != 0 {

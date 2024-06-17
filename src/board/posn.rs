@@ -14,7 +14,7 @@ pub enum Rank {
 }
 
 impl Rank {
-    pub fn from(s: char) -> Option<Rank> {
+    pub const fn from(s: char) -> Option<Rank> {
         match s {
             '1' => Some(Rank::One),
             '2' => Some(Rank::Two),
@@ -49,7 +49,7 @@ pub enum File {
 }
 
 impl File {
-    pub fn from(c: char) -> Option<File> {
+    pub const fn from(c: char) -> Option<File> {
         let lower = c;
         match lower {
             'a' | 'A' => Some(File::A),
@@ -115,13 +115,13 @@ pub struct Posn {
 }
 
 impl Posn {
-    pub fn from(rank: Rank, file: File) -> Posn {
+    pub const fn from(rank: Rank, file: File) -> Posn {
         Posn {
             pos: 1 << ((8 * (rank as u8)) + (file as u8)),
         }
     }
 
-    pub fn rank(&self) -> Rank {
+    pub const fn rank(&self) -> Rank {
         let first_bit = self.pos.ilog2();
         match (first_bit >> 3) & 0x7 {
             0 => Rank::One,
@@ -135,7 +135,7 @@ impl Posn {
         }
     }
 
-    pub fn file(&self) -> File {
+    pub const fn file(&self) -> File {
         let first_bit = self.pos.ilog2();
         match first_bit & 0x7 {
             0 => File::H,
@@ -149,77 +149,77 @@ impl Posn {
         }
     }
 
-    fn check(&self) -> Option<Posn> {
+    const fn check(&self) -> Option<Posn> {
         if self.pos == 0 {
             return None;
         }
         Some(*self)
     }
-    pub fn no_unchecked(&self) -> Posn {
+    pub const fn no_unchecked(&self) -> Posn {
         Posn { pos: self.pos << 8 }
     }
-    pub fn so_unchecked(&self) -> Posn {
+    pub const fn so_unchecked(&self) -> Posn {
         Posn { pos: self.pos >> 8 }
     }
-    pub fn ea_unchecked(&self) -> Posn {
+    pub const fn ea_unchecked(&self) -> Posn {
         const A_FILE: u64 = 0x8080_8080_8080_8080;
         Posn {
             pos: (self.pos >> 1) & !A_FILE,
         }
     }
-    pub fn we_unchecked(&self) -> Posn {
+    pub const fn we_unchecked(&self) -> Posn {
         const H_FILE: u64 = 0x0101_0101_0101_0101;
         Posn {
             pos: (self.pos << 1) & !H_FILE,
         }
     }
 
-    pub fn no(&self) -> Option<Posn> {
+    pub const fn no(&self) -> Option<Posn> {
         self.no_unchecked().check()
     }
-    pub fn so(&self) -> Option<Posn> {
+    pub const fn so(&self) -> Option<Posn> {
         self.so_unchecked().check()
     }
-    pub fn ea(&self) -> Option<Posn> {
+    pub const fn ea(&self) -> Option<Posn> {
         self.ea_unchecked().check()
     }
-    pub fn we(&self) -> Option<Posn> {
+    pub const fn we(&self) -> Option<Posn> {
         self.we_unchecked().check()
     }
-    pub fn nw(&self) -> Option<Posn> {
+    pub const fn nw(&self) -> Option<Posn> {
         self.no_unchecked().we_unchecked().check()
     }
-    pub fn ne(&self) -> Option<Posn> {
+    pub const fn ne(&self) -> Option<Posn> {
         self.no_unchecked().ea_unchecked().check()
     }
-    pub fn sw(&self) -> Option<Posn> {
+    pub const fn sw(&self) -> Option<Posn> {
         self.so_unchecked().we_unchecked().check()
     }
-    pub fn se(&self) -> Option<Posn> {
+    pub const fn se(&self) -> Option<Posn> {
         self.so_unchecked().ea_unchecked().check()
     }
-    pub fn nnw(&self) -> Option<Posn> {
+    pub const fn nnw(&self) -> Option<Posn> {
         self.no_unchecked().no_unchecked().we_unchecked().check()
     }
-    pub fn nne(&self) -> Option<Posn> {
+    pub const fn nne(&self) -> Option<Posn> {
         self.no_unchecked().no_unchecked().ea_unchecked().check()
     }
-    pub fn nww(&self) -> Option<Posn> {
+    pub const fn nww(&self) -> Option<Posn> {
         self.no_unchecked().we_unchecked().we_unchecked().check()
     }
-    pub fn nee(&self) -> Option<Posn> {
+    pub const fn nee(&self) -> Option<Posn> {
         self.no_unchecked().ea_unchecked().ea_unchecked().check()
     }
-    pub fn ssw(&self) -> Option<Posn> {
+    pub const fn ssw(&self) -> Option<Posn> {
         self.so_unchecked().so_unchecked().we_unchecked().check()
     }
-    pub fn sse(&self) -> Option<Posn> {
+    pub const fn sse(&self) -> Option<Posn> {
         self.so_unchecked().so_unchecked().ea_unchecked().check()
     }
-    pub fn sww(&self) -> Option<Posn> {
+    pub const fn sww(&self) -> Option<Posn> {
         self.so_unchecked().we_unchecked().we_unchecked().check()
     }
-    pub fn see(&self) -> Option<Posn> {
+    pub const fn see(&self) -> Option<Posn> {
         self.so_unchecked().ea_unchecked().ea_unchecked().check()
     }
 }
@@ -234,56 +234,56 @@ macro_rules! make_posns {
     ($file:ident) => {
         paste::paste! {
         #[allow(dead_code)]
-        pub fn [<$file:lower 1>]() -> Posn {
+        pub const fn [<$file:lower 1>]() -> Posn {
             Posn::from(
                 Rank::One,
                 File::$file
             )
         }
         #[allow(dead_code)]
-        pub fn [<$file:lower 2>]() -> Posn {
+        pub const fn [<$file:lower 2>]() -> Posn {
             Posn::from(
                 Rank::Two,
                 File::$file
             )
         }
         #[allow(dead_code)]
-        pub fn [<$file:lower 3>]() -> Posn {
+        pub const fn [<$file:lower 3>]() -> Posn {
             Posn::from(
                 Rank::Three,
                 File::$file
             )
         }
         #[allow(dead_code)]
-        pub fn [<$file:lower 4>]() -> Posn{
+        pub const fn [<$file:lower 4>]() -> Posn{
             Posn::from(
                 Rank::Four,
                 File::$file
             )
         }
         #[allow(dead_code)]
-        pub fn [<$file:lower 5>]() -> Posn {
+        pub const fn [<$file:lower 5>]() -> Posn {
             Posn::from(
                 Rank::Five,
                 File::$file
             )
         }
         #[allow(dead_code)]
-        pub fn [<$file:lower 6>]() -> Posn {
+        pub const fn [<$file:lower 6>]() -> Posn {
             Posn::from(
                 Rank::Six,
                 File::$file
             )
         }
         #[allow(dead_code)]
-        pub fn [<$file:lower 7>]() -> Posn {
+        pub const fn [<$file:lower 7>]() -> Posn {
             Posn::from(
                 Rank::Seven,
                 File::$file
             )
         }
         #[allow(dead_code)]
-        pub fn [<$file:lower 8>]() -> Posn{
+        pub const fn [<$file:lower 8>]() -> Posn{
             Posn::from(
                 Rank::Eight,
                 File::$file

@@ -626,14 +626,20 @@ impl Board {
             }
             // En Passant
             if let Some(ep_target) = self.move_rights.last().and_then(|x| x.ep_target) {
-                if (color == Color::White
-                    && (i.nw() == Some(ep_target) || i.ne() == Some(ep_target)))
-                    || (color == Color::Black
-                        && (i.sw() == Some(ep_target) || i.se() == Some(ep_target)))
+                let to = Posn::from(
+                    if color == Color::White {
+                        Rank::Six
+                    } else {
+                        Rank::Three
+                    },
+                    ep_target,
+                );
+                if (color == Color::White && (i.nw() == Some(to) || i.ne() == Some(to)))
+                    || (color == Color::Black && (i.sw() == Some(to) || i.se() == Some(to)))
                 {
                     out.push(Move {
                         from: i,
-                        to: ep_target,
+                        to,
                         turn: color,
                         piece: Piece::Pawn,
                         capture: Some(Piece::Pawn),
@@ -1074,7 +1080,7 @@ mod tests {
         board.black_pieces[Piece::Pawn as usize] = BitBoard::from(e5());
         board.move_rights.push(MoveRights {
             castling_ability: CastlingAbility(0xff),
-            ep_target: Some(e6()),
+            ep_target: Some(File::E),
         });
         board.pawn_moves(Color::White, &mut moves);
         assert_eq!(moves.len(), 2);
@@ -1099,7 +1105,7 @@ mod tests {
         board.black_pieces[Piece::Pawn as usize] = BitBoard::from(d4());
         board.move_rights.push(MoveRights {
             castling_ability: CastlingAbility(0xff),
-            ep_target: Some(e3()),
+            ep_target: Some(File::E),
         });
         board.pawn_moves(Color::Black, &mut moves);
         assert_eq!(moves.len(), 2);

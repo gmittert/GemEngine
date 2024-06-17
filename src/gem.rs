@@ -1,19 +1,19 @@
 use crate::{
-    board,
-    board::Board,
+    board::{self, Board},
     uci::{self, *},
 };
 
 struct GemOptions {
     num_threads: usize,
-
 }
 
 const DEFAULT_THREADS: usize = 64;
 
 impl GemOptions {
     fn default() -> GemOptions {
-        GemOptions { num_threads: DEFAULT_THREADS }
+        GemOptions {
+            num_threads: DEFAULT_THREADS,
+        }
     }
 
     fn report() {
@@ -77,15 +77,15 @@ impl UciEngine for Gem {
     }
 
     fn set_option(&mut self, name: &str, value: Option<&str>) -> Result<(), String> {
-        self.options.set_option(name, value).and_then(
-        |name| match name.as_str() {
-            "NumThreads" => {
-                self.work_queue.set_num_threads(self.options.num_threads);
-                Ok(())
-            }
-            _ => panic!("Bad option set")
-        }
-        )
+        self.options
+            .set_option(name, value)
+            .and_then(|name| match name.as_str() {
+                "NumThreads" => {
+                    self.work_queue.set_num_threads(self.options.num_threads);
+                    Ok(())
+                }
+                _ => panic!("Bad option set"),
+            })
     }
 
     fn register(&mut self) -> Result<(), String> {

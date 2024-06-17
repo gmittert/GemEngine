@@ -2,6 +2,7 @@ mod board;
 mod gem;
 mod perft;
 mod uci;
+mod zobrist;
 use std::io;
 
 fn main() -> io::Result<()> {

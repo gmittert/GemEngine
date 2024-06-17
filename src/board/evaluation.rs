@@ -226,7 +226,7 @@ impl Board {
         let pawn_diff: i64 = self.white_pieces[Piece::Pawn as usize].len() as i64
             - self.black_pieces[Piece::Pawn as usize].len() as i64;
 
-/*
+        /*
         let attacks_white = self.rook_attacks(Color::White)
             | self.queen_attacks(Color::White)
             | self.king_attacks(Color::White)
@@ -260,7 +260,6 @@ impl Board {
 #[cfg(test)]
 mod tests {
     use crate::board::evaluation::*;
-    use crate::board::*;
     #[test]
     fn white_better() {
         let b = Board::from_fen("rkb1kbkr/pppppppp/8/8/8/8/PPPPPPPP/RKBQKBKR w - - 0 1")

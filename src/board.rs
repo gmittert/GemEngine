@@ -6,6 +6,7 @@ mod posn;
 pub use crate::board::bitboard::*;
 pub use crate::board::moves::*;
 pub use crate::board::posn::*;
+use crate::zobrist::ZOBRIST_KEYS;
 use std::fmt;
 
 #[derive(Debug, PartialEq)]
@@ -16,6 +17,12 @@ use std::fmt;
 // 8 = Black queen side
 #[derive(Copy, Clone)]
 pub struct CastlingAbility(u8);
+
+impl Default for CastlingAbility {
+    fn default() -> Self {
+        CastlingAbility(0xff)
+    }
+}
 
 impl CastlingAbility {
     pub fn from_fen(s: &str) -> Option<CastlingAbility> {
@@ -49,15 +56,42 @@ impl CastlingAbility {
             Color::Black => (inner & 0b1000) != 0,
         }
     }
+
+    pub fn hash(self) -> u64 {
+        let mut hash = 0;
+        if self.can_castle_king(Color::White) {
+            hash ^= ZOBRIST_KEYS.white_king_castle;
+        }
+        if self.can_castle_king(Color::Black) {
+            hash ^= ZOBRIST_KEYS.black_king_castle;
+        }
+        if self.can_castle_queen(Color::White) {
+            hash ^= ZOBRIST_KEYS.white_queen_castle;
+        }
+        if self.can_castle_queen(Color::Black) {
+            hash ^= ZOBRIST_KEYS.black_queen_castle;
+        }
+        hash
+    }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Default)]
 pub struct MoveRights {
     pub castling_ability: CastlingAbility,
-    pub ep_target: Option<Posn>,
+    pub ep_target: Option<File>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl MoveRights {
+    pub fn hash(self) -> u64 {
+        let mut hash = self.castling_ability.hash();
+        if let Some(file) = self.ep_target {
+            hash ^= ZOBRIST_KEYS.en_passant_targets[file as usize];
+        }
+        hash
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Board {
     pub black_pieces: [BitBoard; 6],
     pub white_pieces: [BitBoard; 6],
@@ -67,6 +101,19 @@ pub struct Board {
     pub full_move: u16,
     pub move_rights: Vec<MoveRights>,
     pub move_list: Vec<Move>,
+    pub hash: u64,
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Self) -> bool {
+        self.black_pieces == other.black_pieces
+            && self.white_pieces == other.white_pieces
+            && self.to_play == other.to_play
+            && self.half_move == other.half_move
+            && self.full_move == other.full_move
+            && self.move_rights == other.move_rights
+            && self.hash == other.hash
+    }
 }
 
 impl Board {
@@ -80,6 +127,18 @@ impl Board {
             _ => return None,
         });
         let castling_ability = CastlingAbility::from_fen(sections.next()?)?;
+        if castling_ability.can_castle_king(Color::White) {
+            out.hash ^= ZOBRIST_KEYS.white_king_castle;
+        }
+        if castling_ability.can_castle_queen(Color::White) {
+            out.hash ^= ZOBRIST_KEYS.white_queen_castle;
+        }
+        if castling_ability.can_castle_king(Color::Black) {
+            out.hash ^= ZOBRIST_KEYS.black_king_castle;
+        }
+        if castling_ability.can_castle_queen(Color::Black) {
+            out.hash ^= ZOBRIST_KEYS.black_queen_castle;
+        }
         let ep_target = sections.next()?;
         let move_rights = MoveRights {
             castling_ability,
@@ -98,12 +157,7 @@ impl Board {
                     'h' => File::H,
                     _ => return None,
                 };
-                let rank = match ep_chars.next()? {
-                    '3' => Rank::Three,
-                    '6' => Rank::Six,
-                    _ => return None,
-                };
-                Some(Posn::from(rank, file))
+                Some(file)
             },
         };
         out.move_rights.push(move_rights);
@@ -141,79 +195,22 @@ impl Board {
             .into_iter();
             for c in placement.chars() {
                 match c {
-                    'p' => {
-                        out.black_pieces[Piece::Pawn as usize] |= Posn::from(rank, files.next()?)
+                    'p' | 'n' | 'b' | 'r' | 'q' | 'k' => {
+                        out.add_piece(
+                            Color::Black,
+                            Piece::from(c).unwrap(),
+                            Posn::from(rank, files.next()?),
+                        );
                     }
-                    'n' => {
-                        out.black_pieces[Piece::Knight as usize] |= Posn::from(rank, files.next()?)
+                    'P' | 'N' | 'B' | 'R' | 'Q' | 'K' => {
+                        out.add_piece(
+                            Color::White,
+                            Piece::from(c).unwrap(),
+                            Posn::from(rank, files.next()?),
+                        );
                     }
-                    'b' => {
-                        out.black_pieces[Piece::Bishop as usize] |= Posn::from(rank, files.next()?)
-                    }
-                    'r' => {
-                        out.black_pieces[Piece::Rook as usize] |= Posn::from(rank, files.next()?)
-                    }
-                    'q' => {
-                        out.black_pieces[Piece::Queen as usize] |= Posn::from(rank, files.next()?)
-                    }
-                    'k' => {
-                        out.black_pieces[Piece::King as usize] |= Posn::from(rank, files.next()?)
-                    }
-                    'P' => {
-                        out.white_pieces[Piece::Pawn as usize] |= Posn::from(rank, files.next()?)
-                    }
-                    'N' => {
-                        out.white_pieces[Piece::Knight as usize] |= Posn::from(rank, files.next()?)
-                    }
-                    'B' => {
-                        out.white_pieces[Piece::Bishop as usize] |= Posn::from(rank, files.next()?)
-                    }
-                    'R' => {
-                        out.white_pieces[Piece::Rook as usize] |= Posn::from(rank, files.next()?)
-                    }
-                    'Q' => {
-                        out.white_pieces[Piece::Queen as usize] |= Posn::from(rank, files.next()?)
-                    }
-                    'K' => {
-                        out.white_pieces[Piece::King as usize] |= Posn::from(rank, files.next()?)
-                    }
-                    '1' => {
-                        for _ in 0..1 {
-                            files.next()?;
-                        }
-                    }
-                    '2' => {
-                        for _ in 0..2 {
-                            files.next()?;
-                        }
-                    }
-                    '3' => {
-                        for _ in 0..3 {
-                            files.next()?;
-                        }
-                    }
-                    '4' => {
-                        for _ in 0..4 {
-                            files.next()?;
-                        }
-                    }
-                    '5' => {
-                        for _ in 0..5 {
-                            files.next()?;
-                        }
-                    }
-                    '6' => {
-                        for _ in 0..6 {
-                            files.next()?;
-                        }
-                    }
-                    '7' => {
-                        for _ in 0..7 {
-                            files.next()?;
-                        }
-                    }
-                    '8' => {
-                        for _ in 0..8 {
+                    '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' => {
+                        for _ in 0..c.to_digit(10).unwrap() {
                             files.next()?;
                         }
                     }
@@ -235,8 +232,8 @@ impl Board {
         let is_castle_queen = piece == Piece::King
             && ((m.from == e1() && m.to == c1()) || (m.from == e8() && m.to == c8()));
         let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
-        let is_en_passant = if let Some(target) = ep_target {
-            piece == Piece::Pawn && m.to == target
+        let is_en_passant = if let Some(file) = ep_target {
+            piece == Piece::Pawn && m.to.file() == file
         } else {
             false
         };
@@ -256,112 +253,73 @@ impl Board {
         self.make_move(&m);
         Ok(())
     }
-    pub fn make_move(&mut self, m: &Move) {
-        self.move_list.push(*m);
-        match m.turn {
+    pub fn add_piece(&mut self, c: Color, p: Piece, pos: Posn) {
+        match c {
             Color::Black => {
-                self.black_pieces[m.piece as usize] =
-                    self.black_pieces[m.piece as usize].make_move(m);
-                self.full_move += 1;
+                self.black_pieces[p as usize] |= pos;
             }
             Color::White => {
-                self.white_pieces[m.piece as usize] =
-                    self.white_pieces[m.piece as usize].make_move(m)
+                self.white_pieces[p as usize] |= pos;
             }
         };
-        if m.is_castle_king {
-            match m.turn {
-                Color::Black => {
-                    self.black_pieces[Piece::Rook as usize] =
-                        self.black_pieces[Piece::Rook as usize].make_move(&Move {
-                            from: h8(),
-                            to: f8(),
-                            turn: Color::Black,
-                            piece: Piece::Rook,
-                            capture: None,
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
-                            promotion: None,
-                        });
-                }
-                Color::White => {
-                    self.white_pieces[Piece::Rook as usize] =
-                        self.white_pieces[Piece::Rook as usize].make_move(&Move {
-                            from: h1(),
-                            to: f1(),
-                            turn: Color::White,
-                            piece: Piece::Rook,
-                            capture: None,
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
-                            promotion: None,
-                        });
-                }
+        self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
+    }
+    pub fn remove_piece(&mut self, c: Color, p: Piece, pos: Posn) {
+        match c {
+            Color::Black => {
+                self.black_pieces[p as usize] &= !BitBoard::from(pos);
             }
+            Color::White => {
+                self.white_pieces[p as usize] &= !BitBoard::from(pos);
+            }
+        };
+        self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
+    }
+    pub fn move_piece(&mut self, c: Color, p: Piece, from: Posn, to: Posn) {
+        self.remove_piece(c, p, from);
+        self.add_piece(c, p, to);
+    }
+
+    pub fn make_move(&mut self, m: &Move) {
+        self.move_list.push(*m);
+        self.move_piece(m.turn, m.piece, m.from, m.to);
+        if m.is_castle_king {
+            let (from, to) = match m.turn {
+                Color::Black => (h8(), f8()),
+                Color::White => (h1(), f1()),
+            };
+            self.move_piece(m.turn, Piece::Rook, from, to)
         }
         if m.is_castle_queen {
-            match m.turn {
-                Color::Black => {
-                    self.black_pieces[Piece::Rook as usize] =
-                        self.black_pieces[Piece::Rook as usize].make_move(&Move {
-                            from: a8(),
-                            to: d8(),
-                            turn: Color::Black,
-                            piece: Piece::Rook,
-                            capture: None,
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
-                            promotion: None,
-                        });
-                }
-                Color::White => {
-                    self.white_pieces[Piece::Rook as usize] =
-                        self.white_pieces[Piece::Rook as usize].make_move(&Move {
-                            from: a1(),
-                            to: d1(),
-                            turn: Color::White,
-                            piece: Piece::Rook,
-                            capture: None,
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
-                            promotion: None,
-                        });
-                }
-            }
+            let (from, to) = match m.turn {
+                Color::Black => (a8(), d8()),
+                Color::White => (a1(), d1()),
+            };
+            self.move_piece(m.turn, Piece::Rook, from, to)
         }
+
         self.half_move += 1;
         let ep_target =
             if m.piece == Piece::Pawn && m.from.rank() == Rank::Two && m.to.rank() == Rank::Four {
-                Some(Posn::from(Rank::Three, m.from.file()))
+                Some(m.from.file())
             } else if m.piece == Piece::Pawn
                 && m.from.rank() == Rank::Seven
                 && m.to.rank() == Rank::Five
             {
-                Some(Posn::from(Rank::Six, m.from.file()))
+                Some(m.from.file())
             } else {
                 None
             };
-        let CastlingAbility(mut inner) = self
-            .move_rights
-            .last()
-            .map(|x| x.castling_ability)
-            .unwrap_or(CastlingAbility(0xff));
+        let move_rights = *self.move_rights.last().unwrap_or(&MoveRights::default());
+        let CastlingAbility(mut inner) = move_rights.castling_ability;
         if m.piece == Piece::King {
             match m.turn {
-                Color::Black => inner &= 0b0011,
-                Color::White => inner &= 0b1100,
+                Color::Black => {
+                    inner &= 0b0011;
+                }
+                Color::White => {
+                    inner &= 0b1100;
+                }
             }
         }
         if m.piece == Piece::Rook {
@@ -375,173 +333,86 @@ impl Board {
                 inner &= 0b0111
             }
         }
-        match m.capture {
-            Some(p) => {
-                if m.is_en_passant {
-                    match m.turn {
-                        Color::Black => {
-                            self.white_pieces[p as usize] &= !BitBoard::from(m.to.no().unwrap())
-                        }
-                        Color::White => {
-                            self.black_pieces[p as usize] &= !BitBoard::from(m.to.so().unwrap())
-                        }
-                    }
-                } else {
-                    match m.turn {
-                        Color::Black => self.white_pieces[p as usize] &= !BitBoard::from(m.to),
-                        Color::White => self.black_pieces[p as usize] &= !BitBoard::from(m.to),
-                    };
+        if let Some(piece) = m.capture {
+            self.remove_piece(
+                !m.turn,
+                piece,
+                match (m.is_en_passant, m.turn) {
+                    (true, Color::Black) => m.to.no(),
+                    (true, Color::White) => m.to.so(),
+                    _ => Some(m.to),
                 }
-                if p == Piece::Rook {
-                    if m.to == h1() {
-                        inner &= 0b1110
-                    } else if m.to == h8() {
-                        inner &= 0b1011
-                    } else if m.to == a1() {
-                        inner &= 0b1101
-                    } else if m.to == a8() {
-                        inner &= 0b0111
-                    }
+                .unwrap(),
+            );
+            if piece == Piece::Rook {
+                if m.to == h1() {
+                    inner &= 0b1110
+                } else if m.to == h8() {
+                    inner &= 0b1011
+                } else if m.to == a1() {
+                    inner &= 0b1101
+                } else if m.to == a8() {
+                    inner &= 0b0111
                 }
             }
-            None => (),
-        };
-        if let Some(piece) = m.promotion {
-            match m.turn {
-                Color::Black => {
-                    self.black_pieces[Piece::Pawn as usize] &= !BitBoard::from(m.to);
-                    self.black_pieces[piece as usize] |= BitBoard::from(m.to);
-                }
-                Color::White => {
-                    self.white_pieces[Piece::Pawn as usize] &= !BitBoard::from(m.to);
-                    self.white_pieces[piece as usize] |= BitBoard::from(m.to);
-                }
-            };
         }
-        self.move_rights.push(MoveRights {
+        if let Some(piece) = m.promotion {
+            self.add_piece(m.turn, piece, m.to);
+            self.remove_piece(m.turn, Piece::Pawn, m.to);
+        }
+        let new_move_rights = MoveRights {
             castling_ability: CastlingAbility(inner),
             ep_target,
-        });
+        };
+        self.hash ^= move_rights.hash();
+        self.hash ^= new_move_rights.hash();
+        self.move_rights.push(new_move_rights);
+
         self.to_play = !self.to_play;
+        self.hash ^= ZOBRIST_KEYS.black_turn;
     }
 
     pub fn undo_move(&mut self, m: &Move) {
         if let Some(piece) = m.promotion {
-            match m.turn {
-                Color::Black => {
-                    self.black_pieces[Piece::Pawn as usize] |= BitBoard::from(m.to);
-                    self.black_pieces[piece as usize] &= !BitBoard::from(m.to);
-                }
-                Color::White => {
-                    self.white_pieces[Piece::Pawn as usize] |= BitBoard::from(m.to);
-                    self.white_pieces[piece as usize] &= !BitBoard::from(m.to);
-                }
-            };
+            self.remove_piece(m.turn, piece, m.to);
+            self.add_piece(m.turn, Piece::Pawn, m.to);
         }
-        match m.turn {
-            Color::Black => {
-                self.black_pieces[m.piece as usize] =
-                    self.black_pieces[m.piece as usize].undo_move(m);
-                self.full_move -= 1;
-            }
-            Color::White => {
-                self.white_pieces[m.piece as usize] =
-                    self.white_pieces[m.piece as usize].undo_move(m)
-            }
-        };
-        match m.capture {
-            Some(p) => match m.turn {
-                Color::Black => {
-                    if m.is_en_passant {
-                        self.white_pieces[p as usize] |= m.to.no().unwrap();
-                    } else {
-                        self.white_pieces[p as usize] |= m.to
-                    }
+        self.move_piece(m.turn, m.piece, m.to, m.from);
+        if let Some(piece) = m.capture {
+            self.add_piece(
+                !m.turn,
+                piece,
+                match (m.is_en_passant, m.turn) {
+                    (true, Color::Black) => m.to.no(),
+                    (true, Color::White) => m.to.so(),
+                    _ => Some(m.to),
                 }
-                Color::White => {
-                    if m.is_en_passant {
-                        self.black_pieces[p as usize] |= m.to.so().unwrap();
-                    } else {
-                        self.black_pieces[p as usize] |= m.to
-                    }
-                }
-            },
-            None => (),
+                .unwrap(),
+            );
         };
         if m.is_castle_king {
-            match m.turn {
-                Color::Black => {
-                    self.black_pieces[Piece::Rook as usize] =
-                        self.black_pieces[Piece::Rook as usize].make_move(&Move {
-                            from: f8(),
-                            to: h8(),
-                            turn: Color::Black,
-                            piece: Piece::Rook,
-                            capture: None,
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
-                            promotion: None,
-                        });
-                }
-                Color::White => {
-                    self.white_pieces[Piece::Rook as usize] =
-                        self.white_pieces[Piece::Rook as usize].make_move(&Move {
-                            from: f1(),
-                            to: h1(),
-                            turn: Color::White,
-                            piece: Piece::Rook,
-                            capture: None,
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
-                            promotion: None,
-                        });
-                }
-            }
+            let (to, from) = match m.turn {
+                Color::Black => (h8(), f8()),
+                Color::White => (h1(), f1()),
+            };
+            self.move_piece(m.turn, Piece::Rook, from, to)
         }
         if m.is_castle_queen {
-            match m.turn {
-                Color::Black => {
-                    self.black_pieces[Piece::Rook as usize] =
-                        self.black_pieces[Piece::Rook as usize].make_move(&Move {
-                            from: d8(),
-                            to: a8(),
-                            turn: Color::Black,
-                            piece: Piece::Rook,
-                            capture: None,
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
-                            promotion: None,
-                        });
-                }
-                Color::White => {
-                    self.white_pieces[Piece::Rook as usize] =
-                        self.white_pieces[Piece::Rook as usize].make_move(&Move {
-                            from: d1(),
-                            to: a1(),
-                            turn: Color::White,
-                            piece: Piece::Rook,
-                            capture: None,
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
-                            promotion: None,
-                        });
-                }
-            }
+            let (to, from) = match m.turn {
+                Color::Black => (a8(), d8()),
+                Color::White => (a1(), d1()),
+            };
+            self.move_piece(m.turn, Piece::Rook, from, to)
         }
         self.to_play = !self.to_play;
-        self.move_rights.pop();
+        self.hash ^= ZOBRIST_KEYS.black_turn;
+
+        if let Some(prev_rights) = self.move_rights.pop() {
+            self.hash ^= prev_rights.hash();
+            if let Some(new_rights) = self.move_rights.last() {
+                self.hash ^= new_rights.hash();
+            }
+        }
         self.move_list.pop();
         self.half_move -= 1;
     }
@@ -678,6 +549,15 @@ pub fn empty_board(turn: Color) -> Board {
             castling_ability: CastlingAbility(0xff),
         }],
         move_list: vec![],
+        hash: ZOBRIST_KEYS.white_king_castle
+            ^ ZOBRIST_KEYS.white_queen_castle
+            ^ ZOBRIST_KEYS.black_king_castle
+            ^ ZOBRIST_KEYS.black_queen_castle
+            ^ if turn == Color::Black {
+                ZOBRIST_KEYS.black_turn
+            } else {
+                0
+            },
     }
 }
 
