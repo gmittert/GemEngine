@@ -3,3 +3,5 @@
 out.*
 pgns
 prev
+perf.data
+perf.data.old

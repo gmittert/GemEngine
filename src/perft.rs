@@ -1,8 +1,8 @@
 use crate::board;
 use std::fmt;
-use ahash::AHashMap;
+use crate::hashmap::HashMap;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct PerftResult {
     nodes: usize,
     captures: usize,
@@ -26,10 +26,10 @@ impl fmt::Display for PerftResult {
 }
 
 pub fn perft(b: &mut board::Board, depth: u8) -> PerftResult {
-    let mut cache: AHashMap<u64, PerftResult> = AHashMap::new();
+    let mut cache: HashMap<PerftResult, {1024*1024}> = HashMap::new();
     perft_inner(b, depth, &mut cache).clone()
 }
-fn perft_inner(b: &mut board::Board, depth: u8, cache: &mut AHashMap<u64, PerftResult>) -> PerftResult {
+fn perft_inner(b: &mut board::Board, depth: u8, cache: &mut HashMap<PerftResult, {1024*1024}>) -> PerftResult {
     let mut result = PerftResult {
         nodes: 0,
         captures: 0,
