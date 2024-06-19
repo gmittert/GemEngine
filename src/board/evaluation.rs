@@ -1,9 +1,10 @@
 pub use crate::board::*;
+use crate::hashmap::HashMap;
 use std::fmt;
 use std::ops::Neg;
 use std::sync::mpsc;
 
-#[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
 pub struct Evaluation(pub i64);
 
 // An evaluation is simply an i64 with a few caveats:
@@ -176,6 +177,11 @@ impl Board {
     }
 
     pub fn alpha_beta(&mut self, alpha: Evaluation, beta: Evaluation, depth: usize) -> Evaluation {
+        let mut cache: HashMap<Evaluation, {1024*1024}> = HashMap::new();
+        self.alpha_beta_inner(alpha, beta, depth, &mut cache)
+    }
+
+    pub fn alpha_beta_inner(&mut self, alpha: Evaluation, beta: Evaluation, depth: usize, cache: &mut HashMap<Evaluation, {1024*1024}>) -> Evaluation {
         if depth == 0 {
             return self.quiesce(alpha, beta);
         }
@@ -187,7 +193,7 @@ impl Board {
             if !self.in_check(!self.to_play) {
                 had_legal_move = true;
                 let eval = -self
-                    .alpha_beta(-beta, -alpha.inc_mate(), depth - 1)
+                    .alpha_beta_inner(-beta, -alpha.inc_mate(), depth - 1, cache)
                     .dec_mate();
                 if eval >= beta {
                     self.undo_move(&m);

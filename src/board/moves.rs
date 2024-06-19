@@ -5,7 +5,7 @@ use std::ops::Not;
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Piece {
-    Pawn,
+    Pawn = 0,
     Rook,
     Knight,
     Bishop,
@@ -30,8 +30,8 @@ impl Piece {
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Color {
-    Black,
-    White,
+    Black = 0,
+    White = 1,
 }
 
 impl Not for Color {

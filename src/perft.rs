@@ -1,6 +1,9 @@
 use crate::board;
-use std::fmt;
 use crate::hashmap::HashMap;
+use std::{
+    fmt,
+    ops::{Add, AddAssign},
+};
 
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct PerftResult {
@@ -11,6 +14,33 @@ pub struct PerftResult {
     promotions: usize,
     checks: usize,
     checkmates: usize,
+}
+
+impl Add for PerftResult {
+    type Output = PerftResult;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        PerftResult {
+            nodes: self.nodes + rhs.nodes,
+            captures: self.captures + rhs.captures,
+            enpassants: self.enpassants + rhs.enpassants,
+            castles: self.castles + rhs.castles,
+            promotions: self.promotions + rhs.promotions,
+            checks: self.checks + rhs.checks,
+            checkmates: self.checkmates + rhs.checkmates,
+        }
+    }
+}
+impl AddAssign for PerftResult {
+    fn add_assign(&mut self, rhs: Self) {
+        self.nodes += rhs.nodes;
+        self.captures += rhs.captures;
+        self.enpassants += rhs.enpassants;
+        self.castles += rhs.castles;
+        self.promotions += rhs.promotions;
+        self.checks += rhs.checks;
+        self.checkmates += rhs.checkmates;
+    }
 }
 
 impl fmt::Display for PerftResult {
@@ -26,10 +56,39 @@ impl fmt::Display for PerftResult {
 }
 
 pub fn perft(b: &mut board::Board, depth: u8) -> PerftResult {
-    let mut cache: HashMap<PerftResult, {1024*1024}> = HashMap::new();
-    perft_inner(b, depth, &mut cache).clone()
+    if depth == 0 {
+        return PerftResult {
+            nodes: 1,
+            ..Default::default()
+        };
+    }
+    let mut cache: HashMap<PerftResult, { 1024 * 1024 }> = HashMap::new();
+    let res = perft_inner(b, depth, &mut cache).clone();
+    cache.print_stats();
+    res
 }
-fn perft_inner(b: &mut board::Board, depth: u8, cache: &mut HashMap<PerftResult, {1024*1024}>) -> PerftResult {
+
+fn perft_inner(
+    b: &mut board::Board,
+    depth: u8,
+    cache: &mut HashMap<PerftResult, { 1024 * 1024 }>,
+) -> PerftResult {
+    const DEPTH_KEYS: [u64; 10] = [
+        0xfd4b4027ed1f23fc,
+        0x1e1868cda8784d1f,
+        0xe9fe0f4d017a548b,
+        0xefd0a39fbd797aaa,
+        0xacff95d3fc47bb52,
+        0xaa24744cf0bbed33,
+        0x9d9a762a6f0fdc52,
+        0x3a1dde62a0f9b96a,
+        0x24a16969e817cf8c,
+        0x5c28ed2953879b8a,
+    ];
+    let hash = b.hash ^ DEPTH_KEYS[depth as usize];
+    if let Some(v) = cache.get(hash) {
+        return v.clone();
+    }
     let mut result = PerftResult {
         nodes: 0,
         captures: 0,
@@ -39,34 +98,7 @@ fn perft_inner(b: &mut board::Board, depth: u8, cache: &mut HashMap<PerftResult,
         castles: 0,
         promotions: 0,
     };
-    if depth == 0 {
-        result.nodes = 1;
-        if b.in_check(b.to_play) {
-            result.checks = 1;
-            if perft_inner(b, 1, cache).nodes == 0 {
-                result.checkmates = 1;
-            }
-        }
-        if let Some(last_move) = b.move_list.last() {
-            if last_move.capture.is_some() {
-                result.captures = 1
-            }
-            if last_move.is_en_passant {
-                result.enpassants = 1
-            }
-            if last_move.is_castle_queen || last_move.is_castle_king {
-                result.castles = 1
-            }
-            if last_move.promotion.is_some() {
-                result.promotions = 1
-            }
-        }
-        cache.insert(b.hash, result.clone());
-        return result;
-    }
-
     let moves = board::generate_pseudo_legal_moves(b);
-
     for m in &moves {
         let preb = b.black_pieces();
         let prew = b.white_pieces();
@@ -86,14 +118,30 @@ fn perft_inner(b: &mut board::Board, depth: u8, cache: &mut HashMap<PerftResult,
             mw
         );
         if !b.in_check(!b.to_play) {
-            let next_res = perft_inner(b, depth - 1, cache);
-            result.nodes += next_res.nodes;
-            result.captures += next_res.captures;
-            result.checks += next_res.checks;
-            result.checkmates += next_res.checkmates;
-            result.enpassants += next_res.enpassants;
-            result.castles += next_res.castles;
-            result.promotions += next_res.promotions;
+            if depth > 1 {
+                let next_res = perft_inner(b, depth - 1, cache);
+                result += next_res;
+            } else {
+                result.nodes += 1;
+                if b.in_check(b.to_play) {
+                    result.checks += 1;
+                    if perft_inner(b, 1, cache).nodes == 0 {
+                        result.checkmates += 1;
+                    }
+                }
+                if m.capture.is_some() {
+                    result.captures += 1
+                }
+                if m.is_en_passant {
+                    result.enpassants += 1
+                }
+                if m.is_castle_queen || m.is_castle_king {
+                    result.castles += 1
+                }
+                if m.promotion.is_some() {
+                    result.promotions += 1
+                }
+            }
         }
         b.undo_move(&m);
         let postb = b.black_pieces();
@@ -112,7 +160,10 @@ fn perft_inner(b: &mut board::Board, depth: u8, cache: &mut HashMap<PerftResult,
         assert_eq!(prew, postw);
     }
 
-    cache.insert(b.hash, result.clone());
+    if let Some(v) = cache.get(hash) {
+        assert_eq!(v, &result);
+    }
+    cache.insert(hash, result.clone());
     return result;
 }
 #[cfg(test)]
