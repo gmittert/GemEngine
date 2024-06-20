@@ -1,4 +1,4 @@
-mod bitboard;
+pub mod bitboard;
 pub mod evaluation;
 mod move_generation;
 mod moves;
@@ -100,7 +100,6 @@ pub struct Board {
     pub half_move: u16,
     pub full_move: u16,
     pub move_rights: Vec<MoveRights>,
-    pub move_list: Vec<Move>,
     pub hash: u64,
 }
 
@@ -163,7 +162,6 @@ impl Board {
         out.move_rights.push(move_rights);
         out.half_move = sections.next()?.parse::<u16>().ok()?;
         out.full_move = sections.next()?.parse::<u16>().ok()?;
-        out.move_list = vec![];
         if sections.next() != None {
             return None;
         }
@@ -281,7 +279,6 @@ impl Board {
     }
 
     pub fn make_move(&mut self, m: &Move) {
-        self.move_list.push(*m);
         self.move_piece(m.turn, m.piece, m.from, m.to);
         if m.is_castle_king {
             let (from, to) = match m.turn {
@@ -413,7 +410,6 @@ impl Board {
                 self.hash ^= new_rights.hash();
             }
         }
-        self.move_list.pop();
         self.half_move -= 1;
     }
 
@@ -548,7 +544,6 @@ pub fn empty_board(turn: Color) -> Board {
             ep_target: None,
             castling_ability: CastlingAbility(0xff),
         }],
-        move_list: vec![],
         hash: ZOBRIST_KEYS.white_king_castle
             ^ ZOBRIST_KEYS.white_queen_castle
             ^ ZOBRIST_KEYS.black_king_castle

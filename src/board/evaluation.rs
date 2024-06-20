@@ -182,8 +182,13 @@ impl Board {
     }
 
     pub fn alpha_beta_inner(&mut self, alpha: Evaluation, beta: Evaluation, depth: usize, cache: &mut HashMap<Evaluation, {1024*1024}>) -> Evaluation {
+        if let Some(eval) = cache.get(self.hash) {
+            return *eval;
+        }
         if depth == 0 {
-            return self.quiesce(alpha, beta);
+            let eval = self.quiesce(alpha, beta);
+            cache.insert(self.hash, eval);
+            return eval;
         }
         let mut alpha = alpha;
         let mut had_legal_move = false;
@@ -205,7 +210,7 @@ impl Board {
             }
             self.undo_move(&m);
         }
-        if had_legal_move {
+        let eval = if had_legal_move {
             alpha
         } else {
             // We have no legal moves. If we are in check, it's checkmate. If not, it's stalemate
@@ -214,7 +219,10 @@ impl Board {
             } else {
                 Evaluation::draw()
             }
-        }
+        };
+
+        cache.insert(self.hash, eval);
+        eval
     }
 
     pub fn eval(&self, to_play: Color) -> Evaluation {
@@ -232,7 +240,6 @@ impl Board {
         let pawn_diff: i64 = self.white_pieces[Piece::Pawn as usize].len() as i64
             - self.black_pieces[Piece::Pawn as usize].len() as i64;
 
-        /*
         let attacks_white = self.rook_attacks(Color::White)
             | self.queen_attacks(Color::White)
             | self.king_attacks(Color::White)
@@ -246,8 +253,6 @@ impl Board {
             | self.knight_attacks(Color::Black);
 
         let attacks_diff = attacks_white.len() as i64 - attacks_black.len() as i64;
-        */
-        let attacks_diff = 0;
 
         let materialistic = 20000 * king_diff
             + 900 * queen_diff

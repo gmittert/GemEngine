@@ -1,13 +1,9 @@
-use gem::board;
-use gem::gem;
-use gem::perft;
 use gem::uci;
-use gem::hashmap;
-use gem::zobrist;
+use gem::gem::Gem;
 use std::io;
 
 fn main() -> io::Result<()> {
-    let mut gem = gem::Gem::new();
+    let mut gem = Gem::new();
     let mut buffer = String::new();
     loop {
         io::stdin().read_line(&mut buffer)?;

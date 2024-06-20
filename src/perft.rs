@@ -7,13 +7,13 @@ use std::{
 
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct PerftResult {
-    nodes: usize,
-    captures: usize,
-    enpassants: usize,
-    castles: usize,
-    promotions: usize,
-    checks: usize,
-    checkmates: usize,
+    pub nodes: usize,
+    pub captures: usize,
+    pub enpassants: usize,
+    pub castles: usize,
+    pub promotions: usize,
+    pub checks: usize,
+    pub checkmates: usize,
 }
 
 impl Add for PerftResult {
@@ -64,7 +64,6 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerftResult {
     }
     let mut cache: HashMap<PerftResult, { 1024 * 1024 }> = HashMap::new();
     let res = perft_inner(b, depth, &mut cache).clone();
-    cache.print_stats();
     res
 }
 

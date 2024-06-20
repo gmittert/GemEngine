@@ -3,11 +3,26 @@ name = "gem"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "gem"
+path = "src/lib.rs"
+
+[[bin]]
+name = "gem"
+path = "src/bin/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 paste = "1.0"
 threadpool = "1.8.1"
+
+[dev-dependencies]
+criterion = { version = "0.4", features = ["html_reports"] }
+
+[[bench]]
+name = "gem_bench"
+harness = false
 
 [profile.rel-with-debug]
 inherits = "release"

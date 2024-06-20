@@ -1,6 +1,5 @@
 use std::array;
 
-
 #[derive(Debug)]
 pub struct HashMap<T, const N: usize> {
     // 1GiB
