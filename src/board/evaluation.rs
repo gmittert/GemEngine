@@ -1,11 +1,20 @@
 pub use crate::board::*;
 use crate::hashmap::HashMap;
 use std::fmt;
-use std::ops::Neg;
+use std::ops::{Add, Neg};
 use std::sync::mpsc;
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
 pub struct Evaluation(pub i64);
+
+const PIECE_VALUES: [i64; 6] = [
+    100,   // Pawn
+    500,   // Rook
+    300,   // Knight
+    310,   // Bishop
+    900,   // Queen
+    20000, // King
+];
 
 // An evaluation is simply an i64 with a few caveats:
 // - We limit the range to (std::i64::MIN, std::i64::MAX] to not run into negation errors
@@ -71,6 +80,15 @@ impl Evaluation {
             *self
         }
     }
+}
+
+impl Add for Evaluation {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Evaluation(self.0 + rhs.0)
+    }
+
 }
 
 impl Neg for Evaluation {
@@ -147,10 +165,19 @@ impl Board {
         }
     }
 
-    pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
+    pub fn quiesce(
+        &mut self,
+        alpha: Evaluation,
+        beta: Evaluation,
+        cache: &mut HashMap<Evaluation, { 1024 * 1024 }>,
+    ) -> Evaluation {
+        if let Some(eval) = cache.get(self.hash) {
+            return *eval;
+        }
         let mut alpha = alpha;
         let stand_pat = self.eval(self.to_play);
         if stand_pat >= beta {
+            cache.insert(self.hash, beta);
             return beta;
         }
         if alpha < stand_pat {
@@ -160,11 +187,24 @@ impl Board {
             .into_iter()
             .filter(|x| x.capture.is_some());
         for capture in captures {
+
+            // The most material this could swing is capturing a queen
+            let mut big_change = PIECE_VALUES[Piece::Queen as usize];
+            // While possibly promoting
+            if let Some(promote) = capture.promotion {
+                big_change += PIECE_VALUES[promote as usize];
+            }
+            // If we're so far down that this doesn't help, don't bother searching
+            if stand_pat + Evaluation(big_change) < alpha {
+                continue;
+            }
+
             self.make_move(&capture);
             if !self.in_check(!self.to_play) {
-                let eval = -self.quiesce(-beta, -alpha.inc_mate()).dec_mate();
+                let eval = -self.quiesce(-beta, -alpha.inc_mate(), cache).dec_mate();
                 if eval >= beta {
                     self.undo_move(&capture);
+                    cache.insert(self.hash, beta);
                     return beta;
                 }
                 if eval > alpha {
@@ -173,20 +213,29 @@ impl Board {
             }
             self.undo_move(&capture);
         }
+        cache.insert(self.hash, alpha);
         alpha
     }
 
     pub fn alpha_beta(&mut self, alpha: Evaluation, beta: Evaluation, depth: usize) -> Evaluation {
-        let mut cache: HashMap<Evaluation, {1024*1024}> = HashMap::new();
-        self.alpha_beta_inner(alpha, beta, depth, &mut cache)
+        let mut cache: HashMap<Evaluation, { 1024 * 1024 }> = HashMap::new();
+        let res = self.alpha_beta_inner(alpha, beta, depth, &mut cache);
+        cache.print_stats();
+        res
     }
 
-    pub fn alpha_beta_inner(&mut self, alpha: Evaluation, beta: Evaluation, depth: usize, cache: &mut HashMap<Evaluation, {1024*1024}>) -> Evaluation {
+    pub fn alpha_beta_inner(
+        &mut self,
+        alpha: Evaluation,
+        beta: Evaluation,
+        depth: usize,
+        cache: &mut HashMap<Evaluation, { 1024 * 1024 }>,
+    ) -> Evaluation {
         if let Some(eval) = cache.get(self.hash) {
             return *eval;
         }
         if depth == 0 {
-            let eval = self.quiesce(alpha, beta);
+            let eval = self.quiesce(alpha, beta, cache);
             cache.insert(self.hash, eval);
             return eval;
         }
@@ -254,12 +303,12 @@ impl Board {
 
         let attacks_diff = attacks_white.len() as i64 - attacks_black.len() as i64;
 
-        let materialistic = 20000 * king_diff
-            + 900 * queen_diff
-            + 500 * rook_diff
-            + 310 * bishop_diff
-            + 300 * knight_diff
-            + 100 * pawn_diff
+        let materialistic = PIECE_VALUES[Piece::King as usize] * king_diff
+            + PIECE_VALUES[Piece::Queen as usize] * queen_diff
+            + PIECE_VALUES[Piece::Rook as usize] * rook_diff
+            + PIECE_VALUES[Piece::Bishop as usize] * bishop_diff
+            + PIECE_VALUES[Piece::Knight as usize] * knight_diff
+            + PIECE_VALUES[Piece::Pawn as usize] * pawn_diff
             + attacks_diff as i64;
         match to_play {
             Color::Black => -Evaluation(materialistic),
@@ -456,5 +505,14 @@ mod tests {
         assert_eq!("-M1", format!("{}", -Evaluation::m1()));
         assert_eq!("M2", format!("{}", Evaluation::m2()));
         assert_eq!("-M2", format!("{}", -Evaluation::m2()));
+    }
+    #[test]
+    fn many_moves() {
+        let mut board = Board::from_fen(
+            "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
+        )
+        .expect("Invalid fen?");
+        let pool = threadpool::ThreadPool::new(32);
+        board.best_move(&pool);
     }
 }
