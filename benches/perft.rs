@@ -28,7 +28,7 @@ pub fn deep_perft(c: &mut Criterion) {
 
 criterion_group!(shallow_perfts, shallow_perft);
 
-criterion_group!{
+criterion_group! {
     name=deep_perfts;
     config=Criterion::default().measurement_time(core::time::Duration::from_secs(75));
     targets=deep_perft

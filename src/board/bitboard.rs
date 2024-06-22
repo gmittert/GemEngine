@@ -3,25 +3,23 @@ use std::ops;
 use crate::board::posn::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
-pub struct BitBoard {
-    bits: u64,
-}
+pub struct BitBoard(pub u64);
 
 impl BitBoard {
     pub const fn empty() -> BitBoard {
-        BitBoard { bits: 0 }
+        BitBoard { 0: 0 }
     }
 
     pub const fn from(p: Posn) -> BitBoard {
-        BitBoard { bits: p.pos }
+        BitBoard { 0: p.pos }
     }
 
     pub const fn contains(&self, p: Posn) -> bool {
-        self.bits & p.pos != 0
+        self.0 & p.pos != 0
     }
 
     pub const fn len(&self) -> usize {
-        let mut acc = self.bits as u64;
+        let mut acc = self.0 as u64;
         let mut count = 0;
         while acc != 0 {
             count += 1;
@@ -31,20 +29,36 @@ impl BitBoard {
     }
 }
 
+impl std::fmt::Display for BitBoard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for rank in 0..8 {
+            for file in 0..8 {
+                if (self.0 & (1 << ((8 * rank) + file))) != 0 {
+                    write!(f, "o")?;
+                } else {
+                    write!(f, ".")?;
+                }
+            }
+            write!(f, "\n")?;
+        }
+        Ok(())
+    }
+}
+
 impl Iterator for BitBoard {
     type Item = Posn;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.bits == 0 {
+        if self.0 == 0 {
             return None;
         }
-        if self.bits == 0x8000_0000_0000_0000 {
-            let res = self.bits;
-            self.bits = 0;
+        if self.0 == 0x8000_0000_0000_0000 {
+            let res = self.0;
+            self.0 = 0;
             return Some(Posn { pos: res });
         }
-        let lsb = (self.bits as i64) & -(self.bits as i64);
-        self.bits &= self.bits - 1;
+        let lsb = (self.0 as i64) & -(self.0 as i64);
+        self.0 &= self.0 - 1;
         Some(Posn { pos: lsb as u64 })
     }
 }
@@ -53,7 +67,7 @@ impl ops::BitOr<Posn> for BitBoard {
     type Output = Self;
     fn bitor(self, rhs: Posn) -> Self::Output {
         BitBoard {
-            bits: self.bits | BitBoard::from(rhs).bits,
+            0: self.0 | BitBoard::from(rhs).0,
         }
     }
 }
@@ -61,43 +75,39 @@ impl ops::BitOr<Posn> for BitBoard {
 impl ops::Not for BitBoard {
     type Output = Self;
     fn not(self) -> Self::Output {
-        BitBoard { bits: !self.bits }
+        BitBoard { 0: !self.0 }
     }
 }
 
 impl ops::BitOr for BitBoard {
     type Output = Self;
     fn bitor(self, rhs: BitBoard) -> Self::Output {
-        BitBoard {
-            bits: self.bits | rhs.bits,
-        }
+        BitBoard { 0: self.0 | rhs.0 }
     }
 }
 
 impl ops::BitAnd for BitBoard {
     type Output = Self;
     fn bitand(self, rhs: BitBoard) -> Self::Output {
-        BitBoard {
-            bits: self.bits & rhs.bits,
-        }
+        BitBoard { 0: self.0 & rhs.0 }
     }
 }
 
 impl ops::BitOrAssign<Posn> for BitBoard {
     fn bitor_assign(&mut self, rhs: Posn) {
-        self.bits |= BitBoard::from(rhs).bits;
+        self.0 |= BitBoard::from(rhs).0;
     }
 }
 
 impl ops::BitOrAssign for BitBoard {
     fn bitor_assign(&mut self, rhs: BitBoard) {
-        self.bits |= rhs.bits;
+        self.0 |= rhs.0;
     }
 }
 
 impl ops::BitAndAssign for BitBoard {
     fn bitand_assign(&mut self, rhs: BitBoard) {
-        self.bits &= rhs.bits;
+        self.0 &= rhs.0;
     }
 }
 

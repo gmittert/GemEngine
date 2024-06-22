@@ -88,7 +88,6 @@ impl Add for Evaluation {
     fn add(self, rhs: Self) -> Self::Output {
         Evaluation(self.0 + rhs.0)
     }
-
 }
 
 impl Neg for Evaluation {
@@ -187,7 +186,6 @@ impl Board {
             .into_iter()
             .filter(|x| x.capture.is_some());
         for capture in captures {
-
             // The most material this could swing is capturing a queen
             let mut big_change = PIECE_VALUES[Piece::Queen as usize];
             // While possibly promoting

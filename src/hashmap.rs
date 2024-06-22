@@ -8,24 +8,33 @@ pub struct HashMap<T, const N: usize> {
     misses: usize,
     conflicts: usize,
 
-    accepted : usize,
+    accepted: usize,
     rejected: usize,
 }
-impl <T, const N: usize> HashMap<T, N>  where T: Default {
+impl<T, const N: usize> HashMap<T, N>
+where
+    T: Default,
+{
     pub fn print_stats(&self) {
         println!("HashMap Stats: ");
         println!("Hits: {}", self.hits);
         println!("Misses: {}", self.misses);
         println!("Conflicts: {}", self.conflicts);
-        println!("Hit Rate: {}", self.hits as f64/ (self.hits + self.misses + self.conflicts) as f64);
+        println!(
+            "Hit Rate: {}",
+            self.hits as f64 / (self.hits + self.misses + self.conflicts) as f64
+        );
         println!("");
         println!("Accepted: {}", self.accepted);
         println!("Rejected: {}", self.rejected);
-        println!("Acceptance Rate: {}", self.accepted as f64 / (self.accepted + self.rejected) as f64);
+        println!(
+            "Acceptance Rate: {}",
+            self.accepted as f64 / (self.accepted + self.rejected) as f64
+        );
     }
     pub fn new() -> HashMap<T, N> {
         HashMap {
-            data: Box::new(array::from_fn(|_|(0, T::default()))),
+            data: Box::new(array::from_fn(|_| (0, T::default()))),
             hits: 0,
             misses: 0,
             conflicts: 0,
@@ -35,7 +44,7 @@ impl <T, const N: usize> HashMap<T, N>  where T: Default {
     }
     pub fn get(&mut self, k: u64) -> Option<&T> {
         let pos: usize = k as usize % N;
-        let (kp,v) = &self.data[pos];
+        let (kp, v) = &self.data[pos];
         if *kp == 0 {
             self.misses += 1;
             return None;

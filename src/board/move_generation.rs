@@ -1,5 +1,6 @@
 pub use crate::board::moves::*;
 pub use crate::board::posn::*;
+use crate::board::sliding_attacks;
 pub use crate::board::*;
 
 impl Board {
@@ -105,35 +106,9 @@ impl Board {
             Color::Black => self.black_pieces,
         }[Piece::Rook as usize];
 
-        let allied_pieces = match color {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
-
-        let opponent_pieces = match color {
-            Color::Black => self.white_pieces(),
-            Color::White => self.black_pieces(),
-        };
         let mut acc = BitBoard::empty();
         for i in rooks {
-            for shift in [
-                |p: Posn| p.no(),
-                |p: Posn| p.so(),
-                |p: Posn| p.ea(),
-                |p: Posn| p.we(),
-            ] {
-                let mut slide = shift(i);
-                while let Some(pos) = slide {
-                    if allied_pieces.contains(pos) {
-                        break;
-                    }
-                    acc |= pos;
-                    if opponent_pieces.contains(pos) {
-                        break;
-                    }
-                    slide = shift(pos);
-                }
-            }
+            acc |= sliding_attacks::compute_rook_attacks(i, self.pieces())
         }
         acc
     }
@@ -149,40 +124,25 @@ impl Board {
             Color::Black => self.black_pieces(),
         };
 
-        let opponent_pieces = match color {
-            Color::Black => self.white_pieces(),
-            Color::White => self.black_pieces(),
-        };
         for i in rooks {
-            for shift in [
-                |p: Posn| p.no(),
-                |p: Posn| p.so(),
-                |p: Posn| p.ea(),
-                |p: Posn| p.we(),
-            ] {
-                let mut slide = shift(i);
-                while let Some(pos) = slide {
-                    if allied_pieces.contains(pos) {
-                        break;
-                    }
-                    out.push(Move {
-                        from: i,
-                        to: pos,
-                        turn: color,
-                        piece: Piece::Rook,
-                        capture: self.query_pos(pos),
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: false,
-                        is_castle_king: false,
-                        is_castle_queen: false,
-                        promotion: None,
-                    });
-                    if opponent_pieces.contains(pos) {
-                        break;
-                    }
-                    slide = shift(pos);
+            let attacks = sliding_attacks::compute_rook_attacks(i, self.pieces());
+            for pos in attacks {
+                if allied_pieces.contains(pos) {
+                    continue;
                 }
+                out.push(Move {
+                    from: i,
+                    to: pos,
+                    turn: color,
+                    piece: Piece::Rook,
+                    capture: self.query_pos(pos),
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_king: false,
+                    is_castle_queen: false,
+                    promotion: None,
+                });
             }
         }
     }

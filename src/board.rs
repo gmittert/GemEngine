@@ -3,6 +3,7 @@ pub mod evaluation;
 mod move_generation;
 mod moves;
 mod posn;
+mod sliding_attacks;
 pub use crate::board::bitboard::*;
 pub use crate::board::moves::*;
 pub use crate::board::posn::*;
@@ -471,6 +472,15 @@ impl Board {
         let mut b = BitBoard::empty();
         for i in 0..6 {
             b |= self.black_pieces[i];
+        }
+        b
+    }
+
+    pub fn pieces(&self) -> BitBoard {
+        let mut b = BitBoard::empty();
+        for i in 0..6 {
+            b |= self.black_pieces[i];
+            b |= self.white_pieces[i];
         }
         b
     }

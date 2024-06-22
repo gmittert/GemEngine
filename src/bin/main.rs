@@ -1,5 +1,5 @@
-use gem::uci;
 use gem::gem::Gem;
+use gem::uci;
 use std::io;
 
 fn main() -> io::Result<()> {
