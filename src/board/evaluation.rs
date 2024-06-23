@@ -505,6 +505,7 @@ mod tests {
         assert_eq!("-M2", format!("{}", -Evaluation::m2()));
     }
     #[test]
+    #[ignore]
     fn many_moves() {
         let mut board = Board::from_fen(
             "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",

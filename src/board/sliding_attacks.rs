@@ -33,29 +33,57 @@ fn pdep(mask: u64, bits: u64) -> u64 {
     x
 }
 
-lazy_static! {
+static ROOK_MASK: [u64; 64] = {
+    let mut arr = [0; 64];
+    let mut i = 0;
+    while i < 64 {
+        let pos = Posn { pos: 1 << i };
 
-static ref ROOK_MASK: [u64; 64] = std::array::from_fn(|i| {
-    let pos = Posn { pos: 1 << i };
+        let mut acc = 0;
 
-    let mut acc = BitBoard::empty();
-    for shift in [
-        |p: Posn| p.no(),
-        |p: Posn| p.so(),
-        |p: Posn| p.ea(),
-        |p: Posn| p.we(),
-    ] {
-        let mut slide = shift(pos);
+        let mut slide = pos.no();
         while let Some(pos) = slide {
-            if shift(pos) == None {
+            if pos.no().is_none() {
                 break;
             }
-            acc |= pos;
-            slide = shift(pos);
+            acc |= pos.pos;
+            slide = pos.no();
         }
+
+        let mut slide = pos.so();
+        while let Some(pos) = slide {
+            if pos.so().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.so();
+        }
+
+        let mut slide = pos.ea();
+        while let Some(pos) = slide {
+            if pos.ea().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.ea();
+        }
+
+        let mut slide = pos.we();
+        while let Some(pos) = slide {
+            if pos.we().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.we();
+        }
+
+        arr[i] = acc;
+        i += 1;
     }
-    acc.0
-});
+    arr
+};
+
+lazy_static! {
 
 static ref ROOK_SLIDING_TABLE: [[u64; 4096]; 64] = {
     let mut out = Box::new([[0; 4096]; 64]);
