@@ -1,5 +1,8 @@
+use crate::board::magics::RBITS;
+use crate::board::magics::ROOK_MAGICS;
 use crate::board::BitBoard;
 use crate::board::Posn;
+use crate::board::magics;
 use lazy_static::lazy_static;
 use std::arch::asm;
 
@@ -83,30 +86,16 @@ static ROOK_MASK: [u64; 64] = {
     arr
 };
 
+
 lazy_static! {
 
 static ref ROOK_SLIDING_TABLE: [[u64; 4096]; 64] = {
     let mut out = Box::new([[0; 4096]; 64]);
     for pos in ALL_POSNS {
-        let num_keys = if pos.rank() != Rank::One
-            && pos.rank() != Rank::Eight
-            && pos.file() != File::A
-            && pos.file() != File::H
-        {
-            // Position in the middle of the board
-            1024
-        } else if (pos.rank() == Rank::One || pos.rank() == Rank::Eight)
-            && (pos.file() == File::A || pos.file() == File::H)
-        {
-            // Position in the corner
-            4096
-        } else {
-            // Position on the edge
-            2048
-        };
-        for key in 0..num_keys {
+        let num_bits = RBITS[pos.pos.ilog2() as usize];
+        for idx in 0..(1 << num_bits) {
             let mask = ROOK_MASK[pos.pos.ilog2() as usize];
-            let occupants = pdep(mask, key);
+            let occupants = pdep(mask, idx);
             let board = BitBoard(occupants);
 
             let mut acc = BitBoard::empty();
@@ -125,6 +114,7 @@ static ref ROOK_SLIDING_TABLE: [[u64; 4096]; 64] = {
                     slide = shift(pos);
                 }
             }
+            let key = u64::wrapping_mul(occupants, ROOK_MAGICS[pos.pos.ilog2() as usize]) >> (64 - num_bits);
             out[pos.pos.ilog2() as usize][key as usize] = acc.0;
         }
     }
@@ -134,7 +124,9 @@ static ref ROOK_SLIDING_TABLE: [[u64; 4096]; 64] = {
 
 pub fn compute_rook_attacks(from: Posn, board: BitBoard) -> BitBoard {
     let mask = ROOK_MASK[from.pos.ilog2() as usize];
-    let key = pext(mask, board.0);
+    let num_bits = RBITS[from.pos.ilog2() as usize];
+    let magic = ROOK_MAGICS[from.pos.ilog2() as usize];
+    let key = u64::wrapping_mul(board.0 & mask, magic) >> (64-num_bits);
     BitBoard(ROOK_SLIDING_TABLE[from.pos.ilog2() as usize][key as usize])
 }
 

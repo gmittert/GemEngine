@@ -4,6 +4,7 @@ mod move_generation;
 mod moves;
 mod posn;
 mod sliding_attacks;
+mod magics;
 pub use crate::board::bitboard::*;
 pub use crate::board::moves::*;
 pub use crate::board::posn::*;
