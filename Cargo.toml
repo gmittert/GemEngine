@@ -11,12 +11,17 @@ path = "src/lib.rs"
 name = "gem"
 path = "src/bin/main.rs"
 
+[[bin]]
+name = "find_magics"
+path = "src/magics/find_magics.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 paste = "1.0"
 threadpool = "1.8.1"
 lazy_static = "1.5.0"
+rand = "0.8.5"
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }
