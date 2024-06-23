@@ -10,41 +10,12 @@ impl Board {
             Color::Black => self.black_pieces,
         }[Piece::Queen as usize];
 
-        let allied_pieces = match color {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
-
-        let opponent_pieces = match color {
-            Color::Black => self.white_pieces(),
-            Color::White => self.black_pieces(),
-        };
-        queens.fold(BitBoard::empty(), |acc, i| {
-            let mut ret = acc;
-            for shift in [
-                |p: Posn| p.no(),
-                |p: Posn| p.so(),
-                |p: Posn| p.ea(),
-                |p: Posn| p.we(),
-                |p: Posn| p.ne(),
-                |p: Posn| p.se(),
-                |p: Posn| p.nw(),
-                |p: Posn| p.sw(),
-            ] {
-                let mut slide = shift(i);
-                while let Some(pos) = slide {
-                    if allied_pieces.contains(pos) {
-                        break;
-                    }
-                    ret |= pos;
-                    if opponent_pieces.contains(pos) {
-                        break;
-                    }
-                    slide = shift(pos);
-                }
-            }
-            ret
-        })
+        let mut acc = BitBoard::empty();
+        for i in queens {
+            acc |= sliding_attacks::compute_rook_attacks(i, self.pieces());
+            acc |= sliding_attacks::compute_bishop_attacks(i, self.pieces());
+        }
+        acc
     }
 
     pub fn queen_moves(&self, color: Color, out: &mut Vec<Move>) {
@@ -58,44 +29,26 @@ impl Board {
             Color::Black => self.black_pieces(),
         };
 
-        let opponent_pieces = match color {
-            Color::Black => self.white_pieces(),
-            Color::White => self.black_pieces(),
-        };
         for i in queens {
-            for shift in [
-                |p: Posn| p.no(),
-                |p: Posn| p.so(),
-                |p: Posn| p.ea(),
-                |p: Posn| p.we(),
-                |p: Posn| p.nw(),
-                |p: Posn| p.ne(),
-                |p: Posn| p.sw(),
-                |p: Posn| p.se(),
-            ] {
-                let mut slide = shift(i);
-                while let Some(pos) = slide {
-                    if allied_pieces.contains(pos) {
-                        break;
-                    }
-                    out.push(Move {
-                        from: i,
-                        to: pos,
-                        turn: color,
-                        piece: Piece::Queen,
-                        capture: self.query_pos(pos),
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: false,
-                        is_castle_king: false,
-                        is_castle_queen: false,
-                        promotion: None,
-                    });
-                    if opponent_pieces.contains(pos) {
-                        break;
-                    }
-                    slide = shift(pos);
+            let attacks = sliding_attacks::compute_rook_attacks(i, self.pieces())
+                | sliding_attacks::compute_bishop_attacks(i, self.pieces());
+            for pos in attacks {
+                if allied_pieces.contains(pos) {
+                    continue;
                 }
+                out.push(Move {
+                    from: i,
+                    to: pos,
+                    turn: color,
+                    piece: Piece::Queen,
+                    capture: self.query_pos(pos),
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_king: false,
+                    is_castle_queen: false,
+                    promotion: None,
+                });
             }
         }
     }
@@ -153,37 +106,11 @@ impl Board {
             Color::Black => self.black_pieces,
         }[Piece::Bishop as usize];
 
-        let allied_pieces = match color {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
-
-        let opponent_pieces = match color {
-            Color::Black => self.white_pieces(),
-            Color::White => self.black_pieces(),
-        };
-        bishops.fold(BitBoard::empty(), |acc, i| {
-            let mut ret = acc;
-            for shift in [
-                |p: Posn| p.nw(),
-                |p: Posn| p.ne(),
-                |p: Posn| p.sw(),
-                |p: Posn| p.se(),
-            ] {
-                let mut slide = shift(i);
-                while let Some(pos) = slide {
-                    if allied_pieces.contains(pos) {
-                        break;
-                    }
-                    ret |= pos;
-                    if opponent_pieces.contains(pos) {
-                        break;
-                    }
-                    slide = shift(pos);
-                }
-            }
-            ret
-        })
+        let mut acc = BitBoard::empty();
+        for i in bishops {
+            acc |= sliding_attacks::compute_bishop_attacks(i, self.pieces())
+        }
+        acc
     }
 
     pub fn bishop_moves(&self, color: Color, out: &mut Vec<Move>) {
@@ -202,35 +129,24 @@ impl Board {
             Color::White => self.black_pieces(),
         };
         for i in bishops {
-            for shift in [
-                |p: Posn| p.nw(),
-                |p: Posn| p.ne(),
-                |p: Posn| p.sw(),
-                |p: Posn| p.se(),
-            ] {
-                let mut slide = shift(i);
-                while let Some(pos) = slide {
-                    if allied_pieces.contains(pos) {
-                        break;
-                    }
-                    out.push(Move {
-                        from: i,
-                        to: pos,
-                        turn: color,
-                        piece: Piece::Bishop,
-                        capture: self.query_pos(pos),
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: false,
-                        is_castle_king: false,
-                        is_castle_queen: false,
-                        promotion: None,
-                    });
-                    if opponent_pieces.contains(pos) {
-                        break;
-                    }
-                    slide = shift(pos);
+            let attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
+            for pos in attacks {
+                if allied_pieces.contains(pos) {
+                    continue;
                 }
+                out.push(Move {
+                    from: i,
+                    to: pos,
+                    turn: color,
+                    piece: Piece::Bishop,
+                    capture: self.query_pos(pos),
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_king: false,
+                    is_castle_queen: false,
+                    promotion: None,
+                });
             }
         }
     }

@@ -116,25 +116,14 @@ fn pdep(mask: u64, bits: u64) -> u64 {
 }
 
 static RBITS: [u8; 64] = [
-  12, 11, 11, 11, 11, 11, 11, 12,
-  11, 10, 10, 10, 10, 10, 10, 11,
-  11, 10, 10, 10, 10, 10, 10, 11,
-  11, 10, 10, 10, 10, 10, 10, 11,
-  11, 10, 10, 10, 10, 10, 10, 11,
-  11, 10, 10, 10, 10, 10, 10, 11,
-  11, 10, 10, 10, 10, 10, 10, 11,
-  12, 11, 11, 11, 11, 11, 11, 12
+    12, 11, 11, 11, 11, 11, 11, 12, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11,
+    11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11,
+    11, 10, 10, 10, 10, 10, 10, 11, 12, 11, 11, 11, 11, 11, 11, 12,
 ];
 
 static BBITS: [u8; 64] = [
-  6, 5, 5, 5, 5, 5, 5, 6,
-  5, 5, 5, 5, 5, 5, 5, 5,
-  5, 5, 7, 7, 7, 7, 5, 5,
-  5, 5, 7, 9, 9, 7, 5, 5,
-  5, 5, 7, 9, 9, 7, 5, 5,
-  5, 5, 7, 7, 7, 7, 5, 5,
-  5, 5, 5, 5, 5, 5, 5, 5,
-  6, 5, 5, 5, 5, 5, 5, 6
+    6, 5, 5, 5, 5, 5, 5, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 7, 7, 7, 7, 5, 5, 5, 5, 7, 9, 9, 7, 5, 5,
+    5, 5, 7, 9, 9, 7, 5, 5, 5, 5, 7, 7, 7, 7, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 5, 5, 5, 5, 5, 5, 6,
 ];
 
 fn find_rook_magic(pos: Posn, rng: &mut StdRng) {
@@ -149,7 +138,7 @@ fn find_rook_magic(pos: Posn, rng: &mut StdRng) {
         let c3: u64 = rng.gen();
         let candidate: u64 = c1 & c2 & c3;
         let transformed = u64::wrapping_mul(candidate, mask);
-        if transformed.leading_ones() < num_bits as u32{
+        if transformed.leading_ones() < num_bits as u32 {
             continue;
         }
 
@@ -158,7 +147,7 @@ fn find_rook_magic(pos: Posn, rng: &mut StdRng) {
             let key = u64::wrapping_mul(occupants, candidate) >> (64 - num_bits);
             let offset = 1 << (key % 64);
             let idx = (key / 64) as usize;
-            if bitset[idx] & offset != 0{
+            if bitset[idx] & offset != 0 {
                 continue 'outer;
             }
             bitset[idx] |= offset;
@@ -184,7 +173,7 @@ fn find_bishop_magic(pos: Posn, rng: &mut StdRng) {
         let c3: u64 = rng.gen();
         let candidate: u64 = c1 & c2 & c3;
         let transformed = u64::wrapping_mul(candidate, mask);
-        if transformed.leading_ones() < num_bits as u32{
+        if transformed.leading_ones() < num_bits as u32 {
             continue;
         }
 
@@ -193,7 +182,7 @@ fn find_bishop_magic(pos: Posn, rng: &mut StdRng) {
             let key = u64::wrapping_mul(occupants, candidate) >> (64 - num_bits);
             let offset = 1 << (key % 64);
             let idx = (key / 64) as usize;
-            if bitset[idx] & offset != 0{
+            if bitset[idx] & offset != 0 {
                 continue 'outer;
             }
             bitset[idx] |= offset;
