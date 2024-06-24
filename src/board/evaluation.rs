@@ -1,19 +1,20 @@
 pub use crate::board::*;
 use crate::hashmap::HashMap;
+use std::cmp::max;
 use std::fmt;
-use std::ops::{Add, Neg};
+use std::ops::{Add, AddAssign, Neg, Sub};
 use std::sync::mpsc;
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
 pub struct Evaluation(pub i64);
 
-const PIECE_VALUES: [i64; 6] = [
-    100,   // Pawn
-    500,   // Rook
-    300,   // Knight
-    310,   // Bishop
-    900,   // Queen
-    20000, // King
+const PIECE_VALUES: [Evaluation; 6] = [
+    Evaluation(100),   // Pawn
+    Evaluation(500),   // Rook
+    Evaluation(300),   // Knight
+    Evaluation(310),   // Bishop
+    Evaluation(900),   // Queen
+    Evaluation(20000), // King
 ];
 
 // An evaluation is simply an i64 with a few caveats:
@@ -87,6 +88,20 @@ impl Add for Evaluation {
 
     fn add(self, rhs: Self) -> Self::Output {
         Evaluation(self.0 + rhs.0)
+    }
+}
+
+impl AddAssign for Evaluation {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0
+    }
+}
+
+impl Sub for Evaluation {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Evaluation(self.0 - rhs.0)
     }
 }
 
@@ -193,12 +208,16 @@ impl Board {
                 big_change += PIECE_VALUES[promote as usize];
             }
             // If we're so far down that this doesn't help, don't bother searching
-            if stand_pat + Evaluation(big_change) < alpha {
+            if stand_pat + big_change < alpha {
                 continue;
             }
 
             self.make_move(&capture);
-            if !self.in_check(!self.to_play) {
+
+            let value = PIECE_VALUES[capture.capture.unwrap() as usize]
+                - self.static_exchange_evaluation(capture.to, !capture.turn);
+
+            if value >= Evaluation::draw() && !self.in_check(!self.to_play) {
                 let eval = -self.quiesce(-beta, -alpha.inc_mate(), cache).dec_mate();
                 if eval >= beta {
                     self.undo_move(&capture);
@@ -217,9 +236,7 @@ impl Board {
 
     pub fn alpha_beta(&mut self, alpha: Evaluation, beta: Evaluation, depth: usize) -> Evaluation {
         let mut cache: HashMap<Evaluation, { 1024 * 1024 }> = HashMap::new();
-        let res = self.alpha_beta_inner(alpha, beta, depth, &mut cache);
-        cache.print_stats();
-        res
+        self.alpha_beta_inner(alpha, beta, depth, &mut cache)
     }
 
     pub fn alpha_beta_inner(
@@ -301,17 +318,72 @@ impl Board {
 
         let attacks_diff = attacks_white.len() as i64 - attacks_black.len() as i64;
 
-        let materialistic = PIECE_VALUES[Piece::King as usize] * king_diff
-            + PIECE_VALUES[Piece::Queen as usize] * queen_diff
-            + PIECE_VALUES[Piece::Rook as usize] * rook_diff
-            + PIECE_VALUES[Piece::Bishop as usize] * bishop_diff
-            + PIECE_VALUES[Piece::Knight as usize] * knight_diff
-            + PIECE_VALUES[Piece::Pawn as usize] * pawn_diff
+        let materialistic = PIECE_VALUES[Piece::King as usize].0 * king_diff
+            + PIECE_VALUES[Piece::Queen as usize].0 * queen_diff
+            + PIECE_VALUES[Piece::Rook as usize].0 * rook_diff
+            + PIECE_VALUES[Piece::Bishop as usize].0 * bishop_diff
+            + PIECE_VALUES[Piece::Knight as usize].0 * knight_diff
+            + PIECE_VALUES[Piece::Pawn as usize].0 * pawn_diff
             + attacks_diff as i64;
         match to_play {
             Color::Black => -Evaluation(materialistic),
             Color::White => Evaluation(materialistic),
         }
+    }
+
+    pub fn get_smallest_attacker(&self, p: Posn, side: Color) -> Option<Move> {
+        for i in [
+            Piece::Pawn,
+            Piece::Knight,
+            Piece::Bishop,
+            Piece::Rook,
+            Piece::Queen,
+            Piece::King,
+        ] {
+            let attacks = match i {
+                Piece::Pawn => self.pawn_attacks(side),
+                Piece::Rook => self.rook_attacks(side),
+                Piece::Knight => self.knight_attacks(side),
+                Piece::Bishop => self.bishop_attacks(side),
+                Piece::Queen => self.queen_attacks(side),
+                Piece::King => self.king_attacks(side),
+            };
+            if attacks.contains(p) {
+                let mut moves = vec![];
+                moves.reserve(8);
+                match i {
+                    Piece::Pawn => self.pawn_moves(side, &mut moves),
+                    Piece::Rook => self.rook_moves(side, &mut moves),
+                    Piece::Knight => self.knight_moves(side, &mut moves),
+                    Piece::Bishop => self.bishop_moves(side, &mut moves),
+                    Piece::Queen => self.queen_moves(side, &mut moves),
+                    Piece::King => self.king_moves(side, &mut moves),
+                };
+                for m in moves {
+                    if m.to == p {
+                        return Some(m);
+                    }
+                }
+
+                return None;
+            }
+        }
+        return None;
+    }
+
+    pub fn static_exchange_evaluation(&mut self, p: Posn, side: Color) -> Evaluation {
+        let mut value = Evaluation::draw();
+        if let Some(m) = self.get_smallest_attacker(p, side) {
+            self.make_move(&m);
+            /* Do not consider captures if they lose material, therefor max zero */
+            value = max(
+                Evaluation::draw(),
+                PIECE_VALUES[m.capture.unwrap() as usize]
+                    - self.static_exchange_evaluation(p, !side),
+            );
+            self.undo_move(&m);
+        }
+        value
     }
 }
 
@@ -513,5 +585,50 @@ mod tests {
         .expect("Invalid fen?");
         let pool = threadpool::ThreadPool::new(32);
         board.best_move(&pool);
+    }
+
+    #[test]
+    #[ignore]
+    fn many_moves2() {
+        let mut board =
+            Board::from_fen("rn2k2r/1b1p1p2/p2ppn2/1p1P3p/2P3q1/1PNBP3/P3R1PP/R4Q1K b Qkq - 0 1")
+                .expect("Invalid fen?");
+        let pool = threadpool::ThreadPool::new(64);
+        board.best_move(&pool);
+    }
+
+    #[test]
+    fn see_simple() {
+        let mut board = Board::from_fen("1k1r4/1pp4p/p7/4p3/8/P5P1/1PP4P/2K1R3 w - - 0 1")
+            .expect("Invalid fen?");
+        assert_eq!(
+            Evaluation(100),
+            board.static_exchange_evaluation(e5(), Color::White)
+        );
+    }
+
+    #[test]
+    fn see_med() {
+        let mut board = Board::from_fen("1k1r3q/1ppn3p/p4b2/4p3/8/P2N2P1/1PP1R1BP/2K1Q3 w - - 0 1")
+            .expect("Invalid fen?");
+
+        board.make_move(&Move {
+            from: d3(),
+            to: e5(),
+            turn: Color::White,
+            piece: Piece::Knight,
+            capture: Some(Piece::Pawn),
+            promotion: None,
+            is_check: false,
+            is_mate: false,
+            is_en_passant: false,
+            is_castle_queen: false,
+            is_castle_king: false,
+        });
+        assert_eq!(
+            Evaluation(-200),
+            PIECE_VALUES[Piece::Pawn as usize]
+                - board.static_exchange_evaluation(e5(), Color::Black)
+        );
     }
 }
