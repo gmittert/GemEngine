@@ -191,7 +191,6 @@ impl Board {
         let mut alpha = alpha;
         let stand_pat = self.eval(self.to_play);
         if stand_pat >= beta {
-            cache.insert(self.hash, beta);
             return beta;
         }
         if alpha < stand_pat {
@@ -200,6 +199,7 @@ impl Board {
         let captures = generate_pseudo_legal_moves(self)
             .into_iter()
             .filter(|x| x.capture.is_some());
+        let mut is_pv_node = false;
         for capture in captures {
             // The most material this could swing is capturing a queen
             let mut big_change = PIECE_VALUES[Piece::Queen as usize];
@@ -221,16 +221,20 @@ impl Board {
                 let eval = -self.quiesce(-beta, -alpha.inc_mate(), cache).dec_mate();
                 if eval >= beta {
                     self.undo_move(&capture);
-                    cache.insert(self.hash, beta);
+
                     return beta;
                 }
                 if eval > alpha {
+                    is_pv_node = true;
                     alpha = eval;
                 }
             }
             self.undo_move(&capture);
         }
-        cache.insert(self.hash, alpha);
+        // For now, we only insert into map for PV-Nodes where the score is exact
+        if is_pv_node{
+            cache.insert(self.hash, alpha);
+        }
         alpha
     }
 
@@ -250,13 +254,12 @@ impl Board {
             return *eval;
         }
         if depth == 0 {
-            let eval = self.quiesce(alpha, beta, cache);
-            cache.insert(self.hash, eval);
-            return eval;
+            return self.quiesce(alpha, beta, cache);
         }
         let mut alpha = alpha;
         let mut had_legal_move = false;
         let moves = generate_pseudo_legal_moves(self);
+        let mut is_pv_node = false;
         for m in &moves {
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
@@ -264,11 +267,13 @@ impl Board {
                 let eval = -self
                     .alpha_beta_inner(-beta, -alpha.inc_mate(), depth - 1, cache)
                     .dec_mate();
+
                 if eval >= beta {
                     self.undo_move(&m);
                     return beta;
                 }
                 if eval > alpha {
+                    is_pv_node = true;
                     alpha = eval;
                 }
             }
@@ -285,7 +290,10 @@ impl Board {
             }
         };
 
-        cache.insert(self.hash, eval);
+        // For now, we only insert into map for PV-Nodes where the score is exact
+        if is_pv_node{
+            cache.insert(self.hash, eval);
+        }
         eval
     }
 
@@ -630,5 +638,29 @@ mod tests {
             PIECE_VALUES[Piece::Pawn as usize]
                 - board.static_exchange_evaluation(e5(), Color::Black)
         );
+    }
+
+    #[test]
+    fn eval_bug1() {
+        let mut board =
+            Board::from_fen("r1b1k1nr/pp1p3p/1qnpp3/5pp1/2PP4/2N1P3/PPQ2PPP/R3KBNR b KQkq - 2 8")
+                .expect("Invalid fen?");
+        board.make_move(&Move {
+            from: b6(),
+            to: b2(),
+            turn: Color::Black,
+            piece: Piece::Queen,
+            capture: Some(Piece::Pawn),
+            promotion: None,
+            is_check: false,
+            is_mate: false,
+            is_en_passant: false,
+            is_castle_queen: false,
+            is_castle_king: false,
+        });
+        let best_score = Evaluation::lost();
+        let eval = -board.alpha_beta(Evaluation::lost(), -best_score.inc_mate(), 4);
+        println!("Eval: {}", eval);
+        assert!(eval < Evaluation::draw());
     }
 }
