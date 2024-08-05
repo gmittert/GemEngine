@@ -1,4 +1,3 @@
-use crate::board::magics;
 use crate::board::magics::BBITS;
 use crate::board::magics::BISHOP_MAGICS;
 use crate::board::magics::RBITS;
@@ -8,11 +7,9 @@ use crate::board::Posn;
 use lazy_static::lazy_static;
 use std::arch::asm;
 
-use super::File;
-use super::Rank;
 use super::ALL_POSNS;
 
-fn pext(mask: u64, bits: u64) -> u64 {
+fn _pext(mask: u64, bits: u64) -> u64 {
     let mut x: u64;
     unsafe {
         asm!(
@@ -258,7 +255,6 @@ mod tests {
     }
     #[test]
     pub fn bishop_slides_empty() {
-        let pos = d5();
         let mut board = empty_board(Color::White);
         board.white_pieces[Piece::Rook as usize] = BitBoard::from(d5());
         let computed = compute_bishop_attacks(d5(), board.pieces());

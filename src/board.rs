@@ -367,6 +367,9 @@ impl Board {
         self.hash ^= new_move_rights.hash();
         self.move_rights.push(new_move_rights);
 
+        if self.to_play == Color::Black {
+            self.full_move += 1;
+        }
         self.to_play = !self.to_play;
         self.hash ^= ZOBRIST_KEYS.black_turn;
     }
@@ -411,6 +414,9 @@ impl Board {
             if let Some(new_rights) = self.move_rights.last() {
                 self.hash ^= new_rights.hash();
             }
+        }
+        if self.to_play == Color::Black {
+            self.full_move -= 1;
         }
         self.half_move -= 1;
     }
@@ -570,6 +576,15 @@ pub fn empty_board(turn: Color) -> Board {
 pub fn starting_board() -> Board {
     Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
         .expect("Failed to parse starting fen")
+}
+
+pub fn fill_pseudo_legal_moves(moves: &mut Vec<Move>, b: &Board) {
+    b.rook_moves(b.to_play, moves);
+    b.bishop_moves(b.to_play, moves);
+    b.queen_moves(b.to_play, moves);
+    b.knight_moves(b.to_play, moves);
+    b.king_moves(b.to_play, moves);
+    b.pawn_moves(b.to_play, moves);
 }
 
 pub fn generate_pseudo_legal_moves(b: &Board) -> Vec<Move> {

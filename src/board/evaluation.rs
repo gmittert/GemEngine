@@ -8,6 +8,16 @@ use std::sync::mpsc;
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
 pub struct Evaluation(pub i64);
 
+#[derive(Default)]
+pub struct TTEntry {
+    eval: Evaluation,
+    is_exact: bool,
+    is_upper: bool,
+    is_lower: bool,
+    depth: u16,
+    best_move: Option<Move>,
+}
+
 const PIECE_VALUES: [Evaluation; 6] = [
     Evaluation(100),   // Pawn
     Evaluation(500),   // Rook
@@ -134,7 +144,8 @@ impl Board {
     pub fn best_move(&mut self, queue: &threadpool::ThreadPool) -> (Option<Move>, Evaluation) {
         let moves = generate_pseudo_legal_moves(self);
         let mut had_legal_move = false;
-        const DEFAULT_DEPTH: usize = 4;
+        const DEFAULT_DEPTH: u16 = 4;
+        let target_depth = self.full_move + DEFAULT_DEPTH;
 
         let (tx, rx) = mpsc::channel();
         for m in &moves {
@@ -150,7 +161,7 @@ impl Board {
                 queue.execute(move || {
                     let best_score = Evaluation::lost();
                     let eval = -new_b
-                        .alpha_beta(Evaluation::lost(), -best_score.inc_mate(), DEFAULT_DEPTH)
+                        .alpha_beta(Evaluation::lost(), -best_score.inc_mate(), target_depth)
                         .dec_mate();
 
                     let _ = tx.send((eval, m));
@@ -183,11 +194,7 @@ impl Board {
         &mut self,
         alpha: Evaluation,
         beta: Evaluation,
-        cache: &mut HashMap<Evaluation, { 1024 * 1024 }>,
     ) -> Evaluation {
-        if let Some(eval) = cache.get(self.hash) {
-            return *eval;
-        }
         let mut alpha = alpha;
         let stand_pat = self.eval(self.to_play);
         if stand_pat >= beta {
@@ -199,7 +206,6 @@ impl Board {
         let captures = generate_pseudo_legal_moves(self)
             .into_iter()
             .filter(|x| x.capture.is_some());
-        let mut is_pv_node = false;
         for capture in captures {
             // The most material this could swing is capturing a queen
             let mut big_change = PIECE_VALUES[Piece::Queen as usize];
@@ -218,28 +224,23 @@ impl Board {
                 - self.static_exchange_evaluation(capture.to, !capture.turn);
 
             if value >= Evaluation::draw() && !self.in_check(!self.to_play) {
-                let eval = -self.quiesce(-beta, -alpha.inc_mate(), cache).dec_mate();
+                let eval = -self.quiesce(-beta, -alpha.inc_mate()).dec_mate();
                 if eval >= beta {
                     self.undo_move(&capture);
 
                     return beta;
                 }
                 if eval > alpha {
-                    is_pv_node = true;
                     alpha = eval;
                 }
             }
             self.undo_move(&capture);
         }
-        // For now, we only insert into map for PV-Nodes where the score is exact
-        if is_pv_node{
-            cache.insert(self.hash, alpha);
-        }
         alpha
     }
 
-    pub fn alpha_beta(&mut self, alpha: Evaluation, beta: Evaluation, depth: usize) -> Evaluation {
-        let mut cache: HashMap<Evaluation, { 1024 * 1024 }> = HashMap::new();
+    pub fn alpha_beta(&mut self, alpha: Evaluation, beta: Evaluation, depth: u16) -> Evaluation {
+        let mut cache: HashMap<TTEntry, 1024> = HashMap::new();
         self.alpha_beta_inner(alpha, beta, depth, &mut cache)
     }
 
@@ -247,18 +248,37 @@ impl Board {
         &mut self,
         alpha: Evaluation,
         beta: Evaluation,
-        depth: usize,
-        cache: &mut HashMap<Evaluation, { 1024 * 1024 }>,
+        depth: u16,
+        cache: &mut HashMap<TTEntry, 1024>,
     ) -> Evaluation {
-        if let Some(eval) = cache.get(self.hash) {
-            return *eval;
+        let mut best_move = None;
+        if let Some(entry) = cache.get(self.hash) {
+            // We can use this cache entry if:
+            // - The node is deep enough
+            // - The entry is exact, or the upper bound <= alpha or lowerbound >= beta
+            if entry.depth >= depth
+                && (entry.is_exact
+                    || (entry.is_upper && entry.eval <= alpha)
+                    || (entry.is_lower && entry.eval >= beta))
+            {
+                return entry.eval;
+            }
+            // If not, if the entry has a best move, start with it and hope that it gives us a nice
+            // alpha to start with that should cause lots of cut offs.
+            best_move = entry.best_move;
         }
-        if depth == 0 {
-            return self.quiesce(alpha, beta, cache);
+        // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't
+        // want to compute taking a pawn with our queen and just stop computing there, for example.
+        if self.full_move >= depth {
+            return self.quiesce(alpha, beta);
         }
         let mut alpha = alpha;
         let mut had_legal_move = false;
-        let moves = generate_pseudo_legal_moves(self);
+        let mut moves = match best_move {
+            Some(m) => vec![m],
+            None => vec![],
+        };
+        fill_pseudo_legal_moves(&mut moves, self);
         let mut is_pv_node = false;
         for m in &moves {
             self.make_move(&m);
@@ -270,6 +290,14 @@ impl Board {
 
                 if eval >= beta {
                     self.undo_move(&m);
+                    cache.insert(self.hash, TTEntry{
+                        eval: beta,
+                        is_exact: false,
+                        is_upper: true,
+                        is_lower: false,
+                        depth: self.full_move,
+                        best_move: None,
+                    });
                     return beta;
                 }
                 if eval > alpha {
@@ -291,9 +319,24 @@ impl Board {
         };
 
         // For now, we only insert into map for PV-Nodes where the score is exact
-        if is_pv_node{
-            cache.insert(self.hash, eval);
+        if is_pv_node {
+            cache.insert(self.hash, TTEntry{
+                eval: beta,
+                is_exact: true,
+                is_upper: false,
+                is_lower: false,
+                depth: self.full_move,
+                best_move: None,
+            });
         }
+        cache.insert(self.hash, TTEntry{
+            eval: alpha,
+            is_exact: false,
+            is_upper: false,
+            is_lower: true,
+            depth: self.full_move,
+            best_move: None,
+        });
         eval
     }
 
