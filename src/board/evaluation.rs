@@ -628,7 +628,6 @@ mod tests {
         assert_eq!("-M2", format!("{}", -Evaluation::m2()));
     }
     #[test]
-    #[ignore]
     fn many_moves() {
         let mut board = Board::from_fen(
             "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
@@ -639,7 +638,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn many_moves2() {
         let mut board =
             Board::from_fen("rn2k2r/1b1p1p2/p2ppn2/1p1P3p/2P3q1/1PNBP3/P3R1PP/R4Q1K b Qkq - 0 1")
@@ -705,5 +703,16 @@ mod tests {
         let eval = -board.alpha_beta(Evaluation::lost(), -best_score.inc_mate(), 4);
         println!("Eval: {}", eval);
         assert!(eval < Evaluation::draw());
+    }
+    #[test]
+    fn eval_bug2() {
+        let mut board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").expect("bad fen?");
+        board.make_alg_move(&AlgebraicMove{from: d2(), to: d4(), promotion: None}).expect("bad move?");
+        board.make_alg_move(&AlgebraicMove{from: c7(), to: c5(), promotion: None}).expect("bad move?");
+        board.make_alg_move(&AlgebraicMove{from: d4(), to: c5(), promotion: None}).expect("bad move?");
+
+        let pool = threadpool::ThreadPool::new(32);
+        let (m, _) = board.best_move(&pool);
+        assert!(m.unwrap().to != c5());
     }
 }

@@ -226,17 +226,20 @@ impl Board {
         let piece = self
             .query_pos(m.from)
             .ok_or(format!("Failed to find a piece on position: {}", m.from))?;
-        let capture = self.query_pos(m.to);
+        let mut capture = self.query_pos(m.to);
         let is_castle_king = piece == Piece::King
             && ((m.from == e1() && m.to == g1()) || (m.from == e8() && m.to == g8()));
         let is_castle_queen = piece == Piece::King
             && ((m.from == e1() && m.to == c1()) || (m.from == e8() && m.to == c8()));
         let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
         let is_en_passant = if let Some(file) = ep_target {
-            piece == Piece::Pawn && m.to.file() == file
+            piece == Piece::Pawn && m.to.file() == file && capture.is_none()
         } else {
             false
         };
+        if is_en_passant {
+            capture = Some(Piece::Pawn)
+        }
         let m = Move {
             from: m.from,
             to: m.to,

@@ -12,6 +12,19 @@ pub enum Piece {
     Queen,
     King,
 }
+impl fmt::Display for Piece {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Piece::Pawn => write!(f, "Pawn"),
+            Piece::Rook => write!(f, "Rook"),
+            Piece::Knight => write!(f, "Knight"),
+            Piece::Bishop => write!(f, "Bishop"),
+            Piece::Queen => write!(f, "Queen"),
+            Piece::King => write!(f, "King"),
+        }?;
+        Ok(())
+    }
+}
 
 impl Piece {
     pub fn from(c: char) -> Option<Piece> {
