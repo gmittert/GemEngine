@@ -11,7 +11,7 @@ pub fn start(c: &mut Criterion) {
                 let mut board = board::starting_board();
                 let pool = threadpool::ThreadPool::new(num_cpus);
                 b.iter(|| {
-                    board.best_move(&pool);
+                    board.best_move(4, &pool);
                 })
             },
         );
@@ -32,7 +32,7 @@ pub fn london(c: &mut Criterion) {
                 .expect("Invalid fen?");
                 let pool = threadpool::ThreadPool::new(num_cpus);
                 b.iter(|| {
-                    board.best_move(&pool);
+                    board.best_move(4, &pool);
                 })
             },
         );

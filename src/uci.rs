@@ -252,7 +252,7 @@ pub fn info(info_block: Info) {
             print!(" mate -{m}")
         } else {
             let Evaluation(cp) = eval;
-            print!(" cp {}", (cp * 100) as i64)
+            print!(" cp {}", cp as i64)
         }
         if score.is_upper_bound {
             print!(" upperbound")

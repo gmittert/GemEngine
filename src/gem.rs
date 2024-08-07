@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{
     board::{self, Board},
     uci::{self, *},
@@ -111,7 +113,7 @@ impl UciEngine for Gem {
     }
 
     fn go(&mut self, options: crate::uci::GoOptions) -> Result<(), String> {
-        let (m, eval) = self.board.best_move(&self.work_queue);
+        let (m, eval, info) = self.board.search_best_move_for(Duration::from_secs(1), &self.work_queue);
         let Some(best_move) = m else {
             return Err(format!("Failed to find best move on board: {}", self.board));
         };
@@ -121,6 +123,8 @@ impl UciEngine for Gem {
                 is_upper_bound: true,
                 is_lower_bound: false,
             }),
+            depth: Some(info.depth.into()),
+            time: info.time.as_millis().try_into().ok(),
             ..Default::default()
         };
         uci::info(info);
