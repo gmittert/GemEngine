@@ -1,80 +1,101 @@
 use std::array;
+use std::cell::UnsafeCell;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-use crate::board::{AlgebraicMove, Move};
-
-
-pub struct TranspositionData {
-    zobrist_key: u64,
-    best_move: AlgebraicMove,
-    depth: u8,
-
+pub struct SharedHashMapEntry<T> {
+    key: AtomicU64,
+    val: T,
 }
-#[derive(Debug)]
-pub struct TranspositionTable<const N: usize> {
+
+pub struct SharedHashMap<T, const N: usize>
+where
+    T: Sized,
+{
     // 1GiB
-    data: Box<[(u64, T); N]>,
-    hits: usize,
-    misses: usize,
-    conflicts: usize,
+    data: UnsafeCell<[SharedHashMapEntry<T>; N]>,
+    hits: AtomicUsize,
+    misses: AtomicUsize,
+    conflicts: AtomicUsize,
 
-    accepted: usize,
-    rejected: usize,
+    accepted: AtomicUsize,
+    rejected: AtomicUsize,
 }
-impl<T, const N: usize> HashMap<T, N>
+unsafe impl<T, const N: usize> Send for SharedHashMap<T, N> {}
+unsafe impl<T, const N: usize> Sync for SharedHashMap<T, N> {}
+impl<T, const N: usize> SharedHashMap<T, N>
 where
     T: Default,
 {
     pub fn print_stats(&self) {
+        let hits = self.hits.load(Ordering::Relaxed);
+        let misses = self.misses.load(Ordering::Relaxed);
+        let conflicts = self.conflicts.load(Ordering::Relaxed);
+        let accepted = self.accepted.load(Ordering::Relaxed);
+        let rejected = self.rejected.load(Ordering::Relaxed);
         println!("HashMap Stats: ");
-        println!("Hits: {}", self.hits);
-        println!("Misses: {}", self.misses);
-        println!("Conflicts: {}", self.conflicts);
+        println!("Hits: {}", hits);
+        println!("Misses: {}", misses);
+        println!("Conflicts: {}", conflicts);
         println!(
             "Hit Rate: {}",
-            self.hits as f64 / (self.hits + self.misses + self.conflicts) as f64
+            hits as f64 / (hits + misses + conflicts) as f64
         );
         println!("");
-        println!("Accepted: {}", self.accepted);
-        println!("Rejected: {}", self.rejected);
+        println!("Accepted: {}", accepted);
+        println!("Rejected: {}", rejected);
         println!(
             "Acceptance Rate: {}",
-            self.accepted as f64 / (self.accepted + self.rejected) as f64
+            accepted as f64 / (accepted + rejected) as f64
         );
     }
-    pub fn new() -> HashMap<T, N> {
-        HashMap {
-            data: Box::new(array::from_fn(|_| (0, T::default()))),
-            hits: 0,
-            misses: 0,
-            conflicts: 0,
-            accepted: 0,
-            rejected: 0,
+    pub fn new() -> SharedHashMap<T, N> {
+        SharedHashMap {
+            data: UnsafeCell::new(array::from_fn(|_| SharedHashMapEntry {
+                key: AtomicU64::new(0),
+                val: T::default(),
+            })),
+            hits: AtomicUsize::new(0),
+            misses: AtomicUsize::new(0),
+            conflicts: AtomicUsize::new(0),
+            accepted: AtomicUsize::new(0),
+            rejected: AtomicUsize::new(0),
         }
     }
-    pub fn get(&mut self, k: u64) -> Option<&T> {
+    pub fn get(&self, k: u64) -> Option<&T> {
         let pos: usize = k as usize % N;
-        let (kp, v) = &self.data[pos];
-        if *kp == 0 {
-            self.misses += 1;
+        let kp = unsafe { &self.data.get().as_ref().unwrap()[pos].key };
+        let v = unsafe { &self.data.get().as_ref().unwrap()[pos].val };
+        let header = kp.load(Ordering::Acquire);
+        if header == 0 {
+            self.misses.fetch_add(1, Ordering::Relaxed);
             return None;
         }
-        if *kp != k {
-            self.conflicts += 1;
+        if header != k {
+            self.conflicts.fetch_add(1, Ordering::Relaxed);
             return None;
         }
-        self.hits += 1;
+        self.hits.fetch_add(1, Ordering::Relaxed);
         Some(v)
     }
 
-    pub fn insert(&mut self, k: u64, v: T) -> bool {
+    pub fn insert(&self, k: u64, v: T) -> bool {
         let pos: usize = k as usize % N;
-        let (kp, _) = &self.data[pos];
-        if *kp != 0 {
-            self.rejected += 1;
-            return false;
+        let kp = unsafe { &self.data.get().as_ref().unwrap()[pos].key };
+
+        let res = kp.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Relaxed);
+        match res {
+            Ok(_) => {
+                self.accepted.fetch_add(1, Ordering::Relaxed);
+                unsafe {
+                    &self.data.get().as_mut().map(|x| x.each_mut()[pos].val = v);
+                };
+                kp.store(k, Ordering::Release);
+                true
+            }
+            Err(_) => {
+                self.rejected.fetch_add(1, Ordering::Relaxed);
+                false
+            }
         }
-        self.accepted += 1;
-        self.data[pos] = (k, v);
-        true
     }
 }

@@ -1,9 +1,9 @@
 pub use crate::board::*;
-use crate::hashmap::HashMap;
+use crate::shared_hashmap::SharedHashMap;
 use std::cmp::max;
 use std::fmt;
 use std::ops::{Add, AddAssign, Neg, Sub};
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
@@ -69,7 +69,7 @@ impl Evaluation {
     }
     pub fn mated_in(&self) -> Option<usize> {
         if self.0 <= Self::lost().0 + 100 {
-            Some((Self::lost().0 - self.0) as usize)
+            Some((self.0 - Self::lost().0) as usize)
         } else {
             None
         }
@@ -153,10 +153,11 @@ impl Board {
         queue: &threadpool::ThreadPool,
     ) -> (Option<Move>, Evaluation, SearchInfo) {
         let start = Instant::now();
-        let (mut m, mut eval) = self.best_move(1, &queue);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (mut m, mut eval) = self.best_move(1, &queue, cache.clone());
         let mut depth = 2;
         while (Instant::now() - start) < time {
-            (m, eval) = self.best_move(depth, &queue);
+            (m, eval) = self.best_move(depth, &queue, cache.clone());
             depth += 1;
         }
         let info = SearchInfo {
@@ -170,6 +171,7 @@ impl Board {
         &mut self,
         depth: u16,
         queue: &threadpool::ThreadPool,
+        cache: Arc<SharedHashMap<TTEntry, 1024>>,
     ) -> (Option<Move>, Evaluation) {
         let moves = generate_pseudo_legal_moves(self);
         let mut had_legal_move = false;
@@ -186,10 +188,11 @@ impl Board {
                 let tx = tx.clone();
                 let mut new_b = self.clone();
                 let m = *m;
+                let cloned = cache.clone();
                 queue.execute(move || {
                     let best_score = Evaluation::lost();
                     let eval = -new_b
-                        .alpha_beta(Evaluation::lost(), -best_score.inc_mate(), target_depth)
+                        .alpha_beta(Evaluation::lost(), -best_score.inc_mate(), target_depth, cloned.as_ref())
                         .dec_mate();
 
                     let _ = tx.send((eval, m));
@@ -263,17 +266,13 @@ impl Board {
         alpha
     }
 
-    pub fn alpha_beta(&mut self, alpha: Evaluation, beta: Evaluation, depth: u16) -> Evaluation {
-        let mut cache: HashMap<TTEntry, 1024> = HashMap::new();
-        self.alpha_beta_inner(alpha, beta, depth, &mut cache)
-    }
 
-    pub fn alpha_beta_inner(
+    pub fn alpha_beta(
         &mut self,
         alpha: Evaluation,
         beta: Evaluation,
         depth: u16,
-        cache: &mut HashMap<TTEntry, 1024>,
+        cache: &SharedHashMap<TTEntry, 1024>,
     ) -> Evaluation {
         let mut best_move = None;
         if let Some(entry) = cache.get(self.hash) {
@@ -309,7 +308,7 @@ impl Board {
             if !self.in_check(!self.to_play) {
                 had_legal_move = true;
                 let eval = -self
-                    .alpha_beta_inner(-beta, -alpha.inc_mate(), depth - 1, cache)
+                    .alpha_beta(-beta, -alpha.inc_mate(), depth - 1, cache)
                     .dec_mate();
 
                 if eval >= beta {
@@ -499,7 +498,8 @@ mod tests {
         let mut b = Board::from_fen("4k3/pppppppp/8/8/7q/8/PPPPPPP1/RKBQKBKR w - - 0 1")
             .expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
-        let (best_move, _) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, _) = b.best_move(4, &pool, cache.clone());
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
@@ -513,7 +513,8 @@ mod tests {
         let mut b = Board::from_fen("rk1qkbkr/ppp2ppp/3pB3/4p3/4P3/5K2/PPPP1PPP/RKBQK2R b - - 0 1")
             .expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
-        let (best_move, _) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, _) = b.best_move(4, &pool, cache.clone());
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
@@ -527,7 +528,8 @@ mod tests {
         let mut b =
             Board::from_fen("1k6/ppp5/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
-        let (best_move, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, eval) = b.best_move(4, &pool, cache.clone());
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
@@ -542,7 +544,8 @@ mod tests {
         let mut b =
             Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
-        let (best_move, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, eval) = b.best_move(4, &pool, cache.clone());
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::won());
     }
@@ -551,7 +554,8 @@ mod tests {
         let mut b =
             Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
-        let (best_move, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, eval) = b.best_move(4, &pool, cache.clone());
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::lost());
     }
@@ -559,7 +563,8 @@ mod tests {
     fn stalemate() {
         let mut b = Board::from_fen("k7/2Q5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
-        let (best_move, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, eval) = b.best_move(4, &pool, cache.clone());
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::draw());
     }
@@ -567,12 +572,14 @@ mod tests {
     fn draw() {
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
-        let (_, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (_, eval) = b.best_move(4, &pool, cache.clone());
         assert_eq!(eval, Evaluation::draw());
 
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
-        let (_, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (_, eval) = b.best_move(4, &pool, cache.clone());
         assert_eq!(eval, Evaluation::draw());
     }
     #[test]
@@ -580,7 +587,8 @@ mod tests {
         let mut b =
             Board::from_fen("1k6/pppr4/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
-        let (best_move, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, eval) = b.best_move(4, &pool, cache.clone());
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
@@ -593,7 +601,8 @@ mod tests {
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, eval) = b.best_move(4, &pool, cache.clone());
         println!("Eval: {}", eval);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -605,14 +614,16 @@ mod tests {
         assert_eq!(eval, Evaluation::m1());
 
         let mut b = Board::from_fen("k5RN/7R/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, eval) = b.best_move(4, &pool, cache.clone());
         println!("Eval: {}", eval);
         assert!(best_move.is_none());
         assert_eq!(eval, Evaluation::lost());
 
         let mut b =
             Board::from_fen("k6N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, eval) = b.best_move(4, &pool, cache.clone());
         println!("Eval: {}", eval);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -623,7 +634,8 @@ mod tests {
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let (best_move, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, eval) = b.best_move(4, &pool, cache.clone());
         println!("Eval: {}", eval);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -637,7 +649,8 @@ mod tests {
         let mut b =
             Board::from_fen("8/8/8/1B6/5N2/6K1/8/6k1 w - - 0 1").expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
-        let (best_move, eval) = b.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, eval) = b.best_move(4, &pool, cache.clone());
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
@@ -667,7 +680,8 @@ mod tests {
         )
         .expect("Invalid fen?");
         let pool = threadpool::ThreadPool::new(32);
-        board.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        board.best_move(4, &pool, cache.clone());
     }
 
     #[test]
@@ -676,7 +690,8 @@ mod tests {
             Board::from_fen("rn2k2r/1b1p1p2/p2ppn2/1p1P3p/2P3q1/1PNBP3/P3R1PP/R4Q1K b Qkq - 0 1")
                 .expect("Invalid fen?");
         let pool = threadpool::ThreadPool::new(64);
-        board.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        board.best_move(4, &pool, cache.clone());
     }
 
     #[test]
@@ -733,7 +748,8 @@ mod tests {
             is_castle_king: false,
         });
         let best_score = Evaluation::lost();
-        let eval = -board.alpha_beta(Evaluation::lost(), -best_score.inc_mate(), 4);
+        let cache = SharedHashMap::new();
+        let eval = -board.alpha_beta(Evaluation::lost(), -best_score.inc_mate(), 4, &cache);
         println!("Eval: {}", eval);
         assert!(eval < Evaluation::draw());
     }
@@ -764,7 +780,8 @@ mod tests {
             .expect("bad move?");
 
         let pool = threadpool::ThreadPool::new(32);
-        let (m, _) = board.best_move(4, &pool);
+        let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
+        let (m, _) = board.best_move(4, &pool, cache.clone());
         assert!(m.unwrap().to != c5());
     }
 }

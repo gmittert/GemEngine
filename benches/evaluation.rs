@@ -1,5 +1,7 @@
+use std::sync::Arc;
+
 use criterion::{criterion_group, BenchmarkId, Criterion};
-use gem::board;
+use gem::{board::{self, evaluation::TTEntry}, shared_hashmap::SharedHashMap};
 
 pub fn start(c: &mut Criterion) {
     let mut group = c.benchmark_group("start");
@@ -10,8 +12,9 @@ pub fn start(c: &mut Criterion) {
             |b, &num_cpus| {
                 let mut board = board::starting_board();
                 let pool = threadpool::ThreadPool::new(num_cpus);
+                let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
                 b.iter(|| {
-                    board.best_move(4, &pool);
+                    board.best_move(4, &pool, cache.clone());
                 })
             },
         );
@@ -31,8 +34,9 @@ pub fn london(c: &mut Criterion) {
                 )
                 .expect("Invalid fen?");
                 let pool = threadpool::ThreadPool::new(num_cpus);
+                let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
                 b.iter(|| {
-                    board.best_move(4, &pool);
+                    board.best_move(4, &pool, cache.clone());
                 })
             },
         );
