@@ -103,6 +103,9 @@ pub struct Board {
     pub full_move: u16,
     pub move_rights: Vec<MoveRights>,
     pub hash: u64,
+    // We track moves so that
+    pub moves: Vec<u64>,
+    pub last_irreversible: Vec<u16>,
 }
 
 impl PartialEq for Board {
@@ -284,6 +287,13 @@ impl Board {
     }
 
     pub fn make_move(&mut self, m: &Move) {
+        self.half_move += 1;
+
+        self.moves.push(self.hash);
+        if m.is_castle_king || m.is_castle_queen || m.capture.is_some() || m.piece == Piece::Pawn {
+            self.last_irreversible.push(self.half_move);
+        }
+
         self.move_piece(m.turn, m.piece, m.from, m.to);
         if m.is_castle_king {
             let (from, to) = match m.turn {
@@ -300,7 +310,6 @@ impl Board {
             self.move_piece(m.turn, Piece::Rook, from, to)
         }
 
-        self.half_move += 1;
         let ep_target =
             if m.piece == Piece::Pawn && m.from.rank() == Rank::Two && m.to.rank() == Rank::Four {
                 Some(m.from.file())
@@ -378,6 +387,11 @@ impl Board {
     }
 
     pub fn undo_move(&mut self, m: &Move) {
+        self.moves.pop();
+        if m.is_castle_king || m.is_castle_queen || m.capture.is_some() || m.piece == Piece::Pawn {
+            self.last_irreversible.pop();
+        }
+
         if let Some(piece) = m.promotion {
             self.remove_piece(m.turn, piece, m.to);
             self.add_piece(m.turn, Piece::Pawn, m.to);
@@ -573,6 +587,8 @@ pub fn empty_board(turn: Color) -> Board {
             } else {
                 0
             },
+        last_irreversible: vec![],
+        moves: vec![],
     }
 }
 

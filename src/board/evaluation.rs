@@ -373,6 +373,16 @@ impl Board {
     }
 
     pub fn eval(&self, to_play: Color) -> Evaluation {
+        // Check for 3 fold repetition
+        if let Some(irr) = self.last_irreversible.last() {
+            if self.half_move - irr >= 12 {
+                for prev_state in &self.moves[*irr as usize..] {
+                    if *prev_state == self.hash {
+                        return Evaluation::draw();
+                    }
+                }
+            }
+        }
         // Let's start with a simple materialistic evaluation
         let king_diff: i64 = self.white_pieces[Piece::King as usize].len() as i64
             - self.black_pieces[Piece::King as usize].len() as i64;
@@ -783,5 +793,99 @@ mod tests {
         let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
         let (m, _) = board.best_move(4, &pool, cache.clone());
         assert!(m.unwrap().to != c5());
+    }
+    #[test]
+    fn repitition() {
+        let mut board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+            .expect("bad fen?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: b1(),
+                to: c3(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: b8(),
+                to: c6(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: c3(),
+                to: b1(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: c6(),
+                to: b8(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: b1(),
+                to: c3(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: b8(),
+                to: c6(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: c3(),
+                to: b1(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: c6(),
+                to: b8(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: b1(),
+                to: c3(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: b8(),
+                to: c6(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: c3(),
+                to: b1(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: c6(),
+                to: b8(),
+                promotion: None,
+            })
+            .expect("bad move?");
+
+        let evalw = board.eval(Color::White);
+        assert!(evalw == Evaluation::draw());
+        let evalb = board.eval(Color::Black);
+        assert!(evalb == Evaluation::draw());
     }
 }
