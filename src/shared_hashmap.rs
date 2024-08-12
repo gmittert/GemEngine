@@ -1,4 +1,3 @@
-use std::array;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
@@ -12,7 +11,7 @@ where
     T: Sized,
 {
     // 1GiB
-    data: UnsafeCell<[SharedHashMapEntry<T>; N]>,
+    data: UnsafeCell<Vec<SharedHashMapEntry<T>>>,
     hits: AtomicUsize,
     misses: AtomicUsize,
     conflicts: AtomicUsize,
@@ -49,11 +48,15 @@ where
         );
     }
     pub fn new() -> SharedHashMap<T, N> {
-        SharedHashMap {
-            data: UnsafeCell::new(array::from_fn(|_| SharedHashMapEntry {
+        let mut vec = Vec::with_capacity(N);
+        for _ in 0..N {
+            vec.push( SharedHashMapEntry {
                 key: AtomicU64::new(0),
                 val: T::default(),
-            })),
+            });
+        }
+        SharedHashMap {
+            data: UnsafeCell::new(vec),
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
             conflicts: AtomicUsize::new(0),
@@ -87,7 +90,11 @@ where
             Ok(_) => {
                 self.accepted.fetch_add(1, Ordering::Relaxed);
                 unsafe {
-                    &self.data.get().as_mut().map(|x| x.each_mut()[pos].val = v);
+                    &self
+                        .data
+                        .get()
+                        .as_mut()
+                        .map(|x: &mut Vec<SharedHashMapEntry<T>>| x[pos].val = v);
                 };
                 kp.store(k, Ordering::Release);
                 true

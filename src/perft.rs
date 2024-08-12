@@ -1,5 +1,4 @@
-use crate::board;
-use crate::hashmap::HashMap;
+use crate::{board, shared_hashmap::SharedHashMap};
 use std::{
     fmt,
     ops::{Add, AddAssign},
@@ -62,7 +61,7 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerftResult {
             ..Default::default()
         };
     }
-    let mut cache: HashMap<PerftResult, { 1024 * 1024 }> = HashMap::new();
+    let mut cache: SharedHashMap<PerftResult, { 1024 * 1024 }> = SharedHashMap::new();
     let res = perft_inner(b, depth, &mut cache).clone();
     res
 }
@@ -70,7 +69,7 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerftResult {
 fn perft_inner(
     b: &mut board::Board,
     depth: u8,
-    cache: &mut HashMap<PerftResult, { 1024 * 1024 }>,
+    cache: &mut SharedHashMap<PerftResult, { 1024 * 1024 }>,
 ) -> PerftResult {
     const DEPTH_KEYS: [u64; 10] = [
         0xfd4b4027ed1f23fc,
