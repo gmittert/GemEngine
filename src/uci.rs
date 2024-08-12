@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::board::{evaluation::Evaluation, AlgebraicMove, Move};
+use crate::board::{evaluation::Evaluation, AlgebraicMove, Move, Piece};
 pub mod reader;
 
 #[derive(Default, PartialEq)]
@@ -212,7 +212,15 @@ pub fn best_move(m: Move, ponder: Option<Move>) {
             m.from, m.to, ponder_move.from, ponder_move.to
         );
     } else {
-        println!("bestmove {}{}", m.from, m.to);
+        let promotion = match m.promotion {
+            None => "",
+            Some(Piece::Queen) => "q",
+            Some(Piece::Rook) => "r",
+            Some(Piece::Bishop) => "b",
+            Some(Piece::Knight) => "n",
+            _ => panic!("Not a valid promotion piece"),
+        };
+        println!("bestmove {}{}{}", m.from, m.to, promotion);
     }
 }
 
