@@ -342,6 +342,46 @@ impl Board {
         });
     }
 
+    pub fn knight_can_capture(&self, color: Color, target_pos: Posn) -> Option<Move> {
+        let knights = match color {
+            Color::White => self.white_pieces[Piece::Knight as usize],
+            Color::Black => self.black_pieces[Piece::Knight as usize],
+        };
+
+        if knights.is_empty() {
+            return None;
+        }
+
+        for knight in [
+            target_pos.see(),
+            target_pos.sse(),
+            target_pos.ssw(),
+            target_pos.sww(),
+            target_pos.nww(),
+            target_pos.nnw(),
+            target_pos.nne(),
+            target_pos.nee(),
+        ] {
+            if let Some(p) = knight {
+                if knights.contains(p) {
+                    return Some(Move {
+                        from: p,
+                        to: target_pos,
+                        piece: Piece::Knight,
+                        capture: self.query_pos(target_pos, !color),
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: None,
+                    });
+                }
+            }
+        }
+        None
+    }
+
     pub fn pawn_attacks(&self, color: Color) -> BitBoard {
         (match color {
             Color::White => self.white_pieces,
@@ -512,6 +552,93 @@ impl Board {
                 }
             }
         }
+    }
+    pub fn pawn_can_capture(&self, color: Color, target_pos: Posn) -> Option<Move> {
+        let pawns = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Pawn as usize];
+
+        let promo_rank = match color {
+            Color::Black => Rank::One,
+            Color::White => Rank::Eight,
+        };
+
+        for i in pawns {
+            let mpush_pos = match color {
+                Color::White => i.no(),
+                Color::Black => i.so(),
+            };
+
+            for take in [
+                mpush_pos.and_then(|x| x.we()),
+                mpush_pos.and_then(|x| x.ea()),
+            ] {
+                if let Some(pos) = take {
+                    if pos != target_pos {
+                        continue;
+                    }
+                    if pos.rank() == promo_rank {
+                        for piece in [Piece::Queen, Piece::Rook, Piece::Knight, Piece::Bishop] {
+                            return Some(Move {
+                                from: i,
+                                to: pos,
+                                piece: Piece::Pawn,
+                                capture: self.query_pos(pos, !color),
+                                is_check: false,
+                                is_mate: false,
+                                is_en_passant: false,
+                                is_castle_king: false,
+                                is_castle_queen: false,
+                                promotion: Some(piece),
+                            });
+                        }
+                    } else {
+                        return Some(Move {
+                            from: i,
+                            to: pos,
+                            piece: Piece::Pawn,
+                            capture: self.query_pos(pos, !color),
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
+                            promotion: None,
+                        });
+                    }
+                }
+            }
+            // En Passant
+            if let Some(ep_target) = self.move_rights.last().and_then(|x| x.ep_target) {
+                let to = Posn::from(
+                    if color == Color::White {
+                        Rank::Six
+                    } else {
+                        Rank::Three
+                    },
+                    ep_target,
+                );
+                if to == target_pos
+                    && ((color == Color::White && (i.nw() == Some(to) || i.ne() == Some(to)))
+                        || (color == Color::Black && (i.sw() == Some(to) || i.se() == Some(to))))
+                {
+                    return Some(Move {
+                        from: i,
+                        to,
+                        piece: Piece::Pawn,
+                        capture: Some(Piece::Pawn),
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: true,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: None,
+                    });
+                }
+            }
+        }
+        None
     }
 }
 

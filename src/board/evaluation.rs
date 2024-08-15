@@ -192,7 +192,12 @@ impl Board {
                 queue.execute(move || {
                     let best_score = Evaluation::lost();
                     let eval = -new_b
-                        .alpha_beta(Evaluation::lost(), -best_score.inc_mate(), target_depth, cloned.as_ref())
+                        .alpha_beta(
+                            Evaluation::lost(),
+                            -best_score.inc_mate(),
+                            target_depth,
+                            cloned.as_ref(),
+                        )
                         .dec_mate();
 
                     let _ = tx.send((eval, m));
@@ -265,7 +270,6 @@ impl Board {
         }
         alpha
     }
-
 
     pub fn alpha_beta<const N: usize>(
         &mut self,
@@ -425,32 +429,34 @@ impl Board {
     }
 
     pub fn get_smallest_attacker(&self, p: Posn, side: Color) -> Option<Move> {
+        if let Some(m) = self
+            .pawn_can_capture(side, p)
+            .or(self.knight_can_capture(side, p))
+        {
+            return Some(m);
+        }
         for i in [
-            Piece::Pawn,
-            Piece::Knight,
             Piece::Bishop,
             Piece::Rook,
             Piece::Queen,
             Piece::King,
         ] {
             let attacks = match i {
-                Piece::Pawn => self.pawn_attacks(side),
                 Piece::Rook => self.rook_attacks(side),
-                Piece::Knight => self.knight_attacks(side),
                 Piece::Bishop => self.bishop_attacks(side),
                 Piece::Queen => self.queen_attacks(side),
                 Piece::King => self.king_attacks(side),
+                _ => panic!("Shouldn't be"),
             };
             if attacks.contains(p) {
                 let mut moves = vec![];
                 moves.reserve(32);
                 match i {
-                    Piece::Pawn => self.pawn_moves(side, &mut moves),
                     Piece::Rook => self.rook_moves(side, &mut moves),
-                    Piece::Knight => self.knight_moves(side, &mut moves),
                     Piece::Bishop => self.bishop_moves(side, &mut moves),
                     Piece::Queen => self.queen_moves(side, &mut moves),
                     Piece::King => self.king_moves(side, &mut moves),
+                    _ => panic!("Shouldn't be"),
                 };
                 for m in moves {
                     if m.to == p {

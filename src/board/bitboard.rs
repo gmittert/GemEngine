@@ -18,6 +18,10 @@ impl BitBoard {
         self.0 & p.pos != 0
     }
 
+    pub const fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
     pub const fn len(&self) -> usize {
         let mut acc = self.0 as u64;
         let mut count = 0;
