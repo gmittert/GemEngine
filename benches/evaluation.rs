@@ -29,14 +29,14 @@ pub fn london(c: &mut Criterion) {
             BenchmarkId::from_parameter(num_cpus),
             num_cpus,
             |b, &num_cpus| {
+                let mut pool = threadpool::ThreadPool::new(num_cpus);
                 let mut board = board::Board::from_fen(
                     "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
                 )
                 .expect("Invalid fen?");
-                let pool = threadpool::ThreadPool::new(num_cpus);
                 let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
                 b.iter(|| {
-                    board.best_move(4, &pool, cache.clone());
+                    board.best_move(8, &pool, cache.clone());
                 })
             },
         );

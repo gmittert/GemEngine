@@ -48,16 +48,16 @@ impl Evaluation {
     fn m1() -> Evaluation {
         Evaluation(std::i64::MAX - 1)
     }
-    fn m2() -> Evaluation {
+    fn _m2() -> Evaluation {
         Evaluation(std::i64::MAX - 2)
     }
-    fn m3() -> Evaluation {
+    fn _m3() -> Evaluation {
         Evaluation(std::i64::MAX - 3)
     }
-    fn m4() -> Evaluation {
+    fn _m4() -> Evaluation {
         Evaluation(std::i64::MAX - 4)
     }
-    fn m5() -> Evaluation {
+    fn _m5() -> Evaluation {
         Evaluation(std::i64::MAX - 5)
     }
     pub fn mate_in(&self) -> Option<usize> {
@@ -248,7 +248,7 @@ impl Board {
             self.make_move(&capture);
 
             let value = PIECE_VALUES[capture.capture.unwrap() as usize]
-                - self.static_exchange_evaluation(capture.to, !capture.turn);
+                - self.static_exchange_evaluation(capture.to, self.to_play);
 
             if value >= Evaluation::draw() && !self.in_check(!self.to_play) {
                 let eval = -self.quiesce(-beta, -alpha.inc_mate()).dec_mate();
@@ -443,7 +443,7 @@ impl Board {
             };
             if attacks.contains(p) {
                 let mut moves = vec![];
-                moves.reserve(8);
+                moves.reserve(32);
                 match i {
                     Piece::Pawn => self.pawn_moves(side, &mut moves),
                     Piece::Rook => self.rook_moves(side, &mut moves),
@@ -607,7 +607,7 @@ mod tests {
         assert_eq!(best_move.from, h1());
         assert_eq!(best_move.to, h8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval, Evaluation::m3());
+        assert_eq!(eval, Evaluation::_m3());
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
@@ -652,7 +652,7 @@ mod tests {
         assert_eq!(best_move.piece, Piece::King);
         assert_eq!(best_move.from, b8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval, -Evaluation::m2());
+        assert_eq!(eval, -Evaluation::_m2());
     }
     #[test]
     fn bishop_knight_mate() {
@@ -680,8 +680,8 @@ mod tests {
     fn eval_formatted() {
         assert_eq!("M1", format!("{}", Evaluation::m1()));
         assert_eq!("-M1", format!("{}", -Evaluation::m1()));
-        assert_eq!("M2", format!("{}", Evaluation::m2()));
-        assert_eq!("-M2", format!("{}", -Evaluation::m2()));
+        assert_eq!("M2", format!("{}", Evaluation::_m2()));
+        assert_eq!("-M2", format!("{}", -Evaluation::_m2()));
     }
     #[test]
     fn many_moves() {
@@ -722,7 +722,6 @@ mod tests {
         board.make_move(&Move {
             from: d3(),
             to: e5(),
-            turn: Color::White,
             piece: Piece::Knight,
             capture: Some(Piece::Pawn),
             promotion: None,
@@ -747,7 +746,6 @@ mod tests {
         board.make_move(&Move {
             from: b6(),
             to: b2(),
-            turn: Color::Black,
             piece: Piece::Queen,
             capture: Some(Piece::Pawn),
             promotion: None,

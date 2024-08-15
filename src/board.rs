@@ -247,7 +247,6 @@ impl Board {
             from: m.from,
             to: m.to,
             piece,
-            turn: self.to_play,
             capture,
             is_check: false,
             is_mate: false,
@@ -294,20 +293,20 @@ impl Board {
             self.last_irreversible.push(self.half_move);
         }
 
-        self.move_piece(m.turn, m.piece, m.from, m.to);
+        self.move_piece(self.to_play, m.piece, m.from, m.to);
         if m.is_castle_king {
-            let (from, to) = match m.turn {
+            let (from, to) = match self.to_play {
                 Color::Black => (h8(), f8()),
                 Color::White => (h1(), f1()),
             };
-            self.move_piece(m.turn, Piece::Rook, from, to)
+            self.move_piece(self.to_play, Piece::Rook, from, to)
         }
         if m.is_castle_queen {
-            let (from, to) = match m.turn {
+            let (from, to) = match self.to_play {
                 Color::Black => (a8(), d8()),
                 Color::White => (a1(), d1()),
             };
-            self.move_piece(m.turn, Piece::Rook, from, to)
+            self.move_piece(self.to_play, Piece::Rook, from, to)
         }
 
         let ep_target =
@@ -324,7 +323,7 @@ impl Board {
         let move_rights = *self.move_rights.last().unwrap_or(&MoveRights::default());
         let CastlingAbility(mut inner) = move_rights.castling_ability;
         if m.piece == Piece::King {
-            match m.turn {
+            match self.to_play {
                 Color::Black => {
                     inner &= 0b0011;
                 }
@@ -346,9 +345,9 @@ impl Board {
         }
         if let Some(piece) = m.capture {
             self.remove_piece(
-                !m.turn,
+                !self.to_play,
                 piece,
-                match (m.is_en_passant, m.turn) {
+                match (m.is_en_passant, self.to_play) {
                     (true, Color::Black) => m.to.no(),
                     (true, Color::White) => m.to.so(),
                     _ => Some(m.to),
@@ -368,8 +367,8 @@ impl Board {
             }
         }
         if let Some(piece) = m.promotion {
-            self.add_piece(m.turn, piece, m.to);
-            self.remove_piece(m.turn, Piece::Pawn, m.to);
+            self.add_piece(self.to_play, piece, m.to);
+            self.remove_piece(self.to_play, Piece::Pawn, m.to);
         }
         let new_move_rights = MoveRights {
             castling_ability: CastlingAbility(inner),
@@ -387,21 +386,22 @@ impl Board {
     }
 
     pub fn undo_move(&mut self, m: &Move) {
+        self.to_play = !self.to_play;
         self.moves.pop();
         if m.is_castle_king || m.is_castle_queen || m.capture.is_some() || m.piece == Piece::Pawn {
             self.last_irreversible.pop();
         }
 
         if let Some(piece) = m.promotion {
-            self.remove_piece(m.turn, piece, m.to);
-            self.add_piece(m.turn, Piece::Pawn, m.to);
+            self.remove_piece(self.to_play, piece, m.to);
+            self.add_piece(self.to_play, Piece::Pawn, m.to);
         }
-        self.move_piece(m.turn, m.piece, m.to, m.from);
+        self.move_piece(self.to_play, m.piece, m.to, m.from);
         if let Some(piece) = m.capture {
             self.add_piece(
-                !m.turn,
+                !self.to_play,
                 piece,
-                match (m.is_en_passant, m.turn) {
+                match (m.is_en_passant, self.to_play) {
                     (true, Color::Black) => m.to.no(),
                     (true, Color::White) => m.to.so(),
                     _ => Some(m.to),
@@ -410,20 +410,19 @@ impl Board {
             );
         };
         if m.is_castle_king {
-            let (to, from) = match m.turn {
+            let (to, from) = match self.to_play {
                 Color::Black => (h8(), f8()),
                 Color::White => (h1(), f1()),
             };
-            self.move_piece(m.turn, Piece::Rook, from, to)
+            self.move_piece(self.to_play, Piece::Rook, from, to)
         }
         if m.is_castle_queen {
-            let (to, from) = match m.turn {
+            let (to, from) = match self.to_play {
                 Color::Black => (a8(), d8()),
                 Color::White => (a1(), d1()),
             };
-            self.move_piece(m.turn, Piece::Rook, from, to)
+            self.move_piece(self.to_play, Piece::Rook, from, to)
         }
-        self.to_play = !self.to_play;
         self.hash ^= ZOBRIST_KEYS.black_turn;
 
         if let Some(prev_rights) = self.move_rights.pop() {
@@ -608,6 +607,7 @@ pub fn fill_pseudo_legal_moves(moves: &mut Vec<Move>, b: &Board) {
 
 pub fn generate_pseudo_legal_moves(b: &Board) -> Vec<Move> {
     let mut moves = vec![];
+    moves.reserve(32);
 
     b.rook_moves(b.to_play, &mut moves);
     b.bishop_moves(b.to_play, &mut moves);
@@ -635,7 +635,6 @@ mod tests {
         let m = Move {
             from: e2(),
             to: e4(),
-            turn: Color::White,
             piece: Piece::Pawn,
             capture: None,
             is_check: false,

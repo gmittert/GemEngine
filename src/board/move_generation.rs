@@ -39,7 +39,6 @@ impl Board {
                 out.push(Move {
                     from: i,
                     to: pos,
-                    turn: color,
                     piece: Piece::Queen,
                     capture: self.query_pos(pos),
                     is_check: false,
@@ -86,7 +85,6 @@ impl Board {
                 out.push(Move {
                     from: i,
                     to: pos,
-                    turn: color,
                     piece: Piece::Rook,
                     capture: self.query_pos(pos),
                     is_check: false,
@@ -124,10 +122,6 @@ impl Board {
             Color::Black => self.black_pieces(),
         };
 
-        let opponent_pieces = match color {
-            Color::Black => self.white_pieces(),
-            Color::White => self.black_pieces(),
-        };
         for i in bishops {
             let attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
             for pos in attacks {
@@ -137,7 +131,6 @@ impl Board {
                 out.push(Move {
                     from: i,
                     to: pos,
-                    turn: color,
                     piece: Piece::Bishop,
                     capture: self.query_pos(pos),
                     is_check: false,
@@ -209,7 +202,6 @@ impl Board {
                         out.push(Move {
                             from: i,
                             to: pos,
-                            turn: color,
                             piece: Piece::King,
                             capture: self.query_pos(pos),
                             is_check: false,
@@ -237,7 +229,6 @@ impl Board {
                     out.push(Move {
                         from: i,
                         to: i.ea().and_then(|x| x.ea()).unwrap(),
-                        turn: color,
                         piece: Piece::King,
                         capture: None,
                         is_check: false,
@@ -273,7 +264,6 @@ impl Board {
                     out.push(Move {
                         from: i,
                         to: i.we().and_then(|x| x.we()).unwrap(),
-                        turn: color,
                         piece: Piece::King,
                         capture: None,
                         is_check: false,
@@ -339,7 +329,6 @@ impl Board {
                 out.push(Move {
                     from: knight,
                     to: p,
-                    turn: color,
                     piece: Piece::Knight,
                     capture: self.query_pos(p),
                     is_check: false,
@@ -402,7 +391,6 @@ impl Board {
                             out.push(Move {
                                 from: i,
                                 to: push_pos,
-                                turn: color,
                                 piece: Piece::Pawn,
                                 capture: None,
                                 is_check: false,
@@ -417,7 +405,6 @@ impl Board {
                         out.push(Move {
                             from: i,
                             to: push_pos,
-                            turn: color,
                             piece: Piece::Pawn,
                             capture: None,
                             is_check: false,
@@ -443,7 +430,6 @@ impl Board {
                                     out.push(Move {
                                         from: i,
                                         to: double_push_pos,
-                                        turn: color,
                                         piece: Piece::Pawn,
                                         capture: None,
                                         is_check: false,
@@ -472,7 +458,6 @@ impl Board {
                                 out.push(Move {
                                     from: i,
                                     to: pos,
-                                    turn: color,
                                     piece: Piece::Pawn,
                                     capture: self.query_pos(pos),
                                     is_check: false,
@@ -487,7 +472,6 @@ impl Board {
                             out.push(Move {
                                 from: i,
                                 to: pos,
-                                turn: color,
                                 piece: Piece::Pawn,
                                 capture: self.query_pos(pos),
                                 is_check: false,
@@ -516,7 +500,6 @@ impl Board {
                     out.push(Move {
                         from: i,
                         to,
-                        turn: color,
                         piece: Piece::Pawn,
                         capture: Some(Piece::Pawn),
                         is_check: false,
@@ -1113,7 +1096,7 @@ mod tests {
     fn castle_king_black_queen() {
         {
             let board =
-                Board::from_fen("r3k3/8/8/8/8/8/8/8 w KQkq - 0 1").expect("Failed to parse fen");
+                Board::from_fen("r3k3/8/8/8/8/8/8/8 b KQkq - 0 1").expect("Failed to parse fen");
             let mut moves = vec![];
             board.king_moves(Color::Black, &mut moves);
             let only_castles: Vec<Move> = moves
@@ -1124,7 +1107,7 @@ mod tests {
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
             let mut before = board.clone();
-            for m in moves {
+            for m in only_castles {
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -1132,7 +1115,7 @@ mod tests {
         }
         {
             let board =
-                Board::from_fen("r3k3/8/8/8/8/8/8/8 w q - 0 1").expect("Failed to parse fen");
+                Board::from_fen("r3k3/8/8/8/8/8/8/8 b q - 0 1").expect("Failed to parse fen");
             let mut moves = vec![];
             board.king_moves(Color::Black, &mut moves);
             let only_castles: Vec<Move> = moves

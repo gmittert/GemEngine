@@ -109,7 +109,6 @@ mod tests {
 pub struct Move {
     pub from: Posn,
     pub to: Posn,
-    pub turn: Color,
     pub piece: Piece,
     pub capture: Option<Piece>,
     pub promotion: Option<Piece>,
@@ -122,9 +121,6 @@ pub struct Move {
 
 impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.turn == Color::Black {
-            write!(f, "..")?;
-        }
         let is_check = if self.is_check {
             "+"
         } else if self.is_mate {
@@ -138,32 +134,20 @@ impl fmt::Display for Move {
             format!("")
         };
 
-        let icon = match (self.piece, self.turn) {
-            (Piece::Rook, Color::Black) => "♖",
-            (Piece::Rook, Color::White) => "♜",
-            (Piece::Knight, Color::Black) => "♘",
-            (Piece::Knight, Color::White) => "♞",
-            (Piece::Bishop, Color::Black) => "♗",
-            (Piece::Bishop, Color::White) => "♝",
-            (Piece::Queen, Color::Black) => "♕",
-            (Piece::Queen, Color::White) => "♛",
-            (Piece::King, Color::Black) => {
-                if self.is_castle_king {
-                    return write!(f, "O-O{}", is_check);
-                } else if self.is_castle_queen {
-                    return write!(f, "O-O-O{}", is_check);
-                }
-                "♔"
-            }
-            (Piece::King, Color::White) => {
+        let icon = match self.piece {
+            Piece::Rook => "♜",
+            Piece::Knight => "♞",
+            Piece::Bishop => "♝",
+            Piece::Queen => "♛",
+            Piece::King => {
                 if self.is_castle_king {
                     return write!(f, "O-O{}", is_check);
                 } else if self.is_castle_queen {
                     return write!(f, "O-O-O{}", is_check);
                 }
                 "♚"
-            }
-            (Piece::Pawn, _) => match self.capture {
+            },
+            Piece::Pawn => match self.capture {
                 Some(_) => {
                     return write!(
                         f,

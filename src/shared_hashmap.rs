@@ -90,7 +90,7 @@ where
             Ok(_) => {
                 self.accepted.fetch_add(1, Ordering::Relaxed);
                 unsafe {
-                    &self
+                    let _ = &self
                         .data
                         .get()
                         .as_mut()
