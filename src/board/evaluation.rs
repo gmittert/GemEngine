@@ -167,11 +167,11 @@ impl Board {
         (m, eval, info)
     }
 
-    pub fn best_move(
+    pub fn best_move<const N: usize>(
         &mut self,
         depth: u16,
         queue: &threadpool::ThreadPool,
-        cache: Arc<SharedHashMap<TTEntry, 1024>>,
+        cache: Arc<SharedHashMap<TTEntry, N>>,
     ) -> (Option<Move>, Evaluation) {
         let moves = generate_pseudo_legal_moves(self);
         let mut had_legal_move = false;
@@ -267,12 +267,12 @@ impl Board {
     }
 
 
-    pub fn alpha_beta(
+    pub fn alpha_beta<const N: usize>(
         &mut self,
         alpha: Evaluation,
         beta: Evaluation,
         depth: u16,
-        cache: &SharedHashMap<TTEntry, 1024>,
+        cache: &SharedHashMap<TTEntry, N>,
     ) -> Evaluation {
         let mut best_move = None;
         if let Some(entry) = cache.get(self.hash) {
@@ -757,7 +757,7 @@ mod tests {
         });
         let best_score = Evaluation::lost();
         let cache = SharedHashMap::new();
-        let eval = -board.alpha_beta(Evaluation::lost(), -best_score.inc_mate(), 4, &cache);
+        let eval = -board.alpha_beta::<1024>(Evaluation::lost(), -best_score.inc_mate(), 4, &cache);
         println!("Eval: {}", eval);
         assert!(eval < Evaluation::draw());
     }

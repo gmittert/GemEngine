@@ -34,9 +34,9 @@ pub fn london(c: &mut Criterion) {
                     "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
                 )
                 .expect("Invalid fen?");
-                let cache: Arc<SharedHashMap<TTEntry, 1024>> = Arc::new(SharedHashMap::new());
                 b.iter(|| {
-                    board.best_move(8, &pool, cache.clone());
+                    let cache: Arc<SharedHashMap<TTEntry, {1024*1024}>> = Arc::new(SharedHashMap::new());
+                    board.best_move(4, &pool, cache);
                 })
             },
         );

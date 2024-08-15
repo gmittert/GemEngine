@@ -226,10 +226,9 @@ impl Board {
     }
 
     pub fn make_alg_move(&mut self, m: &AlgebraicMove) -> Result<(), String> {
-        let piece = self
-            .query_pos(m.from)
+        let piece = (self.query_pos(m.from, Color::White)).or(self.query_pos(m.from, Color::Black))
             .ok_or(format!("Failed to find a piece on position: {}", m.from))?;
-        let mut capture = self.query_pos(m.to);
+        let mut capture = self.query_pos(m.to, Color::White).or(self.query_pos(m.to, Color::Black));
         let is_castle_king = piece == Piece::King
             && ((m.from == e1() && m.to == g1()) || (m.from == e8() && m.to == g8()));
         let is_castle_queen = piece == Piece::King
@@ -437,19 +436,21 @@ impl Board {
         self.half_move -= 1;
     }
 
-    pub fn query_pos(&self, p: Posn) -> Option<Piece> {
+    pub fn query_pos(&self, p: Posn, color: Color) -> Option<Piece> {
         let pieces: [Piece; 6] = [
             Piece::Pawn,
-            Piece::Rook,
             Piece::Knight,
             Piece::Bishop,
+            Piece::Rook,
             Piece::Queen,
             Piece::King,
         ];
+        let boards = match color {
+            Color::Black => self.black_pieces,
+            Color::White => self.white_pieces,
+        };
         for i in pieces {
-            if (self.black_pieces[i as usize] | self.white_pieces[i as usize]) & BitBoard::from(p)
-                != BitBoard::empty()
-            {
+            if boards[i as usize].contains(p) {
                 return Some(i);
             }
         }
