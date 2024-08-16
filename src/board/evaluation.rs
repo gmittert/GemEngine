@@ -429,45 +429,12 @@ impl Board {
     }
 
     pub fn get_smallest_attacker(&self, p: Posn, side: Color) -> Option<Move> {
-        if let Some(m) = self
-            .pawn_can_capture(side, p)
+        self.pawn_can_capture(side, p)
             .or(self.knight_can_capture(side, p))
-        {
-            return Some(m);
-        }
-        for i in [
-            Piece::Bishop,
-            Piece::Rook,
-            Piece::Queen,
-            Piece::King,
-        ] {
-            let attacks = match i {
-                Piece::Rook => self.rook_attacks(side),
-                Piece::Bishop => self.bishop_attacks(side),
-                Piece::Queen => self.queen_attacks(side),
-                Piece::King => self.king_attacks(side),
-                _ => panic!("Shouldn't be"),
-            };
-            if attacks.contains(p) {
-                let mut moves = vec![];
-                moves.reserve(32);
-                match i {
-                    Piece::Rook => self.rook_moves(side, &mut moves),
-                    Piece::Bishop => self.bishop_moves(side, &mut moves),
-                    Piece::Queen => self.queen_moves(side, &mut moves),
-                    Piece::King => self.king_moves(side, &mut moves),
-                    _ => panic!("Shouldn't be"),
-                };
-                for m in moves {
-                    if m.to == p {
-                        return Some(m);
-                    }
-                }
-
-                return None;
-            }
-        }
-        return None;
+            .or(self.bishop_can_capture(side, p))
+            .or(self.rook_can_capture(side, p))
+            .or(self.queen_can_capture(side, p))
+            .or(self.king_can_capture(side, p))
     }
 
     pub fn static_exchange_evaluation(&mut self, p: Posn, side: Color) -> Evaluation {

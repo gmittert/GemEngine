@@ -52,6 +52,48 @@ impl Board {
         }
     }
 
+    pub fn queen_can_capture(&self, color: Color, target: Posn) -> Option<Move> {
+        let queens = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Queen as usize];
+
+        let allied_pieces = match color {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        for i in queens {
+            let mut attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
+            if i.rank() == target.rank() || i.file() == target.file() {
+                attacks |= sliding_attacks::compute_rook_attacks(i, self.pieces())
+            }
+            if !attacks.contains(target) {
+                continue;
+            }
+            for pos in attacks {
+                if allied_pieces.contains(pos) {
+                    continue;
+                }
+                if target == pos {
+                    return Some(Move {
+                        from: i,
+                        to: pos,
+                        piece: Piece::Queen,
+                        capture: self.query_pos(pos, !color),
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: None,
+                    });
+                }
+            }
+        }
+        None
+    }
+
     pub fn rook_attacks(&self, color: Color) -> BitBoard {
         let rooks = match color {
             Color::White => self.white_pieces,
@@ -98,6 +140,45 @@ impl Board {
         }
     }
 
+    pub fn rook_can_capture(&self, color: Color, target: Posn) -> Option<Move> {
+        let rooks = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Rook as usize];
+
+        let allied_pieces = match color {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        for i in rooks {
+            if i.rank() != target.rank() && i.file() != target.file() {
+                continue;
+            }
+            let attacks = sliding_attacks::compute_rook_attacks(i, self.pieces());
+            for pos in attacks {
+                if allied_pieces.contains(pos) {
+                    continue;
+                }
+                if pos == target {
+                    return Some(Move {
+                        from: i,
+                        to: pos,
+                        piece: Piece::Rook,
+                        capture: self.query_pos(pos, !color),
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: None,
+                    });
+                }
+            }
+        }
+        None
+    }
+
     pub fn bishop_attacks(&self, color: Color) -> BitBoard {
         let bishops = match color {
             Color::White => self.white_pieces,
@@ -142,6 +223,45 @@ impl Board {
                 });
             }
         }
+    }
+
+    pub fn bishop_can_capture(&self, color: Color, target: Posn) -> Option<Move> {
+        let bishops = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Bishop as usize];
+
+        let allied_pieces = match color {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        for i in bishops {
+            let attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
+            if !attacks.contains(target) {
+                continue;
+            }
+            for pos in attacks {
+                if allied_pieces.contains(pos) {
+                    continue;
+                }
+                if pos == target {
+                    return Some(Move {
+                        from: i,
+                        to: pos,
+                        piece: Piece::Bishop,
+                        capture: self.query_pos(pos, !color),
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: None,
+                    });
+                }
+            }
+        }
+        None
     }
 
     pub fn king_attacks(&self, color: Color) -> BitBoard {
@@ -276,6 +396,42 @@ impl Board {
                 }
             }
         }
+    }
+
+    pub fn king_can_capture(&self, color: Color, target: Posn) -> Option<Move> {
+        let kings = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::King as usize];
+
+        for i in kings {
+            for pos in [
+                i.no(),
+                i.ne(),
+                i.ea(),
+                i.se(),
+                i.so(),
+                i.sw(),
+                i.we(),
+                i.nw(),
+            ] {
+                if Some(target) == pos {
+                    return Some(Move {
+                        from: i,
+                        to: pos.unwrap(),
+                        piece: Piece::King,
+                        capture: self.query_pos(pos.unwrap(), !color),
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: None,
+                    });
+                }
+            }
+        }
+        None
     }
 
     pub fn knight_attacks(&self, color: Color) -> BitBoard {

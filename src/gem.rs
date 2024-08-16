@@ -113,7 +113,9 @@ impl UciEngine for Gem {
     }
 
     fn go(&mut self, _options: crate::uci::GoOptions) -> Result<(), String> {
-        let (m, eval, info) = self.board.search_best_move_for(Duration::from_secs(1), &self.work_queue);
+        let (m, eval, info) = self
+            .board
+            .search_best_move_for(Duration::from_secs(1), &self.work_queue);
         let Some(best_move) = m else {
             return Err(format!("Failed to find best move on board: {}", self.board));
         };

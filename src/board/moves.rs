@@ -146,7 +146,7 @@ impl fmt::Display for Move {
                     return write!(f, "O-O-O{}", is_check);
                 }
                 "♚"
-            },
+            }
             Piece::Pawn => match self.capture {
                 Some(_) => {
                     return write!(

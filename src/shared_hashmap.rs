@@ -1,5 +1,5 @@
 use std::cell::UnsafeCell;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{fence, AtomicU64, AtomicUsize, Ordering};
 
 pub struct SharedHashMapEntry<T> {
     key: AtomicU64,
@@ -50,7 +50,7 @@ where
     pub fn new() -> SharedHashMap<T, N> {
         let mut vec = Vec::with_capacity(N);
         for _ in 0..N {
-            vec.push( SharedHashMapEntry {
+            vec.push(SharedHashMapEntry {
                 key: AtomicU64::new(0),
                 val: T::default(),
             });
@@ -63,6 +63,16 @@ where
             accepted: AtomicUsize::new(0),
             rejected: AtomicUsize::new(0),
         }
+    }
+    pub fn clear(&self) {
+        for i in 0..N {
+            let _ = unsafe {
+                &self.data.get().as_ref().unwrap()[i]
+                    .key
+                    .store(0, Ordering::Relaxed)
+            };
+        }
+        fence(Ordering::Release)
     }
     pub fn get(&self, k: u64) -> Option<&T> {
         let pos: usize = k as usize % N;

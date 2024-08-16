@@ -226,9 +226,12 @@ impl Board {
     }
 
     pub fn make_alg_move(&mut self, m: &AlgebraicMove) -> Result<(), String> {
-        let piece = (self.query_pos(m.from, Color::White)).or(self.query_pos(m.from, Color::Black))
+        let piece = (self.query_pos(m.from, Color::White))
+            .or(self.query_pos(m.from, Color::Black))
             .ok_or(format!("Failed to find a piece on position: {}", m.from))?;
-        let mut capture = self.query_pos(m.to, Color::White).or(self.query_pos(m.to, Color::Black));
+        let mut capture = self
+            .query_pos(m.to, Color::White)
+            .or(self.query_pos(m.to, Color::Black));
         let is_castle_king = piece == Piece::King
             && ((m.from == e1() && m.to == g1()) || (m.from == e8() && m.to == g8()));
         let is_castle_queen = piece == Piece::King
