@@ -7,7 +7,7 @@ use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
-pub struct Evaluation(pub i64);
+pub struct Evaluation(pub i16);
 
 #[derive(Default)]
 pub struct TTEntry {
@@ -37,28 +37,28 @@ const PIECE_VALUES: [Evaluation; 6] = [
 // - Everything else is an evalutation in centipawns
 impl Evaluation {
     fn won() -> Evaluation {
-        Evaluation(std::i64::MAX)
+        Evaluation(std::i16::MAX)
     }
     fn draw() -> Evaluation {
         Evaluation(0)
     }
     fn lost() -> Evaluation {
-        Evaluation(std::i64::MIN + 1)
+        Evaluation(std::i16::MIN + 1)
     }
     fn m1() -> Evaluation {
-        Evaluation(std::i64::MAX - 1)
+        Evaluation(std::i16::MAX - 1)
     }
     fn _m2() -> Evaluation {
-        Evaluation(std::i64::MAX - 2)
+        Evaluation(std::i16::MAX - 2)
     }
     fn _m3() -> Evaluation {
-        Evaluation(std::i64::MAX - 3)
+        Evaluation(std::i16::MAX - 3)
     }
     fn _m4() -> Evaluation {
-        Evaluation(std::i64::MAX - 4)
+        Evaluation(std::i16::MAX - 4)
     }
     fn _m5() -> Evaluation {
-        Evaluation(std::i64::MAX - 5)
+        Evaluation(std::i16::MAX - 5)
     }
     pub fn mate_in(&self) -> Option<usize> {
         if self.0 >= Self::won().0 - 100 {
@@ -381,18 +381,18 @@ impl Board {
             }
         }
         // Let's start with a simple materialistic evaluation
-        let king_diff: i64 = self.white_pieces[Piece::King as usize].len() as i64
-            - self.black_pieces[Piece::King as usize].len() as i64;
-        let queen_diff: i64 = self.white_pieces[Piece::Queen as usize].len() as i64
-            - self.black_pieces[Piece::Queen as usize].len() as i64;
-        let rook_diff: i64 = self.white_pieces[Piece::Rook as usize].len() as i64
-            - self.black_pieces[Piece::Rook as usize].len() as i64;
-        let bishop_diff: i64 = self.white_pieces[Piece::Bishop as usize].len() as i64
-            - self.black_pieces[Piece::Bishop as usize].len() as i64;
-        let knight_diff: i64 = self.white_pieces[Piece::Knight as usize].len() as i64
-            - self.black_pieces[Piece::Knight as usize].len() as i64;
-        let pawn_diff: i64 = self.white_pieces[Piece::Pawn as usize].len() as i64
-            - self.black_pieces[Piece::Pawn as usize].len() as i64;
+        let king_diff: i16 = self.white_pieces[Piece::King as usize].len() as i16
+            - self.black_pieces[Piece::King as usize].len() as i16;
+        let queen_diff: i16 = self.white_pieces[Piece::Queen as usize].len() as i16
+            - self.black_pieces[Piece::Queen as usize].len() as i16;
+        let rook_diff: i16 = self.white_pieces[Piece::Rook as usize].len() as i16
+            - self.black_pieces[Piece::Rook as usize].len() as i16;
+        let bishop_diff: i16 = self.white_pieces[Piece::Bishop as usize].len() as i16
+            - self.black_pieces[Piece::Bishop as usize].len() as i16;
+        let knight_diff: i16 = self.white_pieces[Piece::Knight as usize].len() as i16
+            - self.black_pieces[Piece::Knight as usize].len() as i16;
+        let pawn_diff: i16 = self.white_pieces[Piece::Pawn as usize].len() as i16
+            - self.black_pieces[Piece::Pawn as usize].len() as i16;
 
         let attacks_white = self.rook_attacks(Color::White)
             | self.queen_attacks(Color::White)
@@ -406,7 +406,7 @@ impl Board {
             | self.pawn_attacks(Color::Black)
             | self.knight_attacks(Color::Black);
 
-        let attacks_diff = attacks_white.len() as i64 - attacks_black.len() as i64;
+        let attacks_diff = attacks_white.len() as i16 - attacks_black.len() as i16;
 
         let materialistic = PIECE_VALUES[Piece::King as usize].0 * king_diff
             + PIECE_VALUES[Piece::Queen as usize].0 * queen_diff
@@ -414,7 +414,7 @@ impl Board {
             + PIECE_VALUES[Piece::Bishop as usize].0 * bishop_diff
             + PIECE_VALUES[Piece::Knight as usize].0 * knight_diff
             + PIECE_VALUES[Piece::Pawn as usize].0 * pawn_diff
-            + attacks_diff as i64;
+            + attacks_diff as i16;
         match to_play {
             Color::Black => -Evaluation(materialistic),
             Color::White => Evaluation(materialistic),
