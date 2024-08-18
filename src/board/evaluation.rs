@@ -175,7 +175,7 @@ impl Board {
     ) -> (Option<Move>, Evaluation) {
         let moves = generate_pseudo_legal_moves(self);
         let mut had_legal_move = false;
-        let target_depth = self.full_move + depth;
+        let target_depth = self.half_move + depth;
 
         let (tx, rx) = mpsc::channel();
         for m in &moves {
@@ -275,17 +275,18 @@ impl Board {
         &mut self,
         alpha: Evaluation,
         beta: Evaluation,
-        depth: u16,
+        target_depth: u16,
         cache: &SharedHashMap<TTEntry, N>,
     ) -> Evaluation {
         let mut best_move = None;
-        if let Some(entry) = cache.get(self.hash) {
+        let cached_val = cache.get(self.hash);
+        if let Some(entry) = cached_val {
             // We can use this cache entry if:
             // - The node is deep enough
             // - The entry is exact, or the upper bound <= alpha or lowerbound >= beta
-            if entry.depth >= depth
+            if entry.depth >= self.half_move
                 && (entry.is_exact
-                    || (entry.is_upper && entry.eval <= alpha)
+                    || (entry.is_upper && entry.eval < alpha)
                     || (entry.is_lower && entry.eval >= beta))
             {
                 return entry.eval;
@@ -296,7 +297,7 @@ impl Board {
         }
         // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't
         // want to compute taking a pawn with our queen and just stop computing there, for example.
-        if self.full_move >= depth {
+        if self.half_move >= target_depth {
             return self.quiesce(alpha, beta);
         }
         let mut alpha = alpha;
@@ -312,22 +313,24 @@ impl Board {
             if !self.in_check(!self.to_play) {
                 had_legal_move = true;
                 let eval = -self
-                    .alpha_beta(-beta, -alpha.inc_mate(), depth - 1, cache)
+                    .alpha_beta(-beta, -alpha.inc_mate(), target_depth, cache)
                     .dec_mate();
 
                 if eval >= beta {
                     self.undo_move(&m);
-                    cache.insert(
-                        self.hash,
-                        TTEntry {
-                            eval: beta,
-                            is_exact: false,
-                            is_upper: true,
-                            is_lower: false,
-                            depth: self.full_move,
-                            best_move: None,
-                        },
-                    );
+                    if cached_val.is_none() {
+                        cache.insert(
+                            self.hash,
+                            TTEntry {
+                                eval: beta,
+                                is_exact: false,
+                                is_upper: true,
+                                is_lower: false,
+                                depth: self.half_move,
+                                best_move: None,
+                            },
+                        );
+                    }
                     return beta;
                 }
                 if eval > alpha {
@@ -347,32 +350,22 @@ impl Board {
                 Evaluation::draw()
             }
         };
-
-        // For now, we only insert into map for PV-Nodes where the score is exact
-        if is_pv_node {
+        if cached_val.is_none() {
             cache.insert(
                 self.hash,
                 TTEntry {
-                    eval: beta,
-                    is_exact: true,
+                    eval,
+                    is_exact: is_pv_node,
                     is_upper: false,
-                    is_lower: false,
-                    depth: self.full_move,
+                    is_lower: !is_pv_node,
+                    depth: self.half_move,
                     best_move: None,
                 },
             );
+        } else if let Some(entry) = cached_val {
+
         }
-        cache.insert(
-            self.hash,
-            TTEntry {
-                eval: alpha,
-                is_exact: false,
-                is_upper: false,
-                is_lower: true,
-                depth: self.full_move,
-                best_move: None,
-            },
-        );
+
         eval
     }
 
@@ -858,5 +851,44 @@ mod tests {
         assert!(evalw == Evaluation::draw());
         let evalb = board.eval(Color::Black);
         assert!(evalb == Evaluation::draw());
+    }
+
+    #[test]
+    fn check_hashing() {
+        let mut board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+            .expect("bad fen?");
+        let starting_hash = board.hash;
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: b1(),
+                to: c3(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        assert_ne!(board.hash, starting_hash);
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: b8(),
+                to: c6(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        assert_ne!(board.hash, starting_hash);
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: c3(),
+                to: b1(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        assert_ne!(board.hash, starting_hash);
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: c6(),
+                to: b8(),
+                promotion: None,
+            })
+            .expect("bad move?");
+        assert_eq!(board.hash, starting_hash);
     }
 }
