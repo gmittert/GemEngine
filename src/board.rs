@@ -226,38 +226,7 @@ impl Board {
     }
 
     pub fn make_alg_move(&mut self, m: &AlgebraicMove) -> Result<(), String> {
-        let piece = (self.query_pos(m.from, Color::White))
-            .or(self.query_pos(m.from, Color::Black))
-            .ok_or(format!("Failed to find a piece on position: {}", m.from))?;
-        let mut capture = self
-            .query_pos(m.to, Color::White)
-            .or(self.query_pos(m.to, Color::Black));
-        let is_castle_king = piece == Piece::King
-            && ((m.from == e1() && m.to == g1()) || (m.from == e8() && m.to == g8()));
-        let is_castle_queen = piece == Piece::King
-            && ((m.from == e1() && m.to == c1()) || (m.from == e8() && m.to == c8()));
-        let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
-        let is_en_passant = if let Some(file) = ep_target {
-            piece == Piece::Pawn && m.to.file() == file && capture.is_none()
-        } else {
-            false
-        };
-        if is_en_passant {
-            capture = Some(Piece::Pawn)
-        }
-        let m = Move {
-            from: m.from,
-            to: m.to,
-            piece,
-            capture,
-            is_check: false,
-            is_mate: false,
-            is_castle_king,
-            is_castle_queen,
-            promotion: m.promotion,
-            is_en_passant,
-        };
-        self.make_move(&m);
+        self.make_move(&self.from_algeabraic(m));
         Ok(())
     }
     pub fn add_piece(&mut self, c: Color, p: Piece, pos: Posn) {
@@ -282,6 +251,40 @@ impl Board {
         };
         self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
     }
+    pub fn from_algeabraic(&self, m: &AlgebraicMove) -> Move {
+        let piece = (self.query_pos(m.from, Color::White))
+            .or(self.query_pos(m.from, Color::Black))
+            .unwrap();
+        let mut capture = self
+            .query_pos(m.to, Color::White)
+            .or(self.query_pos(m.to, Color::Black));
+        let is_castle_king = piece == Piece::King
+            && ((m.from == e1() && m.to == g1()) || (m.from == e8() && m.to == g8()));
+        let is_castle_queen = piece == Piece::King
+            && ((m.from == e1() && m.to == c1()) || (m.from == e8() && m.to == c8()));
+        let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
+        let is_en_passant = if let Some(file) = ep_target {
+            piece == Piece::Pawn && m.to.file() == file && capture.is_none()
+        } else {
+            false
+        };
+        if is_en_passant {
+            capture = Some(Piece::Pawn)
+        }
+        Move {
+            from: m.from,
+            to: m.to,
+            piece,
+            capture,
+            is_check: false,
+            is_mate: false,
+            is_castle_king,
+            is_castle_queen,
+            promotion: m.promotion,
+            is_en_passant,
+        }
+    }
+
     pub fn move_piece(&mut self, c: Color, p: Piece, from: Posn, to: Posn) {
         self.remove_piece(c, p, from);
         self.add_piece(c, p, to);

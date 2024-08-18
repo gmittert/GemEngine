@@ -24,27 +24,29 @@ pub enum NodeType {
 //    40..43 To file
 //    44..47 To rank
 //    48..55 promotion
-//    56..57 Node Type
-//    58..63 6 bits unused
+//    56..56 has best move
+//    57..58 Node Type
+//    59..63 5 bits unused
 pub struct PackedTTEntry(pub u64);
 impl PackedTTEntry {
     pub fn new(
         eval: Evaluation,
         depth: u16,
-        from: Posn,
-        to: Posn,
-        promotion: Option<Piece>,
+        best_move: Option<AlgebraicMove>,
         node_type: NodeType,
     ) -> PackedTTEntry {
         let mut data = 0;
         data |= (eval.0 as u16) as u64;
         data |= (depth as u64) << 16;
-        data |= (from.file() as u64) << 32;
-        data |= (from.rank() as u64) << 36;
-        data |= (to.file() as u64) << 40;
-        data |= (to.rank() as u64) << 44;
-        data |= (promotion.map_or(7, |p| p as u64)) << 48;
-        data |= (node_type as u64) << 56;
+        if let Some(m) = best_move {
+            data |= (m.from.file() as u64) << 32;
+            data |= (m.from.rank() as u64) << 36;
+            data |= (m.to.file() as u64) << 40;
+            data |= (m.to.rank() as u64) << 44;
+            data |= (m.promotion.map_or(7, |p| p as u64)) << 48;
+            data |= 1 << 56;
+        }
+        data |= (node_type as u64) << 57;
 
         PackedTTEntry(data)
     }
@@ -55,29 +57,34 @@ impl PackedTTEntry {
     fn depth(&self) -> u16 {
         (self.0 >> 16) as u16
     }
-
-    fn from(&self) -> Posn {
-        let rank = unsafe { std::mem::transmute(((self.0 >> 36) & 0xf) as u8) };
-        let file = unsafe { std::mem::transmute(((self.0 >> 32) & 0xf) as u8) };
-        Posn::from(rank, file)
-    }
-
-    fn to(&self) -> Posn {
-        let rank = unsafe { std::mem::transmute(((self.0 >> 44) & 0xf) as u8) };
-        let file = unsafe { std::mem::transmute(((self.0 >> 40) & 0xf) as u8) };
-        Posn::from(rank, file)
-    }
-
-    fn promotion(&self) -> Option<Piece> {
-        let bits: u8 = (self.0 >> 48) as u8;
-        if bits == 7 {
+    fn best_move(&self) -> Option<AlgebraicMove> {
+        let best_move_bit = (self.0 >> 56) & 0x1;
+        if best_move_bit == 0 {
             return None;
         }
-        Some(unsafe { std::mem::transmute(bits) })
+        let from_rank = unsafe { std::mem::transmute(((self.0 >> 36) & 0xf) as u8) };
+        let from_file = unsafe { std::mem::transmute(((self.0 >> 32) & 0xf) as u8) };
+        let from = Posn::from(from_rank, from_file);
+
+        let to_rank = unsafe { std::mem::transmute(((self.0 >> 44) & 0xf) as u8) };
+        let to_file = unsafe { std::mem::transmute(((self.0 >> 40) & 0xf) as u8) };
+        let to = Posn::from(to_rank, to_file);
+
+        let promo_bits: u8 = (self.0 >> 48) as u8;
+        let promotion = if promo_bits == 7 {
+            None
+        } else {
+            Some(unsafe { std::mem::transmute(promo_bits) })
+        };
+        Some(AlgebraicMove {
+            to,
+            from,
+            promotion,
+        })
     }
 
     fn node_type(&self) -> NodeType {
-        let bits: u8 = (self.0 >> 56) as u8;
+        let bits: u8 = (self.0 >> 57) as u8;
         unsafe { std::mem::transmute(bits) }
     }
 }
@@ -364,6 +371,9 @@ impl Board {
             // - The entry is exact, or the upper bound <= alpha or lowerbound >= beta
             let node_type = unpacked.node_type();
             let eval = unpacked.eval();
+            // If not, if the entry has a best move, start with it and hope that it gives us a nice
+            // alpha to start with that should cause lots of cut offs.
+            best_move = unpacked.best_move().map(|m| self.from_algeabraic(&m));
             if unpacked.depth() >= target_depth
                 && (node_type == NodeType::Exact
                     || (node_type == NodeType::Upper && eval < alpha)
@@ -371,9 +381,6 @@ impl Board {
             {
                 return eval;
             }
-            // If not, if the entry has a best move, start with it and hope that it gives us a nice
-            // alpha to start with that should cause lots of cut offs.
-            best_move = None;
         }
         // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't
         // want to compute taking a pawn with our queen and just stop computing there, for example.
@@ -410,9 +417,11 @@ impl Board {
                             PackedTTEntry::new(
                                 beta,
                                 self.half_move,
-                                a1(),
-                                a1(),
-                                None,
+                                best_move.map(|m| AlgebraicMove {
+                                    to: m.to,
+                                    from: m.from,
+                                    promotion: m.promotion,
+                                }),
                                 NodeType::Upper,
                             )
                             .0,
@@ -424,6 +433,7 @@ impl Board {
                 if eval > alpha {
                     is_pv_node = true;
                     alpha = eval;
+                    best_move = Some(*m);
                 }
             }
             self.undo_move(&m);
@@ -451,9 +461,11 @@ impl Board {
                 PackedTTEntry::new(
                     eval,
                     self.half_move,
-                    a1(),
-                    a1(),
-                    None,
+                    best_move.map(|m| AlgebraicMove {
+                        to: m.to,
+                        from: m.from,
+                        promotion: m.promotion,
+                    }),
                     if is_pv_node {
                         NodeType::Exact
                     } else {
@@ -993,33 +1005,45 @@ mod tests {
         {
             let eval = Evaluation::m1();
             let depth = 0x123;
-            let from = b6();
-            let to = e2();
-            let promotion = Some(Piece::Queen);
+            let best_move = AlgebraicMove {
+                from: b6(),
+                to: e2(),
+                promotion: Some(Piece::Queen),
+            };
             let node_type = NodeType::Exact;
-            let tt = PackedTTEntry::new(eval, depth, from, to, promotion, node_type);
+            let tt = PackedTTEntry::new(eval, depth, Some(best_move), node_type);
             println!("{:x}", tt.0);
             assert_eq!(tt.eval(), eval);
             assert_eq!(tt.depth(), depth);
-            assert_eq!(tt.from(), from);
-            assert_eq!(tt.to(), to);
-            assert_eq!(tt.promotion(), promotion);
+            assert_eq!(tt.best_move(), Some(best_move));
             assert_eq!(tt.node_type(), node_type);
         }
         {
             let eval = -Evaluation::m1();
             let depth = 0x456;
-            let from = h1();
-            let to = a8();
-            let promotion = None;
+            let best_move = AlgebraicMove {
+                from: h1(),
+                to: a8(),
+                promotion: None,
+            };
             let node_type = NodeType::Upper;
-            let tt = PackedTTEntry::new(eval, depth, from, to, promotion, node_type);
+            let tt = PackedTTEntry::new(eval, depth, Some(best_move), node_type);
             println!("{:x}", tt.0);
             assert_eq!(tt.eval(), eval);
             assert_eq!(tt.depth(), depth);
-            assert_eq!(tt.from(), from);
-            assert_eq!(tt.to(), to);
-            assert_eq!(tt.promotion(), promotion);
+            assert_eq!(tt.best_move(), Some(best_move));
+            assert_eq!(tt.node_type(), node_type);
+        }
+        {
+            let eval = Evaluation(31);
+            let depth = 0x456;
+            let best_move = None;
+            let node_type = NodeType::Upper;
+            let tt = PackedTTEntry::new(eval, depth, best_move, node_type);
+            println!("{:x}", tt.0);
+            assert_eq!(tt.eval(), eval);
+            assert_eq!(tt.depth(), depth);
+            assert_eq!(tt.best_move(), best_move);
             assert_eq!(tt.node_type(), node_type);
         }
     }
