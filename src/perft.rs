@@ -1,5 +1,6 @@
 use crate::{board, shared_hashmap::SharedHashMap};
 use std::{
+    collections::HashMap,
     fmt,
     ops::{Add, AddAssign},
 };
@@ -61,7 +62,7 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerftResult {
             ..Default::default()
         };
     }
-    let mut cache: SharedHashMap<PerftResult, { 1024 * 1024 }> = SharedHashMap::new();
+    let mut cache: HashMap<u64, PerftResult> = HashMap::new();
     let res = perft_inner(b, depth, &mut cache).clone();
     res
 }
@@ -69,7 +70,7 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerftResult {
 fn perft_inner(
     b: &mut board::Board,
     depth: u8,
-    cache: &mut SharedHashMap<PerftResult, { 1024 * 1024 }>,
+    cache: &mut HashMap<u64, PerftResult>,
 ) -> PerftResult {
     const DEPTH_KEYS: [u64; 10] = [
         0xfd4b4027ed1f23fc,
@@ -84,7 +85,7 @@ fn perft_inner(
         0x5c28ed2953879b8a,
     ];
     let hash = b.hash ^ DEPTH_KEYS[depth as usize];
-    if let Some(v) = cache.get(hash) {
+    if let Some(v) = cache.get(&hash) {
         return v.clone();
     }
     let mut result = PerftResult {
@@ -158,7 +159,7 @@ fn perft_inner(
         assert_eq!(prew, postw);
     }
 
-    if let Some(v) = cache.get(hash) {
+    if let Some(v) = cache.get(&hash) {
         assert_eq!(v, &result);
     }
     cache.insert(hash, result.clone());
