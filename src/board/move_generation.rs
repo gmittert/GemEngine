@@ -3,6 +3,269 @@ pub use crate::board::posn::*;
 use crate::board::sliding_attacks;
 pub use crate::board::*;
 
+pub struct QueenMoves<'a> {
+    queens: BitBoard,
+    allies: BitBoard,
+    pieces: BitBoard,
+    attacks: BitBoard,
+    from: Option<Posn>,
+    board: &'a Board,
+    color: Color,
+}
+
+impl QueenMoves<'_> {
+    fn new<'a>(
+        queens: BitBoard,
+        allies: BitBoard,
+        pieces: BitBoard,
+        board: &'a Board,
+        color: Color,
+    ) -> QueenMoves<'a> {
+        QueenMoves {
+            queens,
+            allies,
+            pieces,
+            from: None,
+            attacks: BitBoard::empty(),
+            board,
+            color,
+        }
+    }
+}
+impl Iterator for QueenMoves<'_> {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(attack) = self.attacks.next() {
+                if self.allies.contains(attack) {
+                    continue;
+                }
+                return Some(Move {
+                    from: self.from.unwrap(),
+                    to: attack,
+                    piece: Piece::Queen,
+                    capture: self.board.query_pos(attack, !self.color),
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_king: false,
+                    is_castle_queen: false,
+                    promotion: None,
+                });
+            } else {
+                if let Some(next_queen) = self.queens.next() {
+                    self.from = Some(next_queen);
+                    self.attacks = sliding_attacks::compute_rook_attacks(next_queen, self.pieces)
+                        | sliding_attacks::compute_bishop_attacks(next_queen, self.pieces);
+                } else {
+                    // Finished all the queens
+                    return None;
+                }
+            }
+        }
+    }
+}
+
+pub struct RookMoves<'a> {
+    rooks: BitBoard,
+    allies: BitBoard,
+    pieces: BitBoard,
+    attacks: BitBoard,
+    from: Option<Posn>,
+    board: &'a Board,
+    color: Color,
+}
+
+impl RookMoves<'_> {
+    fn new<'a>(
+        rooks: BitBoard,
+        allies: BitBoard,
+        pieces: BitBoard,
+        board: &'a Board,
+        color: Color,
+    ) -> RookMoves<'a> {
+        RookMoves {
+            rooks,
+            allies,
+            pieces,
+            from: None,
+            attacks: BitBoard::empty(),
+            board,
+            color,
+        }
+    }
+}
+impl Iterator for RookMoves<'_> {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(attack) = self.attacks.next() {
+                if self.allies.contains(attack) {
+                    continue;
+                }
+                return Some(Move {
+                    from: self.from.unwrap(),
+                    to: attack,
+                    piece: Piece::Rook,
+                    capture: self.board.query_pos(attack, !self.color),
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_king: false,
+                    is_castle_queen: false,
+                    promotion: None,
+                });
+            } else {
+                if let Some(next_rook) = self.rooks.next() {
+                    self.from = Some(next_rook);
+                    self.attacks = sliding_attacks::compute_rook_attacks(next_rook, self.pieces);
+                } else {
+                    // Finished all the rooks
+                    return None;
+                }
+            }
+        }
+    }
+}
+
+pub struct BishopMoves<'a> {
+    bishops: BitBoard,
+    allies: BitBoard,
+    pieces: BitBoard,
+    attacks: BitBoard,
+    from: Option<Posn>,
+    board: &'a Board,
+    color: Color,
+}
+
+impl BishopMoves<'_> {
+    fn new<'a>(
+        bishops: BitBoard,
+        allies: BitBoard,
+        pieces: BitBoard,
+        board: &'a Board,
+        color: Color,
+    ) -> BishopMoves<'a> {
+        BishopMoves {
+            bishops,
+            allies,
+            pieces,
+            from: None,
+            attacks: BitBoard::empty(),
+            board,
+            color,
+        }
+    }
+}
+impl Iterator for BishopMoves<'_> {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(attack) = self.attacks.next() {
+                if self.allies.contains(attack) {
+                    continue;
+                }
+                return Some(Move {
+                    from: self.from.unwrap(),
+                    to: attack,
+                    piece: Piece::Bishop,
+                    capture: self.board.query_pos(attack, !self.color),
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_king: false,
+                    is_castle_queen: false,
+                    promotion: None,
+                });
+            } else {
+                if let Some(next_bishop) = self.bishops.next() {
+                    self.from = Some(next_bishop);
+                    self.attacks =
+                        sliding_attacks::compute_bishop_attacks(next_bishop, self.pieces);
+                } else {
+                    // Finished all the bishops
+                    return None;
+                }
+            }
+        }
+    }
+}
+
+pub struct KnightMoves<'a> {
+    knights: BitBoard,
+    allies: BitBoard,
+    attacks: BitBoard,
+    from: Option<Posn>,
+    board: &'a Board,
+    color: Color,
+}
+
+impl KnightMoves<'_> {
+    fn new<'a>(
+        knights: BitBoard,
+        allies: BitBoard,
+        board: &'a Board,
+        color: Color,
+    ) -> KnightMoves<'a> {
+        KnightMoves {
+            knights,
+            allies,
+            from: None,
+            attacks: BitBoard::empty(),
+            board,
+            color,
+        }
+    }
+}
+impl Iterator for KnightMoves<'_> {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(attack) = self.attacks.next() {
+                if self.allies.contains(attack) {
+                    continue;
+                }
+                return Some(Move {
+                    from: self.from.unwrap(),
+                    to: attack,
+                    piece: Piece::Knight,
+                    capture: self.board.query_pos(attack, !self.color),
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_king: false,
+                    is_castle_queen: false,
+                    promotion: None,
+                });
+            } else {
+                if let Some(next_knight) = self.knights.next() {
+                    self.from = Some(next_knight);
+                    self.attacks = [
+                        next_knight.see(),
+                        next_knight.sse(),
+                        next_knight.ssw(),
+                        next_knight.sww(),
+                        next_knight.nww(),
+                        next_knight.nnw(),
+                        next_knight.nne(),
+                        next_knight.nee(),
+                    ]
+                    .into_iter()
+                    .filter_map(|p| p)
+                    .fold(BitBoard::empty(), |x, y| x | y);
+                } else {
+                    // Finished all the knights
+                    return None;
+                }
+            }
+        }
+    }
+}
+
 impl Board {
     pub fn queen_attacks(&self, color: Color) -> BitBoard {
         let queens = match color {
@@ -18,7 +281,7 @@ impl Board {
         acc
     }
 
-    pub fn queen_moves(&self, color: Color, out: &mut Vec<Move>) {
+    pub fn queen_moves_it(&self, color: Color) -> QueenMoves {
         let queens = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
@@ -29,26 +292,12 @@ impl Board {
             Color::Black => self.black_pieces(),
         };
 
-        for i in queens {
-            let attacks = sliding_attacks::compute_rook_attacks(i, self.pieces())
-                | sliding_attacks::compute_bishop_attacks(i, self.pieces());
-            for pos in attacks {
-                if allied_pieces.contains(pos) {
-                    continue;
-                }
-                out.push(Move {
-                    from: i,
-                    to: pos,
-                    piece: Piece::Queen,
-                    capture: self.query_pos(pos, !color),
-                    is_check: false,
-                    is_mate: false,
-                    is_en_passant: false,
-                    is_castle_king: false,
-                    is_castle_queen: false,
-                    promotion: None,
-                });
-            }
+        QueenMoves::new(queens, allied_pieces, self.pieces(), self, color)
+    }
+
+    pub fn queen_moves(&self, color: Color, out: &mut Vec<Move>) {
+        for i in self.queen_moves_it(color) {
+            out.push(i);
         }
     }
 
@@ -107,7 +356,7 @@ impl Board {
         acc
     }
 
-    pub fn rook_moves(&self, color: Color, out: &mut Vec<Move>) {
+    pub fn rook_moves_it(&self, color: Color) -> RookMoves {
         let rooks = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
@@ -118,25 +367,12 @@ impl Board {
             Color::Black => self.black_pieces(),
         };
 
-        for i in rooks {
-            let attacks = sliding_attacks::compute_rook_attacks(i, self.pieces());
-            for pos in attacks {
-                if allied_pieces.contains(pos) {
-                    continue;
-                }
-                out.push(Move {
-                    from: i,
-                    to: pos,
-                    piece: Piece::Rook,
-                    capture: self.query_pos(pos, !color),
-                    is_check: false,
-                    is_mate: false,
-                    is_en_passant: false,
-                    is_castle_king: false,
-                    is_castle_queen: false,
-                    promotion: None,
-                });
-            }
+        RookMoves::new(rooks, allied_pieces, self.pieces(), self, color)
+    }
+
+    pub fn rook_moves(&self, color: Color, out: &mut Vec<Move>) {
+        for i in self.rook_moves_it(color) {
+            out.push(i);
         }
     }
 
@@ -192,7 +428,7 @@ impl Board {
         acc
     }
 
-    pub fn bishop_moves(&self, color: Color, out: &mut Vec<Move>) {
+    pub fn bishop_moves_it(&self, color: Color) -> BishopMoves {
         let bishops = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
@@ -203,25 +439,12 @@ impl Board {
             Color::Black => self.black_pieces(),
         };
 
-        for i in bishops {
-            let attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
-            for pos in attacks {
-                if allied_pieces.contains(pos) {
-                    continue;
-                }
-                out.push(Move {
-                    from: i,
-                    to: pos,
-                    piece: Piece::Bishop,
-                    capture: self.query_pos(pos, !color),
-                    is_check: false,
-                    is_mate: false,
-                    is_en_passant: false,
-                    is_castle_king: false,
-                    is_castle_queen: false,
-                    promotion: None,
-                });
-            }
+        BishopMoves::new(bishops, allied_pieces, self.pieces(), self, color)
+    }
+
+    pub fn bishop_moves(&self, color: Color, out: &mut Vec<Move>) {
+        for i in self.bishop_moves_it(color) {
+            out.push(i);
         }
     }
 
@@ -457,45 +680,24 @@ impl Board {
         })
     }
 
-    pub fn knight_moves(&self, color: Color, out: &mut Vec<Move>) {
+    pub fn knight_moves_it(&self, color: Color) -> KnightMoves {
         let knights = match color {
-            Color::White => self.white_pieces[Piece::Knight as usize],
-            Color::Black => self.black_pieces[Piece::Knight as usize],
-        };
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Knight as usize];
+
         let allied_pieces = match color {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
         };
 
-        knights.into_iter().for_each(|knight| {
-            [
-                knight.see(),
-                knight.sse(),
-                knight.ssw(),
-                knight.sww(),
-                knight.nww(),
-                knight.nnw(),
-                knight.nne(),
-                knight.nee(),
-            ]
-            .into_iter()
-            .filter_map(|p| p)
-            .filter(|p| !allied_pieces.contains(*p))
-            .for_each(|p| {
-                out.push(Move {
-                    from: knight,
-                    to: p,
-                    piece: Piece::Knight,
-                    capture: self.query_pos(p, !color),
-                    is_check: false,
-                    is_mate: false,
-                    is_en_passant: false,
-                    is_castle_king: false,
-                    is_castle_queen: false,
-                    promotion: None,
-                })
-            })
-        });
+        KnightMoves::new(knights, allied_pieces, self, color)
+    }
+
+    pub fn knight_moves(&self, color: Color, out: &mut Vec<Move>) {
+        for i in self.knight_moves_it(color) {
+            out.push(i);
+        }
     }
 
     pub fn knight_can_capture(&self, color: Color, target_pos: Posn) -> Option<Move> {
