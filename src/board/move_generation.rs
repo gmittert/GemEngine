@@ -3,6 +3,503 @@ pub use crate::board::posn::*;
 use crate::board::sliding_attacks;
 pub use crate::board::*;
 
+#[derive(Debug, Clone, Copy)]
+enum PawnMovesState {
+    ReadPawn,
+    Push1,
+    Push2,
+    TakeEast,
+    TakeWest,
+    TakeEp,
+    PromoteQueen,
+    PromoteRook,
+    PromoteKnight,
+    PromoteBishop,
+    Done,
+}
+
+pub struct PawnMoves<'a> {
+    pawns: BitBoard,
+    allies: BitBoard,
+    pieces: BitBoard,
+    attacks: BitBoard,
+    from: Option<Posn>,
+    board: &'a Board,
+    color: Color,
+    state: PawnMovesState,
+    next_state: PawnMovesState,
+    to: Option<Posn>,
+    capture: Option<Piece>,
+}
+
+impl PawnMoves<'_> {
+    fn new<'a>(
+        pawns: BitBoard,
+        allies: BitBoard,
+        pieces: BitBoard,
+        board: &'a Board,
+        color: Color,
+    ) -> PawnMoves<'a> {
+        PawnMoves {
+            pawns,
+            allies,
+            pieces,
+            from: None,
+            attacks: BitBoard::empty(),
+            board,
+            color,
+            state: PawnMovesState::ReadPawn,
+            next_state: PawnMovesState::Done,
+            to: None,
+            capture: None,
+        }
+    }
+}
+impl Iterator for PawnMoves<'_> {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let promo_rank = match self.color {
+            Color::Black => Rank::One,
+            Color::White => Rank::Eight,
+        };
+        loop {
+            match self.state {
+                PawnMovesState::ReadPawn => {
+                    if let Some(pawn) = self.pawns.next() {
+                        self.from = Some(pawn);
+                        self.state = PawnMovesState::Push1;
+                    } else {
+                        self.state = PawnMovesState::Done;
+                    }
+                }
+                PawnMovesState::Push1 => {
+                    let mpush_pos = match self.color {
+                        Color::White => self.from.unwrap().no(),
+                        Color::Black => self.from.unwrap().so(),
+                    };
+
+                    if let Some(push_pos) = mpush_pos {
+                        if !self.pieces.contains(push_pos) {
+                            if push_pos.rank() == promo_rank {
+                                self.to = Some(push_pos);
+                                self.capture = None;
+                                self.next_state = PawnMovesState::TakeEast;
+                                self.state = PawnMovesState::PromoteQueen;
+                                continue;
+                            } else {
+                                self.state = PawnMovesState::Push2;
+                                return Some(Move {
+                                    from: self.from.unwrap(),
+                                    to: push_pos,
+                                    piece: Piece::Pawn,
+                                    capture: None,
+                                    is_check: false,
+                                    is_mate: false,
+                                    is_en_passant: false,
+                                    is_castle_king: false,
+                                    is_castle_queen: false,
+                                    promotion: None,
+                                });
+                            }
+                        } else {
+                            self.state = PawnMovesState::TakeEast;
+                        }
+                    }
+                }
+                PawnMovesState::Push2 => {
+                    let can_double_push = match self.color {
+                        Color::White => self.from.unwrap().rank() == Rank::Two,
+                        Color::Black => self.from.unwrap().rank() == Rank::Seven,
+                    };
+                    if !can_double_push {
+                        self.state = PawnMovesState::TakeEast;
+                        continue;
+                    }
+
+                    let mdouble_push_pos = match self.color {
+                        Color::White => self.from.unwrap().no().and_then(|x| x.no()),
+                        Color::Black => self.from.unwrap().so().and_then(|x| x.so()),
+                    };
+
+                    if let Some(double_push_pos) = mdouble_push_pos {
+                        if !self.pieces.contains(double_push_pos) {
+                            if double_push_pos.rank() == promo_rank {
+                                self.to = Some(double_push_pos);
+                                self.capture = None;
+                                self.next_state = PawnMovesState::TakeEast;
+                                self.state = PawnMovesState::PromoteQueen;
+                                continue;
+                            } else {
+                                self.state = PawnMovesState::TakeEast;
+                                return Some(Move {
+                                    from: self.from.unwrap(),
+                                    to: double_push_pos,
+                                    piece: Piece::Pawn,
+                                    capture: None,
+                                    is_check: false,
+                                    is_mate: false,
+                                    is_en_passant: false,
+                                    is_castle_king: false,
+                                    is_castle_queen: false,
+                                    promotion: None,
+                                });
+                            }
+                        } else {
+                            self.state = PawnMovesState::TakeEast;
+                        }
+                    }
+                }
+                PawnMovesState::TakeEast => {
+                    let mpush_pos = match self.color {
+                        Color::White => self.from.unwrap().no(),
+                        Color::Black => self.from.unwrap().so(),
+                    };
+                    let Some(take_pos) = mpush_pos.and_then(|x| x.ea()) else {
+                        self.state = PawnMovesState::TakeWest;
+                        continue;
+                    };
+                    let Some(capture) = self.board.query_pos(take_pos, !self.color) else {
+                        self.state = PawnMovesState::TakeWest;
+                        continue;
+                    };
+                    if take_pos.rank() == promo_rank {
+                        self.to = Some(take_pos);
+                        self.capture = Some(capture);
+                        self.next_state = PawnMovesState::TakeWest;
+                        self.state = PawnMovesState::PromoteQueen;
+                        continue;
+                    }
+                    self.state = PawnMovesState::TakeWest;
+                    return Some(Move {
+                        from: self.from.unwrap(),
+                        to: take_pos,
+                        piece: Piece::Pawn,
+                        capture: Some(capture),
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: None,
+                    });
+                }
+                PawnMovesState::TakeWest => {
+                    let mpush_pos = match self.color {
+                        Color::White => self.from.unwrap().no(),
+                        Color::Black => self.from.unwrap().so(),
+                    };
+                    let Some(take_pos) = mpush_pos.and_then(|x| x.we()) else {
+                        self.state = PawnMovesState::TakeEp;
+                        continue;
+                    };
+                    let Some(capture) = self.board.query_pos(take_pos, !self.color) else {
+                        self.state = PawnMovesState::TakeEp;
+                        continue;
+                    };
+                    if take_pos.rank() == promo_rank {
+                        self.to = Some(take_pos);
+                        self.capture = Some(capture);
+                        self.next_state = PawnMovesState::TakeEp;
+                        self.state = PawnMovesState::PromoteQueen;
+                        continue;
+                    }
+                    self.state = PawnMovesState::TakeEp;
+                    return Some(Move {
+                        from: self.from.unwrap(),
+                        to: take_pos,
+                        piece: Piece::Pawn,
+                        capture: Some(capture),
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: None,
+                    });
+                }
+                PawnMovesState::TakeEp => {
+                    self.state = PawnMovesState::ReadPawn;
+                    if let Some(ep_target) = self.board.move_rights.last().and_then(|x| x.ep_target)
+                    {
+                        let to = Posn::from(
+                            if self.color == Color::White {
+                                Rank::Six
+                            } else {
+                                Rank::Three
+                            },
+                            ep_target,
+                        );
+                        if (self.color == Color::White
+                            && (self.from.unwrap().nw() == Some(to)
+                                || self.from.unwrap().ne() == Some(to)))
+                            || (self.color == Color::Black
+                                && (self.from.unwrap().sw() == Some(to)
+                                    || self.from.unwrap().se() == Some(to)))
+                        {
+                            return Some(Move {
+                                from: self.from.unwrap(),
+                                to,
+                                piece: Piece::Pawn,
+                                capture: Some(Piece::Pawn),
+                                is_check: false,
+                                is_mate: false,
+                                is_en_passant: true,
+                                is_castle_king: false,
+                                is_castle_queen: false,
+                                promotion: None,
+                            });
+                        }
+                    }
+                }
+                PawnMovesState::Done => return None,
+                PawnMovesState::PromoteQueen => {
+                    self.state = PawnMovesState::PromoteRook;
+                    return Some(Move {
+                        from: self.from.unwrap(),
+                        to: self.to.unwrap(),
+                        piece: Piece::Pawn,
+                        capture: self.capture,
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: Some(Piece::Queen),
+                    });
+                }
+                PawnMovesState::PromoteRook => {
+                    self.state = PawnMovesState::PromoteBishop;
+                    return Some(Move {
+                        from: self.from.unwrap(),
+                        to: self.to.unwrap(),
+                        piece: Piece::Pawn,
+                        capture: self.capture,
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: Some(Piece::Rook),
+                    });
+                }
+                PawnMovesState::PromoteBishop => {
+                    self.state = PawnMovesState::PromoteKnight;
+                    return Some(Move {
+                        from: self.from.unwrap(),
+                        to: self.to.unwrap(),
+                        piece: Piece::Pawn,
+                        capture: self.capture,
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: Some(Piece::Bishop),
+                    });
+                }
+                PawnMovesState::PromoteKnight => {
+                    self.state = self.next_state;
+                    return Some(Move {
+                        from: self.from.unwrap(),
+                        to: self.to.unwrap(),
+                        piece: Piece::Pawn,
+                        capture: self.capture,
+                        is_check: false,
+                        is_mate: false,
+                        is_en_passant: false,
+                        is_castle_king: false,
+                        is_castle_queen: false,
+                        promotion: Some(Piece::Knight),
+                    });
+                }
+            }
+        }
+    }
+}
+
+pub struct KingMoves<'a> {
+    kings: BitBoard,
+    rooks: BitBoard,
+    allies: BitBoard,
+    attacks: BitBoard,
+    pieces: BitBoard,
+    from: Option<Posn>,
+    board: &'a Board,
+    color: Color,
+    castle_queen: bool,
+    castle_king: bool,
+}
+
+impl KingMoves<'_> {
+    fn new<'a>(
+        kings: BitBoard,
+        rooks: BitBoard,
+        allies: BitBoard,
+        pieces: BitBoard,
+        board: &'a Board,
+        color: Color,
+    ) -> KingMoves<'a> {
+        KingMoves {
+            kings,
+            rooks,
+            allies,
+            attacks: BitBoard::empty(),
+            pieces,
+            from: None,
+            board,
+            color,
+            castle_queen: true,
+            castle_king: true,
+        }
+    }
+}
+impl Iterator for KingMoves<'_> {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(attack) = self.attacks.next() {
+                if self.allies.contains(attack) {
+                    continue;
+                }
+                return Some(Move {
+                    from: self.from.unwrap(),
+                    to: attack,
+                    piece: Piece::King,
+                    capture: self.board.query_pos(attack, !self.color),
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_king: false,
+                    is_castle_queen: false,
+                    promotion: None,
+                });
+            } else {
+                if let Some(next_king) = self.kings.next() {
+                    self.from = Some(next_king);
+                    self.attacks = [
+                        next_king.no(),
+                        next_king.ne(),
+                        next_king.nw(),
+                        next_king.ea(),
+                        next_king.we(),
+                        next_king.so(),
+                        next_king.se(),
+                        next_king.sw(),
+                    ]
+                    .into_iter()
+                    .filter_map(|p| p)
+                    .fold(BitBoard::empty(), |x, y| x | y);
+                } else {
+                    // Finished all the kings
+                    if self.castle_king {
+                        self.castle_king = false;
+                        if self
+                            .board
+                            .move_rights
+                            .last()
+                            .and_then(|x| Some(x.castling_ability.can_castle_king(self.color)))
+                            .unwrap_or(false)
+                        {
+                            if !self
+                                .board
+                                .in_check_pos(self.from.unwrap().ea().unwrap(), self.color)
+                                && !self.board.in_check_pos(
+                                    self.from.unwrap().ea().and_then(|x| x.ea()).unwrap(),
+                                    self.color,
+                                )
+                                && !self.board.in_check(self.color)
+                                && !self.pieces.contains(self.from.unwrap().ea().unwrap())
+                                && !self
+                                    .pieces
+                                    .contains(self.from.unwrap().ea().and_then(|x| x.ea()).unwrap())
+                                && self.rooks.contains(
+                                    self.from
+                                        .unwrap()
+                                        .ea()
+                                        .and_then(|x| x.ea())
+                                        .and_then(|x| x.ea())
+                                        .unwrap(),
+                                )
+                            {
+                                return Some(Move {
+                                    from: self.from.unwrap(),
+                                    to: self.from.unwrap().ea().and_then(|x| x.ea()).unwrap(),
+                                    piece: Piece::King,
+                                    capture: None,
+                                    is_check: false,
+                                    is_mate: false,
+                                    is_en_passant: false,
+                                    is_castle_king: true,
+                                    is_castle_queen: false,
+                                    promotion: None,
+                                });
+                            }
+                        }
+                    } else if self.castle_queen {
+                        self.castle_queen = false;
+
+                        if self
+                            .board
+                            .move_rights
+                            .last()
+                            .and_then(|x| Some(x.castling_ability.can_castle_queen(self.color)))
+                            .unwrap_or(false)
+                        {
+                            if !self
+                                .board
+                                .in_check_pos(self.from.unwrap().we().unwrap(), self.color)
+                                && !self.board.in_check_pos(
+                                    self.from.unwrap().we().and_then(|x| x.we()).unwrap(),
+                                    self.color,
+                                )
+                                && !self.board.in_check(self.color)
+                                && !self.pieces.contains(self.from.unwrap().we().unwrap())
+                                && !self
+                                    .pieces
+                                    .contains(self.from.unwrap().we().and_then(|x| x.we()).unwrap())
+                                && !self.pieces.contains(
+                                    self.from
+                                        .unwrap()
+                                        .we()
+                                        .and_then(|x| x.we())
+                                        .and_then(|x| x.we())
+                                        .unwrap(),
+                                )
+                                && self.rooks.contains(
+                                    self.from
+                                        .unwrap()
+                                        .we()
+                                        .and_then(|x| x.we())
+                                        .and_then(|x| x.we())
+                                        .and_then(|x| x.we())
+                                        .unwrap(),
+                                )
+                            {
+                                return Some(Move {
+                                    from: self.from.unwrap(),
+                                    to: self.from.unwrap().we().and_then(|x| x.we()).unwrap(),
+                                    piece: Piece::King,
+                                    capture: None,
+                                    is_check: false,
+                                    is_mate: false,
+                                    is_en_passant: false,
+                                    is_castle_king: false,
+                                    is_castle_queen: true,
+                                    promotion: None,
+                                });
+                            }
+                        }
+                    } else {
+                        return None;
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub struct QueenMoves<'a> {
     queens: BitBoard,
     allies: BitBoard,
@@ -510,7 +1007,7 @@ impl Board {
         })
     }
 
-    pub fn king_moves(&self, color: Color, out: &mut Vec<Move>) {
+    pub fn king_moves_it(&self, color: Color) -> KingMoves {
         let kings = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
@@ -526,98 +1023,12 @@ impl Board {
             Color::Black => self.black_pieces(),
         };
 
-        let all_pieces = self.white_pieces() | self.black_pieces();
+        KingMoves::new(kings, rooks, allied_pieces, self.pieces(), self, color)
+    }
 
-        for i in kings {
-            for pos in [
-                i.no(),
-                i.ne(),
-                i.ea(),
-                i.se(),
-                i.so(),
-                i.sw(),
-                i.we(),
-                i.nw(),
-            ] {
-                pos.into_iter()
-                    .filter(|pos| !allied_pieces.contains(*pos))
-                    .for_each(|pos| {
-                        out.push(Move {
-                            from: i,
-                            to: pos,
-                            piece: Piece::King,
-                            capture: self.query_pos(pos, !color),
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
-                            promotion: None,
-                        })
-                    });
-            }
-            if self
-                .move_rights
-                .last()
-                .and_then(|x| Some(x.castling_ability.can_castle_king(color)))
-                .unwrap_or(false)
-            {
-                if !self.in_check_pos(i.ea().unwrap(), color)
-                    && !self.in_check_pos(i.ea().and_then(|x| x.ea()).unwrap(), color)
-                    && !self.in_check(color)
-                    && !all_pieces.contains(i.ea().unwrap())
-                    && !all_pieces.contains(i.ea().and_then(|x| x.ea()).unwrap())
-                    && rooks.contains(i.ea().and_then(|x| x.ea()).and_then(|x| x.ea()).unwrap())
-                {
-                    out.push(Move {
-                        from: i,
-                        to: i.ea().and_then(|x| x.ea()).unwrap(),
-                        piece: Piece::King,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: false,
-                        is_castle_king: true,
-                        is_castle_queen: false,
-                        promotion: None,
-                    });
-                }
-            }
-            if self
-                .move_rights
-                .last()
-                .and_then(|x| Some(x.castling_ability.can_castle_queen(color)))
-                .unwrap_or(false)
-            {
-                if !self.in_check_pos(i.we().unwrap(), color)
-                    && !self.in_check_pos(i.we().and_then(|x| x.we()).unwrap(), color)
-                    && !self.in_check(color)
-                    && !all_pieces.contains(i.we().unwrap())
-                    && !all_pieces.contains(i.we().and_then(|x| x.we()).unwrap())
-                    && !all_pieces
-                        .contains(i.we().and_then(|x| x.we()).and_then(|x| x.we()).unwrap())
-                    && rooks.contains(
-                        i.we()
-                            .and_then(|x| x.we())
-                            .and_then(|x| x.we())
-                            .and_then(|x| x.we())
-                            .unwrap(),
-                    )
-                {
-                    out.push(Move {
-                        from: i,
-                        to: i.we().and_then(|x| x.we()).unwrap(),
-                        piece: Piece::King,
-                        capture: None,
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: false,
-                        is_castle_king: false,
-                        is_castle_queen: true,
-                        promotion: None,
-                    });
-                }
-            }
+    pub fn king_moves(&self, color: Color, out: &mut Vec<Move>) {
+        for i in self.king_moves_it(color) {
+            out.push(i);
         }
     }
 
@@ -756,8 +1167,7 @@ impl Board {
             })
     }
 
-    pub fn pawn_moves(&self, color: Color, out: &mut Vec<Move>) {
-        // Single Pushes
+    pub fn pawn_moves_it(&self, color: Color) -> PawnMoves {
         let pawns = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
@@ -768,149 +1178,15 @@ impl Board {
             Color::Black => self.black_pieces(),
         };
 
-        let opponent_pieces = match color {
-            Color::White => self.black_pieces(),
-            Color::Black => self.white_pieces(),
-        };
-        let promo_rank = match color {
-            Color::Black => Rank::One,
-            Color::White => Rank::Eight,
-        };
+        PawnMoves::new(pawns, allied_pieces, self.pieces(), self, color)
+    }
 
-        for i in pawns {
-            let mpush_pos = match color {
-                Color::White => i.no(),
-                Color::Black => i.so(),
-            };
-            if let Some(push_pos) = mpush_pos {
-                if !allied_pieces.contains(push_pos) && !opponent_pieces.contains(push_pos) {
-                    if push_pos.rank() == promo_rank {
-                        for piece in [Piece::Queen, Piece::Rook, Piece::Knight, Piece::Bishop] {
-                            out.push(Move {
-                                from: i,
-                                to: push_pos,
-                                piece: Piece::Pawn,
-                                capture: None,
-                                is_check: false,
-                                is_mate: false,
-                                is_en_passant: false,
-                                is_castle_king: false,
-                                is_castle_queen: false,
-                                promotion: Some(piece),
-                            });
-                        }
-                    } else {
-                        out.push(Move {
-                            from: i,
-                            to: push_pos,
-                            piece: Piece::Pawn,
-                            capture: None,
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
-                            promotion: None,
-                        });
-                        let can_double_push = match color {
-                            Color::White => i.rank() == Rank::Two,
-                            Color::Black => i.rank() == Rank::Seven,
-                        };
-                        if can_double_push {
-                            let mdouble_push_pos = match color {
-                                Color::White => i.no().and_then(|x| x.no()),
-                                Color::Black => i.so().and_then(|x| x.so()),
-                            };
-                            if let Some(double_push_pos) = mdouble_push_pos {
-                                if !allied_pieces.contains(double_push_pos)
-                                    && !opponent_pieces.contains(double_push_pos)
-                                {
-                                    out.push(Move {
-                                        from: i,
-                                        to: double_push_pos,
-                                        piece: Piece::Pawn,
-                                        capture: None,
-                                        is_check: false,
-                                        is_mate: false,
-                                        is_en_passant: false,
-                                        is_castle_king: false,
-                                        is_castle_queen: false,
-                                        promotion: None,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            for take in [
-                mpush_pos.and_then(|x| x.we()),
-                mpush_pos.and_then(|x| x.ea()),
-            ] {
-                take.into_iter()
-                    .filter(|pos| opponent_pieces.contains(*pos))
-                    .for_each(|pos| {
-                        if pos.rank() == promo_rank {
-                            for piece in [Piece::Queen, Piece::Rook, Piece::Knight, Piece::Bishop] {
-                                out.push(Move {
-                                    from: i,
-                                    to: pos,
-                                    piece: Piece::Pawn,
-                                    capture: self.query_pos(pos, !color),
-                                    is_check: false,
-                                    is_mate: false,
-                                    is_en_passant: false,
-                                    is_castle_king: false,
-                                    is_castle_queen: false,
-                                    promotion: Some(piece),
-                                });
-                            }
-                        } else {
-                            out.push(Move {
-                                from: i,
-                                to: pos,
-                                piece: Piece::Pawn,
-                                capture: self.query_pos(pos, !color),
-                                is_check: false,
-                                is_mate: false,
-                                is_en_passant: false,
-                                is_castle_king: false,
-                                is_castle_queen: false,
-                                promotion: None,
-                            })
-                        }
-                    });
-            }
-            // En Passant
-            if let Some(ep_target) = self.move_rights.last().and_then(|x| x.ep_target) {
-                let to = Posn::from(
-                    if color == Color::White {
-                        Rank::Six
-                    } else {
-                        Rank::Three
-                    },
-                    ep_target,
-                );
-                if (color == Color::White && (i.nw() == Some(to) || i.ne() == Some(to)))
-                    || (color == Color::Black && (i.sw() == Some(to) || i.se() == Some(to)))
-                {
-                    out.push(Move {
-                        from: i,
-                        to,
-                        piece: Piece::Pawn,
-                        capture: Some(Piece::Pawn),
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: true,
-                        is_castle_king: false,
-                        is_castle_queen: false,
-                        promotion: None,
-                    })
-                }
-            }
+    pub fn pawn_moves(&self, color: Color, out: &mut Vec<Move>) {
+        for i in self.pawn_moves_it(color) {
+            out.push(i);
         }
     }
+
     pub fn pawn_can_capture(&self, color: Color, target_pos: Posn) -> Option<Move> {
         let pawns = match color {
             Color::White => self.white_pieces,
