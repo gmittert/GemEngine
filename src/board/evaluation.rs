@@ -257,12 +257,12 @@ impl Board {
         queue: &threadpool::ThreadPool,
         cache: Arc<SharedHashMap<N>>,
     ) -> (Option<Move>, Evaluation) {
-        let moves = generate_pseudo_legal_moves(self);
         let mut had_legal_move = false;
         let target_depth = self.half_move + depth;
 
         let (tx, rx) = mpsc::channel();
-        for m in &moves {
+        let moves:Vec<Move> = self.pseudo_legal_moves_it(self.to_play).collect();
+        for m in moves {
             if Some(Piece::King) == m.capture {
                 return (None, Evaluation::won());
             }
@@ -271,7 +271,7 @@ impl Board {
                 had_legal_move = true;
                 let tx = tx.clone();
                 let mut new_b = self.clone();
-                let m = *m;
+                let m = m;
                 let cloned = cache.clone();
                 queue.execute(move || {
                     let best_score = Evaluation::lost();

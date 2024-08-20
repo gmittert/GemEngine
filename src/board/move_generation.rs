@@ -763,6 +763,41 @@ impl Iterator for KnightMoves<'_> {
     }
 }
 
+pub struct PsuedoLegalMoves<'a> {
+    iter: std::iter::Chain<
+        std::iter::Chain<
+            std::iter::Chain<
+                std::iter::Chain<std::iter::Chain<KnightMoves<'a>, BishopMoves<'a>>, RookMoves<'a>>,
+                QueenMoves<'a>,
+            >,
+            PawnMoves<'a>,
+        >,
+        KingMoves<'a>,
+    >
+}
+
+impl PsuedoLegalMoves<'_> {
+    fn new<'a>(color: Color, board: &'a Board) -> PsuedoLegalMoves<'a> {
+        PsuedoLegalMoves {
+            iter: board
+                .knight_moves_it(color)
+                .chain(board.bishop_moves_it(color))
+                .chain(board.rook_moves_it(color))
+                .chain(board.queen_moves_it(color))
+                .chain(board.pawn_moves_it(color))
+                .chain(board.king_moves_it(color)),
+        }
+    }
+}
+
+impl Iterator for PsuedoLegalMoves<'_> {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
+}
+
 impl Board {
     pub fn queen_attacks(&self, color: Color) -> BitBoard {
         let queens = match color {
@@ -1273,6 +1308,9 @@ impl Board {
             }
         }
         None
+    }
+    pub fn pseudo_legal_moves_it(&self, color: Color) -> PsuedoLegalMoves {
+        PsuedoLegalMoves::new(color, self)
     }
 }
 
