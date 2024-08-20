@@ -261,8 +261,7 @@ impl Board {
         let target_depth = self.half_move + depth;
 
         let (tx, rx) = mpsc::channel();
-        let amoves:Vec<AlgebraicMove> = self.pseudo_legal_moves_it().collect();
-        for a in amoves {
+        for a in self.pseudo_legal_moves_it() {
             let m = self.from_algeabraic(&a);
             if Some(Piece::King) == m.capture {
                 return (None, Evaluation::won());
@@ -320,10 +319,15 @@ impl Board {
         if alpha < stand_pat {
             alpha = stand_pat;
         }
-        let captures = generate_pseudo_legal_moves(self)
-            .into_iter()
-            .filter(|x| x.capture.is_some());
+        let opponent_pieces = match self.to_play {
+            Color::Black => self.white_pieces(),
+            Color::White => self.black_pieces(),
+        };
+        let captures = self
+            .pseudo_legal_moves_it()
+            .filter(|x| opponent_pieces.contains(x.to));
         for capture in captures {
+            let m = self.from_algeabraic(&capture);
             // The most material this could swing is capturing a queen
             let mut big_change = PIECE_VALUES[Piece::Queen as usize];
             // While possibly promoting
@@ -335,15 +339,15 @@ impl Board {
                 continue;
             }
 
-            self.make_move(&capture);
+            self.make_move(&m);
 
-            let value = PIECE_VALUES[capture.capture.unwrap() as usize]
+            let value = PIECE_VALUES[m.capture.unwrap() as usize]
                 - self.static_exchange_evaluation(capture.to, self.to_play);
 
             if value >= Evaluation::draw() && !self.in_check(!self.to_play) {
                 let eval = -self.quiesce(-beta, -alpha.inc_mate()).dec_mate();
                 if eval >= beta {
-                    self.undo_move(&capture);
+                    self.undo_move(&m);
 
                     return beta;
                 }
@@ -351,7 +355,7 @@ impl Board {
                     alpha = eval;
                 }
             }
-            self.undo_move(&capture);
+            self.undo_move(&m);
         }
         alpha
     }
@@ -374,7 +378,7 @@ impl Board {
             let eval = unpacked.eval();
             // If not, if the entry has a best move, start with it and hope that it gives us a nice
             // alpha to start with that should cause lots of cut offs.
-            best_move = unpacked.best_move().map(|m| self.from_algeabraic(&m));
+            best_move = unpacked.best_move();
             if unpacked.depth() >= target_depth
                 && (node_type == NodeType::Exact
                     || (node_type == NodeType::Upper && eval < alpha)
@@ -390,13 +394,15 @@ impl Board {
         }
         let mut alpha = alpha;
         let mut had_legal_move = false;
-        let mut moves = match best_move {
+        let moves = match best_move {
             Some(m) => vec![m],
             None => vec![],
-        };
-        fill_pseudo_legal_moves(&mut moves, self);
+        }
+        .into_iter()
+        .chain(self.pseudo_legal_moves_it());
         let mut is_pv_node = false;
-        for m in &moves {
+        for a in moves {
+            let m = self.from_algeabraic(&a);
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
                 had_legal_move = true;
@@ -415,17 +421,7 @@ impl Board {
                     if should_cache {
                         cache.insert(
                             self.hash,
-                            PackedTTEntry::new(
-                                beta,
-                                self.half_move,
-                                best_move.map(|m| AlgebraicMove {
-                                    to: m.to,
-                                    from: m.from,
-                                    promotion: m.promotion,
-                                }),
-                                NodeType::Upper,
-                            )
-                            .0,
+                            PackedTTEntry::new(beta, self.half_move, best_move, NodeType::Upper).0,
                         );
                     }
                     return beta;
@@ -434,7 +430,7 @@ impl Board {
                 if eval > alpha {
                     is_pv_node = true;
                     alpha = eval;
-                    best_move = Some(*m);
+                    best_move = Some(a);
                 }
             }
             self.undo_move(&m);

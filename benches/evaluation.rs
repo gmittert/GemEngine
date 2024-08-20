@@ -38,7 +38,7 @@ pub fn london(c: &mut Criterion) {
                 )
                 .expect("Invalid fen?");
                 b.iter(|| {
-                    board.it_depth_best_move(3, &pool);
+                    board.it_depth_best_move(4, &pool);
                 })
             },
         );

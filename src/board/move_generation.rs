@@ -39,9 +39,6 @@ impl PawnMoves {
         color: Color,
         ep_target: Option<File>,
     ) -> PawnMoves {
-        if let Some(target) = ep_target {
-            println!("ep_target: {target}");
-        }
         PawnMoves {
             pawns,
             opponent_pieces,
@@ -90,9 +87,6 @@ impl Iterator for PawnMoves {
                                 continue;
                             } else {
                                 self.state = PawnMovesState::Push2;
-                                println!("single push!");
-                                println!("from: {}", self.from.unwrap());
-                                println!("to: {}", push_pos);
                                 return Some(AlgebraicMove {
                                     from: self.from.unwrap(),
                                     to: push_pos,
@@ -129,9 +123,6 @@ impl Iterator for PawnMoves {
                                 continue;
                             } else {
                                 self.state = PawnMovesState::TakeEast;
-                                println!("double_push!");
-                                println!("from: {}", self.from.unwrap());
-                                println!("to: {}", double_push_pos);
                                 return Some(AlgebraicMove {
                                     from: self.from.unwrap(),
                                     to: double_push_pos,
@@ -164,7 +155,6 @@ impl Iterator for PawnMoves {
                         continue;
                     }
                     self.state = PawnMovesState::TakeWest;
-                    println!("take east!");
                     return Some(AlgebraicMove {
                         from: self.from.unwrap(),
                         to: take_pos,
@@ -192,7 +182,6 @@ impl Iterator for PawnMoves {
                         continue;
                     }
                     self.state = PawnMovesState::TakeEp;
-                    println!("take west!");
                     return Some(AlgebraicMove {
                         from: self.from.unwrap(),
                         to: take_pos,
@@ -217,7 +206,6 @@ impl Iterator for PawnMoves {
                                 && (self.from.unwrap().sw() == Some(to)
                                     || self.from.unwrap().se() == Some(to)))
                         {
-                            println!("Returning ep!");
                             return Some(AlgebraicMove {
                                 from: self.from.unwrap(),
                                 to,
