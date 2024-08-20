@@ -264,7 +264,10 @@ impl Board {
             && ((m.from == e1() && m.to == c1()) || (m.from == e8() && m.to == c8()));
         let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
         let is_en_passant = if let Some(file) = ep_target {
-            piece == Piece::Pawn && m.to.file() == file && capture.is_none()
+            piece == Piece::Pawn
+                && m.to.file() == file
+                && m.from.file() != file
+                && capture.is_none()
         } else {
             false
         };
@@ -604,24 +607,24 @@ pub fn starting_board() -> Board {
 }
 
 pub fn fill_pseudo_legal_moves(moves: &mut Vec<Move>, b: &Board) {
-    b.rook_moves(b.to_play, moves);
-    b.bishop_moves(b.to_play, moves);
-    b.queen_moves(b.to_play, moves);
-    b.knight_moves(b.to_play, moves);
-    b.king_moves(b.to_play, moves);
-    b.pawn_moves(b.to_play, moves);
+    b.rook_moves(moves);
+    b.bishop_moves(moves);
+    b.queen_moves(moves);
+    b.knight_moves(moves);
+    b.king_moves(moves);
+    b.pawn_moves(moves);
 }
 
 pub fn generate_pseudo_legal_moves(b: &Board) -> Vec<Move> {
     let mut moves = vec![];
     moves.reserve(32);
 
-    b.rook_moves(b.to_play, &mut moves);
-    b.bishop_moves(b.to_play, &mut moves);
-    b.queen_moves(b.to_play, &mut moves);
-    b.knight_moves(b.to_play, &mut moves);
-    b.king_moves(b.to_play, &mut moves);
-    b.pawn_moves(b.to_play, &mut moves);
+    b.rook_moves(&mut moves);
+    b.bishop_moves(&mut moves);
+    b.queen_moves(&mut moves);
+    b.knight_moves(&mut moves);
+    b.king_moves(&mut moves);
+    b.pawn_moves(&mut moves);
     moves
 }
 

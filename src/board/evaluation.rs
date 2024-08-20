@@ -261,8 +261,9 @@ impl Board {
         let target_depth = self.half_move + depth;
 
         let (tx, rx) = mpsc::channel();
-        let moves:Vec<Move> = self.pseudo_legal_moves_it(self.to_play).collect();
-        for m in moves {
+        let amoves:Vec<AlgebraicMove> = self.pseudo_legal_moves_it().collect();
+        for a in amoves {
+            let m = self.from_algeabraic(&a);
             if Some(Piece::King) == m.capture {
                 return (None, Evaluation::won());
             }
@@ -560,7 +561,7 @@ mod tests {
     use crate::board::evaluation::*;
     #[test]
     fn white_better() {
-        let b = Board::from_fen("rkb1kbkr/pppppppp/8/8/8/8/PPPPPPPP/RKBQKBKR w - - 0 1")
+        let b = Board::from_fen("rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1")
             .expect("failed to parse fen");
         let eval_white = b.eval(Color::White);
         let eval_black = b.eval(Color::Black);
@@ -570,7 +571,7 @@ mod tests {
     }
     #[test]
     fn black_better() {
-        let b = Board::from_fen("rkbqkbkr/pppppppp/8/8/8/8/PPPPPPPP/RKB1KBKR w - - 0 1")
+        let b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w - - 0 1")
             .expect("failed to parse fen");
         let eval_white = b.eval(Color::White);
         let eval_black = b.eval(Color::Black);
@@ -580,7 +581,7 @@ mod tests {
     }
     #[test]
     fn find_queen_take() {
-        let mut b = Board::from_fen("4k3/pppppppp/8/8/7q/8/PPPPPPP1/RKBQKBKR w - - 0 1")
+        let mut b = Board::from_fen("4k3/pppppppp/8/8/7q/8/PPPPPPP1/RNBQKBNR w - - 0 1")
             .expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
@@ -595,7 +596,7 @@ mod tests {
     }
     #[test]
     fn take_back_trade() {
-        let mut b = Board::from_fen("rk1qkbkr/ppp2ppp/3pB3/4p3/4P3/5K2/PPPP1PPP/RKBQK2R b - - 0 1")
+        let mut b = Board::from_fen("rn1qkbnr/ppp2ppp/3pB3/4p3/4P3/5K2/PPPP1PPP/RNBQK2R b - - 0 1")
             .expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());

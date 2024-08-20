@@ -99,6 +99,9 @@ fn perft_inner(
     };
     let moves = board::generate_pseudo_legal_moves(b);
     for m in &moves {
+        println!("move from: {}", m.from);
+        println!("move to: {}", m.to);
+        println!("Depth {}, Making move: {}", depth, m);
         let preb = b.black_pieces();
         let prew = b.white_pieces();
         assert!(

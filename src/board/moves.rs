@@ -64,6 +64,15 @@ pub struct AlgebraicMove {
     pub to: Posn,
     pub promotion: Option<Piece>,
 }
+impl fmt::Display for AlgebraicMove {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.from, self.to)?;
+        if let Some(piece) = self.promotion {
+            write!(f, "{}", piece)?;
+        }
+        Ok(())
+    }
+}
 
 impl AlgebraicMove {
     pub fn from(s: &str) -> Option<AlgebraicMove> {
