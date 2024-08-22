@@ -873,12 +873,7 @@ impl Board {
             false
         };
 
-        KingMoves::new(
-            kings,
-            allied_pieces,
-            can_castle_queen,
-            can_castle_king,
-        )
+        KingMoves::new(kings, allied_pieces, can_castle_queen, can_castle_king)
     }
 
     pub fn king_moves(&self, out: &mut Vec<Move>) {

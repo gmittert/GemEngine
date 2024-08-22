@@ -17,7 +17,7 @@ pub fn start(c: &mut Criterion) {
                 let pool = threadpool::ThreadPool::new(num_cpus);
                 let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
                 b.iter(|| {
-                    board.best_move(4, &pool, cache.clone());
+                    board.best_move(4, &pool, cache.clone(), None);
                 })
             },
         );
