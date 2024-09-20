@@ -6,3 +6,4 @@ pub mod shared_hashmap;
 pub mod uci;
 pub mod zobrist;
 pub mod pgn;
+pub mod parser;
