@@ -1,6 +1,6 @@
-use crate::parser::*;
 use crate::parser;
 use crate::parser::combinators::*;
+use crate::parser::*;
 
 #[derive(Clone)]
 pub struct Literal {
@@ -28,6 +28,30 @@ impl<'a> Parser<'a> for Literal {
     }
 }
 
+#[derive(Clone)]
+pub struct Ident {
+    i: String,
+}
+
+impl Ident {
+    pub fn new(i: &str) -> Ident {
+        Ident { i: i.to_string() }
+    }
+}
+
+impl<'a> Parser<'a> for Ident {
+    type Item = &'a str;
+    fn parse(&self, text: &'a str) -> Option<(Self::Item, &'a str)> {
+        let (_, text) = parser::ZeroOrMore::new(parser::Whitespace::new()).parse(text)?;
+        if !text.starts_with(&self.i) {
+            return None;
+        }
+        let (ident, text) = text.split_at(self.i.len());
+        let (_, text) = parser::ZeroOrMore::new(parser::Whitespace::new()).parse(text)?;
+        Some((ident, text))
+    }
+}
+
 parser!(Whitespace, (), |text| {
     Literal::new('\n')
         .or(Literal::new(' '))
@@ -46,6 +70,7 @@ parser!(Digit, u32, |text| {
         .or(Literal::new('7'))
         .or(Literal::new('8'))
         .or(Literal::new('9'))
+        .or(Literal::new('0'))
         .parse(text)
         .map(|(c, rest)| (c.to_digit(10).unwrap(), rest))
 });

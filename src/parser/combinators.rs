@@ -1,4 +1,17 @@
+// Parser combinators to use with the parser trait
+//
+// Usage looks like:
+// ```
+//  parser::ZeroOrMore::new(parser::Whitespace::new())
+//      .skip(parser::Literal::new('['))
+//      .then(parser::Word::new())
+//      .and_then(parser::StringLit::new())
+//      .skip(parser::Literal::new(']'))
+//      .parse(text)
+// ```
 use crate::parser::Parser;
+
+// Attempt one parser, then if that fails, attempt the other parser
 #[derive(Clone)]
 pub struct Or<L, R> {
     l: L,
@@ -22,6 +35,8 @@ where
     }
 }
 
+// Attempt one parser, then if that succeeds, attempt the other parser. If both succeed, return the
+// results of both parsers as a tuple
 #[derive(Clone)]
 pub struct AndThen<L, R> {
     l: L,
@@ -47,6 +62,8 @@ where
     }
 }
 
+// Attempt one parser, then if that succeeds, attempt the other parser. If both succeed, return the
+// results of only the second parser
 #[derive(Clone)]
 pub struct Then<L, R> {
     l: L,
@@ -71,6 +88,7 @@ where
     }
 }
 
+// Take characters from the input while the predicate is true
 #[derive(Clone)]
 pub struct TakeWhile {
     pred: fn(char) -> bool,
@@ -90,6 +108,7 @@ impl<'a> Parser<'a> for TakeWhile {
     }
 }
 
+// Apply a parser zero or more times
 #[derive(Clone)]
 pub struct ZeroOrMore<P> {
     parser: P,
@@ -117,6 +136,7 @@ where
     }
 }
 
+// Apply a parser zero or one times
 #[derive(Clone)]
 pub struct Optionally<P> {
     parser: P,
@@ -142,6 +162,7 @@ where
     }
 }
 
+// Apply a parser one or more times
 #[derive(Clone)]
 pub struct OneOrMore<P> {
     parser: P,
@@ -170,6 +191,8 @@ where
     }
 }
 
+// Attempt one parser, then if that succeeds, attempt the other parser. If both succeed, return the
+// results of only the first parser
 #[derive(Clone)]
 pub struct Skip<L, R> {
     l: L,
@@ -376,6 +399,4 @@ mod tests {
         let parsed = one_or_more.parse(s);
         assert!(parsed.is_none());
     }
-
-
 }
