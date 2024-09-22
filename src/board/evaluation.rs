@@ -135,7 +135,7 @@ impl Evaluation {
     }
     pub fn mate_in(&self) -> Option<usize> {
         if self.0 >= Self::won().0 - 100 {
-            Some(Self::won().0 as usize - 100)
+            Some((Self::won().0 - self.0) as usize)
         } else {
             None
         }
@@ -462,10 +462,6 @@ impl Board {
                         for prev_state in &self.moves[*irr as usize..] {
                             if *prev_state == self.hash {
                                 tracing::event!(Level::ERROR, "Three fold!");
-                                println!(
-                                    "Color: {:?} Detected threefold due to move!",
-                                    self.to_play
-                                );
                                 is_three_fold = true;
                                 break;
                             }
@@ -826,6 +822,15 @@ mod tests {
         assert_eq!("M2", format!("{}", Evaluation::_m2()));
         assert_eq!("-M2", format!("{}", -Evaluation::_m2()));
     }
+
+    #[test]
+    fn mated_in_formatting() {
+        assert_eq!(Some(1), Evaluation::m1().mate_in());
+        assert_eq!(Some(1), (-Evaluation::m1()).mated_in());
+        assert_eq!(Some(2), Evaluation::_m2().mate_in());
+        assert_eq!(Some(2), (-Evaluation::_m2()).mated_in());
+    }
+
     #[test]
     fn many_moves() {
         let mut board = Board::from_fen(
