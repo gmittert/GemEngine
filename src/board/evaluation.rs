@@ -580,18 +580,106 @@ impl Board {
             | self.knight_attacks(Color::Black);
 
         let attacks_diff = attacks_white.len() as i16 - attacks_black.len() as i16;
+        let doubled_pawns = self.doubled_pawns(Color::White) as i16 - self.doubled_pawns(Color::Black) as i16;
+        let isolated_pawns = self.isolated_pawns(Color::White) as i16 - self.isolated_pawns(Color::Black) as i16;
+        let blocked_pawns = self.blocked_pawns(Color::White) as i16 - self.blocked_pawns(Color::Black) as i16;
 
-        let materialistic = PIECE_VALUES[Piece::King as usize].0 * king_diff
+        let eval = PIECE_VALUES[Piece::King as usize].0 * king_diff
             + PIECE_VALUES[Piece::Queen as usize].0 * queen_diff
             + PIECE_VALUES[Piece::Rook as usize].0 * rook_diff
             + PIECE_VALUES[Piece::Bishop as usize].0 * bishop_diff
             + PIECE_VALUES[Piece::Knight as usize].0 * knight_diff
             + PIECE_VALUES[Piece::Pawn as usize].0 * pawn_diff
-            + attacks_diff as i16;
+            + attacks_diff as i16
+            - 50 * doubled_pawns
+            - 50 * isolated_pawns
+            - 50 * blocked_pawns;
+
         match to_play {
-            Color::Black => -Evaluation(materialistic),
-            Color::White => Evaluation(materialistic),
+            Color::Black => -Evaluation(eval),
+            Color::White => Evaluation(eval),
         }
+    }
+
+    // The number of doubled pawns a side has
+    pub fn doubled_pawns(&self, side: Color) -> u8 {
+        let pawns = match side {
+            Color::Black => self.black_pieces,
+            Color::White => self.white_pieces,
+        }[Piece::Pawn as usize];
+        let bits = pawns.0;
+        let files = [
+            0x10101010_10101010,
+            0x20202020_20202020,
+            0x40404040_40404040,
+            0x80808080_80808080,
+            0x01010101_01010101,
+            0x02020202_02020202,
+            0x04040404_04040404,
+            0x08080808_08080808,
+        ];
+        let mut doubled_pawns: u8 = 0;
+        for file in files {
+            let num_pawns = BitBoard(bits & file).len();
+            if num_pawns >= 2 {
+                doubled_pawns += num_pawns as u8;
+            }
+        }
+        doubled_pawns
+    }
+
+    // The number of isolated pawns a side has
+    pub fn isolated_pawns(&self, side: Color) -> u8 {
+        let pawns = match side {
+            Color::Black => self.black_pieces,
+            Color::White => self.white_pieces,
+        }[Piece::Pawn as usize];
+        let bits = pawns.0;
+        let files = [
+            0x00000000_00000000,
+            0x10101010_10101010,
+            0x20202020_20202020,
+            0x40404040_40404040,
+            0x80808080_80808080,
+            0x01010101_01010101,
+            0x02020202_02020202,
+            0x04040404_04040404,
+            0x08080808_08080808,
+            0x00000000_00000000,
+        ];
+        let mut isolated_pawns: u8 = 0;
+        for file_idx in 1..9 {
+            let pawns_left = bits & files[file_idx - 1];
+            let pawns_right = bits & files[file_idx + 1];
+            if (pawns_left | pawns_right) == 0 {
+                isolated_pawns += BitBoard(bits & files[file_idx]).len() as u8;
+            }
+        }
+        isolated_pawns
+    }
+
+    // The number of blocked pawns a side has
+    pub fn blocked_pawns(&self, side: Color) -> u8 {
+        let pawns = match side {
+            Color::Black => self.black_pieces,
+            Color::White => self.white_pieces,
+        }[Piece::Pawn as usize];
+        let opponent_pieces = match !side {
+            Color::Black => self.black_pieces(),
+            Color::White => self.white_pieces(),
+        };
+
+        let mut blocked_pawns: u8 = 0;
+
+        for pawn in pawns {
+            if let Some(in_front) = if side == Color::White {pawn.no()} else {pawn.so()} {
+                if opponent_pieces.contains(in_front) || pawns.contains(in_front) {
+                    blocked_pawns += 1;
+                }
+            }
+        }
+
+        blocked_pawns
     }
 
     pub fn get_smallest_attacker(&self, p: Posn, side: Color) -> Option<Move> {
@@ -659,7 +747,7 @@ mod tests {
     }
     #[test]
     fn take_back_trade() {
-        let mut b = Board::from_fen("rn1qkbnr/ppp2ppp/3pB3/4p3/4P3/5K2/PPPP1PPP/RNBQK2R b - - 0 1")
+        let mut b = Board::from_fen("rn1qkbnr/ppp2ppp/3pB3/4p3/4P3/5N2/PPPP1PPP/RNBQK2R b - - 0 1")
             .expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
@@ -1191,5 +1279,24 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         assert!(evalw != Evaluation::draw());
         assert!(evalb != Evaluation::draw());
         assert!(move_eval != Evaluation::draw());
+    }
+    #[test]
+    fn doubled_pawns() {
+        let b = Board::from_fen("8/P7/PP6/1P6/8/8/8/8 w - - 0 1")
+            .expect("failed to parse fen");
+        assert_eq!(4, b.doubled_pawns(Color::White));
+    }
+    #[test]
+    fn isolated_pawns() {
+        let b = Board::from_fen("8/P1P5/P7/8/8/8/8/8 w - - 0 1")
+            .expect("failed to parse fen");
+        assert_eq!(3, b.isolated_pawns(Color::White));
+    }
+    #[test]
+    fn blocked_pawns() {
+        let b = Board::from_fen("8/p1p5/P1N5/8/8/7P/7P/8 w - - 0 1")
+            .expect("failed to parse fen");
+        assert_eq!(2, b.blocked_pawns(Color::White));
+        assert_eq!(2, b.blocked_pawns(Color::Black));
     }
 }
