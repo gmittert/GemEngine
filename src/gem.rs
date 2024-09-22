@@ -47,6 +47,7 @@ pub struct Gem {
     board: Board,
     work_queue: threadpool::ThreadPool,
     options: GemOptions,
+    tracing_handle: Option<tracing_chrome::FlushGuard>,
 }
 
 impl Gem {
@@ -55,6 +56,7 @@ impl Gem {
             board: board::starting_board(),
             work_queue: threadpool::ThreadPool::new(DEFAULT_THREADS),
             options: GemOptions::default(),
+            tracing_handle: None,
         }
     }
 }
@@ -68,8 +70,21 @@ impl UciEngine for Gem {
         Ok(())
     }
 
-    fn debug(&mut self, _on: bool) -> Result<(), String> {
-        // TODO: Implement debug
+    fn debug(&mut self, on: bool) -> Result<(), String> {
+        if on {
+            // Enable trace emission
+            use tracing_chrome::ChromeLayerBuilder;
+            use tracing_subscriber::prelude::*;
+
+            let (chrome_layer, guard) = ChromeLayerBuilder::new()
+                .include_args(true)
+                .trace_style(tracing_chrome::TraceStyle::Threaded)
+                .build();
+            tracing_subscriber::registry().with(chrome_layer).init();
+            self.tracing_handle = Some(guard);
+        } else {
+            self.tracing_handle = None;
+        }
         Ok(())
     }
 

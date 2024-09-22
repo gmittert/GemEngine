@@ -20,14 +20,14 @@ use crate::parser::Parser;
 // <empty> ::=
 
 pub struct PgnGame {
-    tags: Vec<TagPair>,
-    moves: Vec<Element>,
-    termination: GameTermination,
+    pub tags: Vec<TagPair>,
+    pub moves: Vec<Element>,
+    pub termination: GameTermination,
 }
 
 pub struct TagPair {
-    name: String,
-    value: String,
+    pub name: String,
+    pub value: String,
 }
 
 parser!(TagSectionParser, Vec<TagPair>, |text| {
@@ -52,6 +52,7 @@ parser!(TagPairParser, TagPair, |text| {
         })
 });
 
+#[derive(PartialEq, Eq)]
 pub enum GameTermination {
     WhiteWins,
     BlackWins,
@@ -65,7 +66,6 @@ parser!(GameTerminationParser, GameTermination, |text| {
         .or(parser::Ident::new("1/2-1/2"))
         .or(parser::Ident::new("*"))
         .parse(text)?;
-    println!("Successfully get a game termination: {parsed}");
 
     match parsed {
         "1-0" => Some((GameTermination::WhiteWins, rest)),
@@ -76,20 +76,17 @@ parser!(GameTerminationParser, GameTermination, |text| {
     }
 });
 
-#[derive(Clone)]
-pub struct MoveText {}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct Ply {
-    mov: String,
-    comment: Option<String>,
+    pub mov: String,
+    pub comment: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Element {
-    move_num: u64,
-    white: Ply,
-    black: Option<Ply>,
+    pub move_num: u64,
+    pub white: Ply,
+    pub black: Option<Ply>,
 }
 
 parser!(Comment, String, |text| {
@@ -101,7 +98,6 @@ parser!(Comment, String, |text| {
 });
 
 parser!(ElementParser, Element, |text| {
-    println!("Parsing element from: {text}");
     let ply = parser::ZeroOrMore::new(parser::Whitespace::new())
         .then(parser::Word::new())
         .and_then(parser::Optionally::new(Comment::new()));

@@ -65,4 +65,3 @@ macro_rules! parser {
         }
     };
 }
-

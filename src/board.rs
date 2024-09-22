@@ -8,6 +8,9 @@ mod sliding_attacks;
 pub use crate::board::bitboard::*;
 pub use crate::board::moves::*;
 pub use crate::board::posn::*;
+use crate::parser::Parser;
+use crate::pgn;
+use crate::pgn::GameTermination;
 use crate::zobrist::ZOBRIST_KEYS;
 use std::fmt;
 
@@ -121,6 +124,25 @@ impl PartialEq for Board {
 }
 
 impl Board {
+    pub fn from_pgn(s: &str) -> Option<Board> {
+        let (pgn_game, _) = pgn::PgnGameParser::new().parse(s)?;
+        if pgn_game.termination != GameTermination::NoResult {
+            return None;
+        }
+        let mut out = starting_board();
+        for pgn::Element {
+            white: white_move,
+            black: black_move,
+            ..
+        } in pgn_game.moves
+        {
+            out.make_san_move(&white_move.mov).ok()?;
+            if let Some(black_move) = black_move {
+                out.make_san_move(&black_move.mov).ok()?;
+            }
+        }
+        Some(out)
+    }
     pub fn from_fen(s: &str) -> Option<Board> {
         let mut sections = s.split(" ");
         let placement = sections.next()?;
@@ -229,6 +251,100 @@ impl Board {
         self.make_move(&self.from_algeabraic(m));
         Ok(())
     }
+
+    pub fn make_san_move(&mut self, m: &str) -> Result<(), String> {
+        let mut stream = m.chars().rev();
+        let mut curr = stream.next();
+        let mut promotion = None;
+        while let Some(unwrapped) = curr {
+            match unwrapped {
+                '+' | '#' => curr = stream.next(),
+                'K' => promotion = Some(Piece::King),
+                'Q' => promotion = Some(Piece::Queen),
+                'R' => promotion = Some(Piece::Rook),
+                'B' => promotion = Some(Piece::Bishop),
+                'N' => promotion = Some(Piece::Knight),
+                '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' => {
+                    break;
+                }
+                _ => return Err("Invalid character in san move".to_string()),
+            }
+        }
+        let rank = Rank::from(curr.ok_or("Failed to read target rank from move")?)
+            .ok_or("Failed to parse rank")?;
+        let file = File::from(
+            stream
+                .next()
+                .ok_or("Failed to read target file from move")?,
+        )
+        .ok_or("Failed to parse file")?;
+        let mut piece = Piece::Pawn;
+        let mut disamb_file = None;
+        let mut disamb_rank = None;
+
+        while let Some(curr) = stream.next() {
+            match curr {
+                'K' => piece = Piece::King,
+                'Q' => piece = Piece::Queen,
+                'R' => piece = Piece::Rook,
+                'B' => piece = Piece::Bishop,
+                'N' => piece = Piece::Knight,
+                'x' => (),
+                '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' => {
+                    disamb_rank =
+                        Some(Rank::from(curr).ok_or("Failed to parse disambiguation rank")?)
+                }
+                'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' => {
+                    disamb_file =
+                        Some(File::from(curr).ok_or("Failed to parse disambiguation file")?)
+                }
+                _ => return Err("Invalid character in san move".to_string()),
+            };
+        }
+
+        let to = Posn::from(rank, file);
+        let mv = self
+            .find_from(to, piece, promotion, disamb_file, disamb_rank)
+            .ok_or("Failed to find from square")?;
+        self.make_move(&mv);
+        Ok(())
+    }
+
+    pub fn find_from(
+        &self,
+        to: Posn,
+        p: Piece,
+        promotion: Option<Piece>,
+        disamb_file: Option<File>,
+        disamb_rank: Option<Rank>,
+    ) -> Option<Move> {
+        let mut moves = Vec::new();
+        match p {
+            Piece::Pawn => self.pawn_moves(&mut moves),
+            Piece::Rook => self.rook_moves(&mut moves),
+            Piece::Knight => self.knight_moves(&mut moves),
+            Piece::Bishop => self.bishop_moves(&mut moves),
+            Piece::Queen => self.queen_moves(&mut moves),
+            Piece::King => self.king_moves(&mut moves),
+        }
+        for m in moves {
+            if let Some(needed_file) = disamb_file {
+                if m.from.file() != needed_file {
+                    continue;
+                }
+            }
+            if let Some(needed_rank) = disamb_rank {
+                if m.from.rank() != needed_rank {
+                    continue;
+                }
+            }
+            if m.to == to && m.promotion == promotion {
+                return Some(m);
+            }
+        }
+        None
+    }
+
     pub fn add_piece(&mut self, c: Color, p: Piece, pos: Posn) {
         match c {
             Color::Black => {
@@ -657,5 +773,64 @@ mod tests {
         board.make_move(&m);
         board.undo_move(&m);
         assert_eq!(board, board2);
+    }
+
+    #[test]
+    fn from_pgn() {
+        let pgn = r###"        
+[Event "?"]
+[Site "?"]
+[Date "2024.08.21"]
+[Round "?"]
+[White "gem"]
+[Black "gem"]
+[Result "1/2-1/2"]
+[ECO "A00"]
+[GameDuration "00:09:10"]
+[GameEndTime "2024-08-21T22:35:21.457 PDT"]
+[GameStartTime "2024-08-21T22:26:11.364 PDT"]
+[Opening "Van't Kruijs Opening"]
+[PlyCount "110"]
+[TimeControl "6/move"]
+
+1. e3 {+0.04/8 5.0s} d5 {-0.04/7 5.0s} 2. Nf3 {0.00/7 5.0s} Qd6 {-0.01/7 5.0s}
+3. c4 {0.00/7 5.0s} dxc4 {-0.01/7 5.0s} 4. Qa4+ {+0.03/6 5.0s}
+Nc6 {-0.02/7 5.0s} 5. Na3 {0.00/7 5.0s} a6 {-0.02/7 5.0s} 6. Nxc4 {+0.02/6 5.0s}
+Qd7 {-0.03/7 5.0s} 7. Qb3 {+0.01/7 5.0s} Nf6 {-0.02/7 5.0s}
+8. Nce5 {+0.02/7 5.0s} Nxe5 {-0.04/7 5.0s} 9. Nxe5 {+0.02/7 5.0s}
+Qd5 {-0.05/7 5.0s} 10. d4 {+0.05/6 5.0s} e6 {-0.02/6 5.0s} 11. f3 {+0.04/6 5.0s}
+b5 {-0.01/6 5.0s} 12. Kd2 {+0.03/6 5.0s} h5 {-0.02/7 5.0s} 13. h4 {+0.02/6 5.0s}
+Bb7 {-0.02/7 5.0s} 14. Nd3 {+0.02/6 5.0s} Qd6 {-0.02/7 5.0s}
+15. a4 {+0.02/6 5.0s} b4 {-0.03/7 5.0s} 16. Nc5 {+0.03/7 5.0s}
+Bc8 {-0.04/7 5.0s} 17. a5 {+0.03/7 5.0s} Nd7 {-0.04/7 5.0s}
+18. Ne4 {+0.04/7 5.0s} Qd5 {-0.04/7 5.0s} 19. Bc4 {+0.06/7 5.0s}
+Qb7 {-0.06/7 5.0s} 20. Kd3 {+0.05/7 5.0s} Qc6 {-0.06/7 5.0s}
+21. Bd2 {+0.05/7 5.0s} Rb8 {-0.06/7 5.0s} 22. Qa4 {+0.06/6 5.0s}
+Qxa4 {-0.05/7 5.0s} 23. Rxa4 {+0.05/7 5.0s} Bb7 {-0.06/7 5.0s}
+24. Raa1 {+0.05/7 5.0s} Rd8 {-0.06/7 5.0s} 25. Kc2 {+0.05/7 5.0s}
+Rb8 {-0.06/7 5.0s} 26. Be1 {+0.06/7 5.0s} Rh6 {-0.07/7 5.0s}
+27. Bg3 {+0.06/7 5.0s} Rc8 {-0.07/7 5.0s} 28. Rh3 {+0.05/7 5.0s}
+f5 {-0.05/7 5.0s} 29. Ng5 {+0.05/7 5.0s} c5 {-0.05/7 5.0s}
+30. Nxe6 {+0.04/7 5.0s} cxd4 {-0.03/7 5.0s} 31. Nxf8 {+0.04/7 5.0s}
+Kxf8 {-0.09/7 5.0s} 32. Kb3 {+0.09/7 5.0s} dxe3 {-0.09/7 5.0s}
+33. Rd1 {+0.11/7 5.0s} Ke7 {-0.11/7 5.0s} 34. Re1 {+1.03/7 5.0s}
+Rf8 {-0.09/7 5.0s} 35. Rxe3+ {+1.09/7 5.0s} Kd8 {-1.11/8 5.0s}
+36. Bf4 {+1.11/7 5.0s} Rg6 {-1.12/8 5.0s} 37. Bg5+ {+1.12/8 5.0s}
+Kc7 {-1.11/8 5.0s} 38. Kxb4 {+1.11/7 5.0s} f4 {-1.12/7 5.0s}
+39. Re1 {+1.13/7 5.0s} Kc6 {-1.14/7 5.0s} 40. Bd3 {+3.06/7 5.0s}
+Rgf6 {-3.06/8 5.0s} 41. Be4+ {+3.06/7 5.0s} Kc7 {-3.11/8 5.0s}
+42. Bxf6 {+3.11/7 5.0s} gxf6 {-3.10/8 5.0s} 43. Bxb7 {+3.09/8 5.0s}
+Kxb7 {-3.06/8 5.0s} 44. Re7 {+3.07/8 5.0s} Kc7 {-3.08/8 5.0s}
+45. Ka3 {+3.91/9 5.0s} Rg8 {-3.91/8 5.0s} 46. Rh2 {+3.10/8 5.0s}
+Rb8 {-3.94/8 5.0s} 47. b4 {+3.96/8 5.0s} Rb5 {-3.95/8 5.0s}
+48. Re6 {+3.98/8 5.0s} Re5 {-3.98/9 5.0s} 49. Rxa6 {+3.98/9 5.0s}
+Re3+ {-3.98/8 5.0s} 50. Ka4 {+3.98/9 5.0s} Re2 {-4.00/9 5.0s}
+51. Ra7+ {+3.98/9 5.0s} Kc8 {-4.00/9 5.0s} 52. Ra8+ {+3.98/9 5.0s}
+Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
+54. Ra8+ {+3.98/9 5.0s} Nb8 {-4.00/9 5.0s} 55. Ra7 {+4.00/8 5.0s}
+Nd7 {-4.00/9 5.0s, Draw by 3-fold repetition} *
+    "###;
+        let board = Board::from_pgn(pgn);
+        assert!(board.is_some());
     }
 }

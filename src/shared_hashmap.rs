@@ -1,10 +1,12 @@
 use std::sync::atomic::{fence, AtomicU64, AtomicUsize, Ordering};
 
+#[derive(Debug)]
 pub struct SharedHashMapEntry {
     key: AtomicU64,
     val: AtomicU64,
 }
 
+#[derive(Debug)]
 pub struct SharedHashMap<const N: usize> {
     // 1GiB
     data: Vec<SharedHashMapEntry>,

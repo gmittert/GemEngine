@@ -1,3 +1,5 @@
+use tracing::{field, trace_span, Level};
+
 pub use crate::board::*;
 use crate::shared_hashmap::SharedHashMap;
 use std::cmp::max;
@@ -295,8 +297,13 @@ impl Board {
                 let m = m;
                 let cloned = cache.clone();
                 let should_stop = should_stop.clone();
+                let to_play = self.to_play;
                 queue.execute(move || {
                     let best_score = Evaluation::lost();
+                    let span = match to_play {
+                        Color::Black => trace_span!("white", inspecting = %m, alpha = %Evaluation::lost(), beta = %-best_score.inc_mate(), eval = field::Empty).entered(),
+                        Color::White => trace_span!("black", inspecting = %m, alpha = %Evaluation::lost(), beta = %-best_score.inc_mate(), eval = field::Empty).entered(),
+                    };
                     let eval = -new_b
                         .alpha_beta(
                             Evaluation::lost(),
@@ -306,6 +313,9 @@ impl Board {
                             should_stop.clone(),
                         )
                         .dec_mate();
+
+                    span.record("eval", format!("{eval}"));
+                    drop(span);
 
                     let _ = tx.send((eval, m));
                 });
@@ -368,7 +378,10 @@ impl Board {
                 - self.static_exchange_evaluation(capture.to, self.to_play);
 
             if value >= Evaluation::draw() && !self.in_check(!self.to_play) {
+                let span = trace_span!("quiesece", alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered();
                 let eval = -self.quiesce(-beta, -alpha.inc_mate()).dec_mate();
+                span.record("eval", format!("{eval}"));
+                drop(span);
                 if eval >= beta {
                     self.undo_move(&m);
 
@@ -411,13 +424,18 @@ impl Board {
                     || (node_type == NodeType::Upper && eval < alpha)
                     || (node_type == NodeType::Lower && eval >= beta))
             {
+                tracing::event!(Level::INFO, name = "Retrieved from cache", "eval" = %eval);
                 return eval;
             }
         }
         // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't
         // want to compute taking a pawn with our queen and just stop computing there, for example.
         if self.half_move >= target_depth {
-            return self.quiesce(alpha, beta);
+            let span = trace_span!("quiesece", alpha = %alpha, beta = %beta, eval = field::Empty)
+                .entered();
+            let eval = self.quiesce(alpha, beta);
+            span.record("eval", format!("{eval}"));
+            return eval;
         }
         let mut alpha = alpha;
         let mut had_legal_move = false;
@@ -433,15 +451,42 @@ impl Board {
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
                 had_legal_move = true;
-                let eval = -self
-                    .alpha_beta(
-                        -beta,
-                        -alpha.inc_mate(),
-                        target_depth,
-                        cache,
-                        should_stop.clone(),
-                    )
-                    .dec_mate();
+                let span = match self.to_play {
+                    Color::Black => trace_span!("white", inspecting = %m, alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered(),
+                    Color::White => trace_span!("black", inspecting = %m, alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered(),
+                };
+                // Check for 3 fold repetition
+                let mut is_three_fold = false;
+                if let Some(irr) = self.last_irreversible.last() {
+                    if self.half_move - irr >= 12 {
+                        for prev_state in &self.moves[*irr as usize..] {
+                            if *prev_state == self.hash {
+                                tracing::event!(Level::ERROR, "Three fold!");
+                                println!(
+                                    "Color: {:?} Detected threefold due to move!",
+                                    self.to_play
+                                );
+                                is_three_fold = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                let eval = if is_three_fold {
+                    Evaluation::draw()
+                } else {
+                    -self
+                        .alpha_beta(
+                            -beta,
+                            -alpha.inc_mate(),
+                            target_depth,
+                            cache,
+                            should_stop.clone(),
+                        )
+                        .dec_mate()
+                };
+                span.record("eval", format!("{eval}"));
+                drop(span);
 
                 if eval >= beta {
                     self.undo_move(&m);
@@ -457,10 +502,12 @@ impl Board {
                             PackedTTEntry::new(beta, self.half_move, best_move, NodeType::Upper).0,
                         );
                     }
+                    tracing::event!(Level::INFO, name = "Beta cutoff", "eval" = %eval, "beta" = %beta);
                     return beta;
                 }
 
                 if eval > alpha {
+                    tracing::event!(Level::INFO, name = "Raised Alpha!", "alpha" = %alpha, "eval" = %eval);
                     is_pv_node = true;
                     alpha = eval;
                     best_move = Some(a);
@@ -508,17 +555,8 @@ impl Board {
         eval
     }
 
+    #[tracing::instrument]
     pub fn eval(&self, to_play: Color) -> Evaluation {
-        // Check for 3 fold repetition
-        if let Some(irr) = self.last_irreversible.last() {
-            if self.half_move - irr >= 12 {
-                for prev_state in &self.moves[*irr as usize..] {
-                    if *prev_state == self.hash {
-                        return Evaluation::draw();
-                    }
-                }
-            }
-        }
         // Let's start with a simple materialistic evaluation
         let king_diff: i16 = self.white_pieces[Piece::King as usize].len() as i16
             - self.black_pieces[Piece::King as usize].len() as i16;
@@ -905,7 +943,7 @@ mod tests {
         assert!(m.unwrap().to != c5());
     }
     #[test]
-    fn repitition() {
+    fn repetition() {
         let mut board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
             .expect("bad fen?");
         board
@@ -1083,5 +1121,70 @@ mod tests {
             assert_eq!(tt.best_move(), best_move);
             assert_eq!(tt.node_type(), node_type);
         }
+    }
+
+    #[test]
+    fn repetition_bug() {
+        let pgn = r###"
+[Event "?"]
+[Site "?"]
+[Date "2024.08.21"]
+[Round "?"]
+[White "gem"]
+[Black "gem"]
+[Result "1/2-1/2"]
+[ECO "A00"]
+[GameDuration "00:09:10"]
+[GameEndTime "2024-08-21T22:35:21.457 PDT"]
+[GameStartTime "2024-08-21T22:26:11.364 PDT"]
+[Opening "Van't Kruijs Opening"]
+[PlyCount "110"]
+[TimeControl "6/move"]
+
+1. e3 {+0.04/8 5.0s} d5 {-0.04/7 5.0s} 2. Nf3 {0.00/7 5.0s} Qd6 {-0.01/7 5.0s}
+3. c4 {0.00/7 5.0s} dxc4 {-0.01/7 5.0s} 4. Qa4+ {+0.03/6 5.0s}
+Nc6 {-0.02/7 5.0s} 5. Na3 {0.00/7 5.0s} a6 {-0.02/7 5.0s} 6. Nxc4 {+0.02/6 5.0s}
+Qd7 {-0.03/7 5.0s} 7. Qb3 {+0.01/7 5.0s} Nf6 {-0.02/7 5.0s}
+8. Nce5 {+0.02/7 5.0s} Nxe5 {-0.04/7 5.0s} 9. Nxe5 {+0.02/7 5.0s}
+Qd5 {-0.05/7 5.0s} 10. d4 {+0.05/6 5.0s} e6 {-0.02/6 5.0s} 11. f3 {+0.04/6 5.0s}
+b5 {-0.01/6 5.0s} 12. Kd2 {+0.03/6 5.0s} h5 {-0.02/7 5.0s} 13. h4 {+0.02/6 5.0s}
+Bb7 {-0.02/7 5.0s} 14. Nd3 {+0.02/6 5.0s} Qd6 {-0.02/7 5.0s}
+15. a4 {+0.02/6 5.0s} b4 {-0.03/7 5.0s} 16. Nc5 {+0.03/7 5.0s}
+Bc8 {-0.04/7 5.0s} 17. a5 {+0.03/7 5.0s} Nd7 {-0.04/7 5.0s}
+18. Ne4 {+0.04/7 5.0s} Qd5 {-0.04/7 5.0s} 19. Bc4 {+0.06/7 5.0s}
+Qb7 {-0.06/7 5.0s} 20. Kd3 {+0.05/7 5.0s} Qc6 {-0.06/7 5.0s}
+21. Bd2 {+0.05/7 5.0s} Rb8 {-0.06/7 5.0s} 22. Qa4 {+0.06/6 5.0s}
+Qxa4 {-0.05/7 5.0s} 23. Rxa4 {+0.05/7 5.0s} Bb7 {-0.06/7 5.0s}
+24. Raa1 {+0.05/7 5.0s} Rd8 {-0.06/7 5.0s} 25. Kc2 {+0.05/7 5.0s}
+Rb8 {-0.06/7 5.0s} 26. Be1 {+0.06/7 5.0s} Rh6 {-0.07/7 5.0s}
+27. Bg3 {+0.06/7 5.0s} Rc8 {-0.07/7 5.0s} 28. Rh3 {+0.05/7 5.0s}
+f5 {-0.05/7 5.0s} 29. Ng5 {+0.05/7 5.0s} c5 {-0.05/7 5.0s}
+30. Nxe6 {+0.04/7 5.0s} cxd4 {-0.03/7 5.0s} 31. Nxf8 {+0.04/7 5.0s}
+Kxf8 {-0.09/7 5.0s} 32. Kb3 {+0.09/7 5.0s} dxe3 {-0.09/7 5.0s}
+33. Rd1 {+0.11/7 5.0s} Ke7 {-0.11/7 5.0s} 34. Re1 {+1.03/7 5.0s}
+Rf8 {-0.09/7 5.0s} 35. Rxe3+ {+1.09/7 5.0s} Kd8 {-1.11/8 5.0s}
+36. Bf4 {+1.11/7 5.0s} Rg6 {-1.12/8 5.0s} 37. Bg5+ {+1.12/8 5.0s}
+Kc7 {-1.11/8 5.0s} 38. Kxb4 {+1.11/7 5.0s} f4 {-1.12/7 5.0s}
+39. Re1 {+1.13/7 5.0s} Kc6 {-1.14/7 5.0s} 40. Bd3 {+3.06/7 5.0s}
+Rgf6 {-3.06/8 5.0s} 41. Be4+ {+3.06/7 5.0s} Kc7 {-3.11/8 5.0s}
+42. Bxf6 {+3.11/7 5.0s} gxf6 {-3.10/8 5.0s} 43. Bxb7 {+3.09/8 5.0s}
+Kxb7 {-3.06/8 5.0s} 44. Re7 {+3.07/8 5.0s} Kc7 {-3.08/8 5.0s}
+45. Ka3 {+3.91/9 5.0s} Rg8 {-3.91/8 5.0s} 46. Rh2 {+3.10/8 5.0s}
+Rb8 {-3.94/8 5.0s} 47. b4 {+3.96/8 5.0s} Rb5 {-3.95/8 5.0s}
+48. Re6 {+3.98/8 5.0s} Re5 {-3.98/9 5.0s} 49. Rxa6 {+3.98/9 5.0s}
+Re3+ {-3.98/8 5.0s} 50. Ka4 {+3.98/9 5.0s} Re2 {-4.00/9 5.0s}
+51. Ra7+ {+3.98/9 5.0s} Kc8 {-4.00/9 5.0s} 52. Ra8+ {+3.98/9 5.0s}
+Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
+54. Ra8+ {+3.98/9 5.0s} Nb8 {-4.00/9 5.0s} *"###;
+        let mut board = Board::from_pgn(pgn).expect("bad pgn?");
+        let pool = threadpool::ThreadPool::new(1);
+        let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
+        let (_, move_eval) = board.best_move(5, &pool, cache.clone(), None);
+
+        let evalw = board.eval(Color::White);
+        let evalb = board.eval(Color::Black);
+        assert!(evalw != Evaluation::draw());
+        assert!(evalb != Evaluation::draw());
+        assert!(move_eval != Evaluation::draw());
     }
 }
