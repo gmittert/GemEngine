@@ -253,6 +253,65 @@ impl Board {
     }
 
     pub fn make_san_move(&mut self, m: &str) -> Result<(), String> {
+        if m == "O-O" {
+            let mv = match self.to_play {
+                Color::Black => Move {
+                    from: e8(),
+                    to: g8(),
+                    piece: Piece::King,
+                    capture: None,
+                    promotion: None,
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_queen: false,
+                    is_castle_king: true,
+                },
+                Color::White => Move {
+                    from: e1(),
+                    to: g1(),
+                    piece: Piece::King,
+                    capture: None,
+                    promotion: None,
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_queen: false,
+                    is_castle_king: true,
+                },
+            };
+            self.make_move(&mv);
+            return Ok(());
+        } else if m == "O-O-O" {
+            let mv = match self.to_play {
+                Color::Black => Move {
+                    from: e8(),
+                    to: b8(),
+                    piece: Piece::King,
+                    capture: None,
+                    promotion: None,
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_queen: true,
+                    is_castle_king: false,
+                },
+                Color::White => Move {
+                    from: e1(),
+                    to: b1(),
+                    piece: Piece::King,
+                    capture: None,
+                    promotion: None,
+                    is_check: false,
+                    is_mate: false,
+                    is_en_passant: false,
+                    is_castle_queen: true,
+                    is_castle_king: false,
+                },
+            };
+            self.make_move(&mv);
+            return Ok(());
+        }
         let mut stream = m.chars().rev();
         let mut curr = stream.next();
         let mut promotion = None;

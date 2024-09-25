@@ -298,21 +298,35 @@ impl Board {
                 let cloned = cache.clone();
                 let should_stop = should_stop.clone();
                 let to_play = self.to_play;
+
+                if let Some(irr) = self.last_irreversible.last() {
+                    if self.half_move - irr >= 8 {
+                        for prev_state in &self.moves[*irr as usize..] {
+                            if *prev_state == self.hash {
+                                tracing::event!(Level::ERROR, "Three fold!");
+                                let _ = tx.send((Evaluation::draw(), m));
+                                continue;
+                            }
+                        }
+                    }
+                }
+
                 queue.execute(move || {
                     let best_score = Evaluation::lost();
                     let span = match to_play {
                         Color::Black => trace_span!("white", inspecting = %m, alpha = %Evaluation::lost(), beta = %-best_score.inc_mate(), eval = field::Empty).entered(),
                         Color::White => trace_span!("black", inspecting = %m, alpha = %Evaluation::lost(), beta = %-best_score.inc_mate(), eval = field::Empty).entered(),
                     };
+                    // Check for 3 fold repetition
                     let eval = -new_b
-                        .alpha_beta(
-                            Evaluation::lost(),
-                            -best_score.inc_mate(),
-                            target_depth,
-                            cloned.as_ref(),
-                            should_stop.clone(),
-                        )
-                        .dec_mate();
+                            .alpha_beta(
+                                Evaluation::lost(),
+                                -best_score.inc_mate(),
+                                target_depth,
+                                cloned.as_ref(),
+                                should_stop.clone(),
+                            )
+                            .dec_mate();
 
                     span.record("eval", format!("{eval}"));
                     drop(span);
@@ -458,7 +472,7 @@ impl Board {
                 // Check for 3 fold repetition
                 let mut is_three_fold = false;
                 if let Some(irr) = self.last_irreversible.last() {
-                    if self.half_move - irr >= 12 {
+                    if self.half_move - irr >= 8 {
                         for prev_state in &self.moves[*irr as usize..] {
                             if *prev_state == self.hash {
                                 tracing::event!(Level::ERROR, "Three fold!");
@@ -580,9 +594,12 @@ impl Board {
             | self.knight_attacks(Color::Black);
 
         let attacks_diff = attacks_white.len() as i16 - attacks_black.len() as i16;
-        let doubled_pawns = self.doubled_pawns(Color::White) as i16 - self.doubled_pawns(Color::Black) as i16;
-        let isolated_pawns = self.isolated_pawns(Color::White) as i16 - self.isolated_pawns(Color::Black) as i16;
-        let blocked_pawns = self.blocked_pawns(Color::White) as i16 - self.blocked_pawns(Color::Black) as i16;
+        let doubled_pawns =
+            self.doubled_pawns(Color::White) as i16 - self.doubled_pawns(Color::Black) as i16;
+        let isolated_pawns =
+            self.isolated_pawns(Color::White) as i16 - self.isolated_pawns(Color::Black) as i16;
+        let blocked_pawns =
+            self.blocked_pawns(Color::White) as i16 - self.blocked_pawns(Color::Black) as i16;
 
         let eval = PIECE_VALUES[Piece::King as usize].0 * king_diff
             + PIECE_VALUES[Piece::Queen as usize].0 * queen_diff
@@ -672,7 +689,11 @@ impl Board {
         let mut blocked_pawns: u8 = 0;
 
         for pawn in pawns {
-            if let Some(in_front) = if side == Color::White {pawn.no()} else {pawn.so()} {
+            if let Some(in_front) = if side == Color::White {
+                pawn.no()
+            } else {
+                pawn.so()
+            } {
                 if opponent_pieces.contains(in_front) || pawns.contains(in_front) {
                     blocked_pawns += 1;
                 }
@@ -1282,21 +1303,71 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
     }
     #[test]
     fn doubled_pawns() {
-        let b = Board::from_fen("8/P7/PP6/1P6/8/8/8/8 w - - 0 1")
-            .expect("failed to parse fen");
+        let b = Board::from_fen("8/P7/PP6/1P6/8/8/8/8 w - - 0 1").expect("failed to parse fen");
         assert_eq!(4, b.doubled_pawns(Color::White));
     }
     #[test]
     fn isolated_pawns() {
-        let b = Board::from_fen("8/P1P5/P7/8/8/8/8/8 w - - 0 1")
-            .expect("failed to parse fen");
+        let b = Board::from_fen("8/P1P5/P7/8/8/8/8/8 w - - 0 1").expect("failed to parse fen");
         assert_eq!(3, b.isolated_pawns(Color::White));
     }
     #[test]
     fn blocked_pawns() {
-        let b = Board::from_fen("8/p1p5/P1N5/8/8/7P/7P/8 w - - 0 1")
-            .expect("failed to parse fen");
+        let b = Board::from_fen("8/p1p5/P1N5/8/8/7P/7P/8 w - - 0 1").expect("failed to parse fen");
         assert_eq!(2, b.blocked_pawns(Color::White));
         assert_eq!(2, b.blocked_pawns(Color::Black));
+    }
+
+    #[test]
+    fn repetition_bug2() {
+        let pgn = r###"
+[Event "?"]
+[Site "?"]
+[Date "2024.09.22"]
+[Round "?"]
+[White "gem"]
+[Black "Human"]
+[Result "1/2-1/2"]
+[ECO "A40"]
+[GameDuration "00:09:27"]
+[GameEndTime "2024-09-22T13:50:09.343 PDT"]
+[GameStartTime "2024-09-22T13:40:41.980 PDT"]
+[Opening "Queen's pawn"]
+[PlyCount "89"]
+[TimeControl "inf"]
+
+1. d4 {+0.03/8 5.0s} e6 {3.4s} 2. Nc3 {+0.02/7 5.0s} Bb4 {1.6s}
+3. Qd3 {+0.05/8 5.0s} Nc6 {5.0s} 4. d5 {+0.08/7 5.0s} Ne5 {1.2s}
+5. Qd4 {+0.13/7 5.0s} Bd6 {1.8s} 6. Nb5 {+0.63/6 5.0s} Ne7 {2.2s}
+7. Nxd6+ {+2.17/7 5.0s} cxd6 {3.3s} 8. f4 {+2.07/7 5.0s} Nf5 {33s}
+9. Qc3 {+2.75/7 5.0s} Ng4 {1.7s} 10. e4 {+2.52/7 5.0s} Qb6 {2.0s}
+11. Nh3 {+2.47/7 5.0s} Nfe3 {3.6s} 12. Kd2 {+2.47/7 5.0s} O-O {5.0s}
+13. Be2 {+2.49/7 5.0s} e5 {8.0s} 14. f5 {+2.53/7 5.0s} h6 {2.7s}
+15. Re1 {+2.60/7 5.0s} Re8 {2.3s} 16. Bf3 {+3.18/7 5.0s} Qd4+ {5.4s}
+17. Qxd4 {+3.01/7 5.0s} exd4 {4.9s} 18. Bxg4 {+3.03/8 5.0s} Nxg4 {3.0s}
+19. Kd3 {+3.00/8 5.0s} b6 {55s} 20. Kxd4 {+3.02/8 5.0s} Bb7 {9.7s}
+21. Bf4 {+3.02/7 5.0s} Rac8 {6.8s} 22. c3 {+2.99/7 5.0s} Ba6 {6.7s}
+23. b3 {+3.00/7 5.0s} Ne5 {8.2s} 24. Re3 {+3.02/7 5.0s} Ng4 {5.8s}
+25. Rg3 {+3.02/7 5.0s} Nf6 {11s} 26. Re3 {+2.99/7 5.0s} Ng4 {5.9s}
+27. Rg3 {+3.02/7 5.0s} Nf6 {6.7s} 28. Re1 {+2.95/7 5.0s} Nh5 {6.8s}
+29. Rge3 {+2.97/7 5.0s} Nxf4 {7.0s} 30. Nxf4 {+3.49/8 5.0s} Bb7 {13s}
+31. Rg3 {+3.49/7 5.0s} Re5 {11s} 32. Nd3 {+3.55/7 5.0s} Ree8 {8.9s}
+33. Rh3 {+3.50/7 5.0s} Kh7 {7.1s} 34. a4 {+3.50/7 5.0s} g6 {11s}
+35. f6 {+3.50/7 5.0s} h5 {7.0s} 36. g4 {+3.50/7 5.0s} a6 {7.5s}
+37. g5 {+3.99/7 5.0s} a5 {9.8s} 38. Rh4 {+3.58/7 5.0s} Ba6 {7.3s}
+39. Rg1 {+3.58/7 5.0s} Bxd3 {8.0s} 40. Kxd3 {+3.58/8 5.0s} Re5 {7.9s}
+41. Kd4 {+3.57/8 5.0s} Kh8 {5.8s} 42. Kd3 {+3.58/8 5.0s} Kh7 {4.9s}
+43. Kd4 {+3.57/8 5.0s} Rh8 {7.3s} 44. Kc4 {+3.58/8 5.0s} Rc8+ {6.7s} *"###;
+        let mut board = Board::from_pgn(pgn).expect("bad pgn?");
+        let pool = threadpool::ThreadPool::new(64);
+        let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
+        let (best_move, move_eval) = board.best_move(6, &pool, cache.clone(), None);
+
+        let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
+        let evalb = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
+        assert!(evalw != Evaluation::draw());
+        assert!(evalb != Evaluation::draw());
+        assert!(move_eval != Evaluation::draw());
+        assert!(best_move.unwrap().to != d4());
     }
 }
