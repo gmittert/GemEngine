@@ -359,7 +359,7 @@ impl Board {
 
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
         let mut alpha = alpha;
-        let stand_pat = self.eval(self.to_play);
+        let stand_pat = self.eval(alpha, beta, self.to_play);
         if stand_pat >= beta {
             return beta;
         }
@@ -566,7 +566,7 @@ impl Board {
     }
 
     #[tracing::instrument]
-    pub fn eval(&self, to_play: Color) -> Evaluation {
+    pub fn eval(&self, alpha: Evaluation, beta: Evaluation, to_play: Color) -> Evaluation {
         // Let's start with a simple materialistic evaluation
         let king_diff: i16 = self.white_pieces[Piece::King as usize].len() as i16
             - self.black_pieces[Piece::King as usize].len() as i16;
@@ -580,6 +580,28 @@ impl Board {
             - self.black_pieces[Piece::Knight as usize].len() as i16;
         let pawn_diff: i16 = self.white_pieces[Piece::Pawn as usize].len() as i16
             - self.black_pieces[Piece::Pawn as usize].len() as i16;
+
+        let phase1_eval: i16 = PIECE_VALUES[Piece::King as usize].0 * king_diff
+            + PIECE_VALUES[Piece::Queen as usize].0 * queen_diff
+            + PIECE_VALUES[Piece::Rook as usize].0 * rook_diff
+            + PIECE_VALUES[Piece::Bishop as usize].0 * bishop_diff
+            + PIECE_VALUES[Piece::Knight as usize].0 * knight_diff
+            + PIECE_VALUES[Piece::Pawn as usize].0 * pawn_diff;
+
+        // Lazily evaluate the more expensive parts. If we're already too far out of range of alpha
+        // and beta, don't bother trying to compute the minutia.
+        if (alpha.0 - phase1_eval) > 200 {
+            return match to_play {
+                Color::Black => -Evaluation(phase1_eval),
+                Color::White => Evaluation(phase1_eval),
+            };
+        }
+        if (phase1_eval - beta.0) > 200 {
+            return match to_play {
+                Color::Black => -Evaluation(phase1_eval),
+                Color::White => Evaluation(phase1_eval),
+            };
+        }
 
         let attacks_white = self.rook_attacks(Color::White)
             | self.queen_attacks(Color::White)
@@ -600,21 +622,14 @@ impl Board {
             self.isolated_pawns(Color::White) as i16 - self.isolated_pawns(Color::Black) as i16;
         let blocked_pawns =
             self.blocked_pawns(Color::White) as i16 - self.blocked_pawns(Color::Black) as i16;
-
-        let eval = PIECE_VALUES[Piece::King as usize].0 * king_diff
-            + PIECE_VALUES[Piece::Queen as usize].0 * queen_diff
-            + PIECE_VALUES[Piece::Rook as usize].0 * rook_diff
-            + PIECE_VALUES[Piece::Bishop as usize].0 * bishop_diff
-            + PIECE_VALUES[Piece::Knight as usize].0 * knight_diff
-            + PIECE_VALUES[Piece::Pawn as usize].0 * pawn_diff
-            + attacks_diff as i16
+        let phase2_eval = phase1_eval + attacks_diff as i16
             - 20 * doubled_pawns
             - 30 * isolated_pawns
             - 10 * blocked_pawns;
 
         match to_play {
-            Color::Black => -Evaluation(eval),
-            Color::White => Evaluation(eval),
+            Color::Black => -Evaluation(phase2_eval),
+            Color::White => Evaluation(phase2_eval),
         }
     }
 
@@ -735,8 +750,8 @@ mod tests {
     fn white_better() {
         let b = Board::from_fen("rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1")
             .expect("failed to parse fen");
-        let eval_white = b.eval(Color::White);
-        let eval_black = b.eval(Color::Black);
+        let eval_white = b.eval(Evaluation::lost(), Evaluation::won(),Color::White);
+        let eval_black = b.eval(Evaluation::lost(), Evaluation::won(),Color::Black);
         assert!(eval_white.0 > 0);
         assert!(eval_black.0 < 0);
         assert!(eval_black == -eval_white)
@@ -745,8 +760,8 @@ mod tests {
     fn black_better() {
         let b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w - - 0 1")
             .expect("failed to parse fen");
-        let eval_white = b.eval(Color::White);
-        let eval_black = b.eval(Color::Black);
+        let eval_white = b.eval(Evaluation::lost(), Evaluation::won(),Color::White);
+        let eval_black = b.eval(Evaluation::lost(), Evaluation::won(),Color::Black);
         assert!(eval_white.0 < 0);
         assert!(eval_black.0 > 0);
         assert!(eval_black == -eval_white)
@@ -1145,9 +1160,9 @@ mod tests {
             })
             .expect("bad move?");
 
-        let evalw = board.eval(Color::White);
+        let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
         assert!(evalw == Evaluation::draw());
-        let evalb = board.eval(Color::Black);
+        let evalb = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(evalb == Evaluation::draw());
     }
 
@@ -1295,8 +1310,8 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (_, move_eval) = board.best_move(5, &pool, cache.clone(), None);
 
-        let evalw = board.eval(Color::White);
-        let evalb = board.eval(Color::Black);
+        let evalw = board.eval(Evaluation::lost(), Evaluation::won(),Color::White);
+        let evalb = board.eval(Evaluation::lost(), Evaluation::won(),Color::Black);
         assert!(evalw != Evaluation::draw());
         assert!(evalb != Evaluation::draw());
         assert!(move_eval != Evaluation::draw());
