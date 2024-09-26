@@ -608,9 +608,9 @@ impl Board {
             + PIECE_VALUES[Piece::Knight as usize].0 * knight_diff
             + PIECE_VALUES[Piece::Pawn as usize].0 * pawn_diff
             + attacks_diff as i16
-            - 50 * doubled_pawns
-            - 50 * isolated_pawns
-            - 50 * blocked_pawns;
+            - 20 * doubled_pawns
+            - 30 * isolated_pawns
+            - 10 * blocked_pawns;
 
         match to_play {
             Color::Black => -Evaluation(eval),
