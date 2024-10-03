@@ -142,6 +142,9 @@ impl UciEngine for Gem {
             }),
             depth: Some(info.depth.into()),
             time: info.time.as_millis().try_into().ok(),
+            seldepth: Some(info.seldepth as usize),
+            nodes_per_sec: Some(info.nodes_per_sec),
+            nodes: Some(info.nodes),
             ..Default::default()
         };
         uci::info(info);

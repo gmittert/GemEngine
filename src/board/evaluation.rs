@@ -19,6 +19,12 @@ pub enum NodeType {
     Exact,
 }
 
+pub struct EvalResult {
+    eval: Evaluation,
+    seldepth: u16,
+    nodes: usize,
+}
+
 // Layout:
 //     0..15 Evaluation
 //    16..31 Depth
@@ -217,6 +223,9 @@ impl fmt::Display for Evaluation {
 pub struct SearchInfo {
     pub depth: u16,
     pub time: Duration,
+    pub nodes: usize,
+    pub nodes_per_sec: usize,
+    pub seldepth: u16,
 }
 
 impl Board {
@@ -244,18 +253,22 @@ impl Board {
             eval = evalp;
             depth += 1;
         }
+        let time = Instant::now() - start;
         let info = SearchInfo {
             depth,
-            time: Instant::now() - start,
+            seldepth: eval.seldepth,
+            nodes: eval.nodes,
+            nodes_per_sec: eval.nodes / time.as_secs() as usize,
+            time,
         };
-        (m, eval, info)
+        (m, eval.eval, info)
     }
 
     pub fn it_depth_best_move(
         &mut self,
         target_depth: u16,
         queue: &threadpool::ThreadPool,
-    ) -> (Option<Move>, Evaluation) {
+    ) -> (Option<Move>, EvalResult) {
         let cache: Arc<SharedHashMap<{ 1024 * 1024 }>> = Arc::new(SharedHashMap::new());
         let (mut m, mut eval) = self.best_move(1, &queue, cache.clone(), None);
 
@@ -271,7 +284,7 @@ impl Board {
         queue: &threadpool::ThreadPool,
         cache: Arc<SharedHashMap<N>>,
         time: Option<Duration>,
-    ) -> (Option<Move>, Evaluation) {
+    ) -> (Option<Move>, EvalResult) {
         let mut had_legal_move = false;
         let target_depth = self.half_move + depth;
         let should_stop = Arc::new(AtomicBool::new(false));
@@ -282,12 +295,21 @@ impl Board {
                 should_stop.store(true, Ordering::Release);
             });
         }
+        let mut nodes = 0;
+        let mut seldepth = 0;
 
         let (tx, rx) = mpsc::channel();
         for a in self.pseudo_legal_moves_it() {
             let m = self.from_algeabraic(&a);
             if Some(Piece::King) == m.capture {
-                return (None, Evaluation::won());
+                return (
+                    None,
+                    EvalResult {
+                        eval: Evaluation::won(),
+                        nodes: 1,
+                        seldepth: 1,
+                    },
+                );
             }
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
@@ -304,7 +326,14 @@ impl Board {
                         for prev_state in &self.moves[*irr as usize..] {
                             if *prev_state == self.hash {
                                 tracing::event!(Level::ERROR, "Three fold!");
-                                let _ = tx.send((Evaluation::draw(), m));
+                                let _ = tx.send((
+                                    EvalResult {
+                                        eval: Evaluation::draw(),
+                                        nodes: 1,
+                                        seldepth: 1,
+                                    },
+                                    m,
+                                ));
                                 continue;
                             }
                         }
@@ -318,20 +347,24 @@ impl Board {
                         Color::White => trace_span!("black", inspecting = %m, alpha = %Evaluation::lost(), beta = %-best_score.inc_mate(), eval = field::Empty).entered(),
                     };
                     // Check for 3 fold repetition
-                    let eval = -new_b
+                    let eval_res = new_b
                             .alpha_beta(
                                 Evaluation::lost(),
                                 -best_score.inc_mate(),
                                 target_depth,
                                 cloned.as_ref(),
                                 should_stop.clone(),
-                            )
-                            .dec_mate();
+                            );
+                    let eval = -eval_res.eval.dec_mate();
 
                     span.record("eval", format!("{eval}"));
                     drop(span);
 
-                    let _ = tx.send((eval, m));
+                    let _ = tx.send((EvalResult{
+                        eval,
+                        nodes: eval_res.nodes,
+                        seldepth: eval_res.seldepth,
+                    }, m));
                 });
             }
             self.undo_move(&m);
@@ -341,31 +374,60 @@ impl Board {
             let mut best_move = None;
             let mut best_score = Evaluation::lost();
             while let Ok((eval, m)) = rx.recv() {
-                if eval > best_score {
+                nodes += eval.nodes;
+                seldepth = max(seldepth, eval.seldepth + 1);
+                if eval.eval > best_score {
                     best_move = Some(m);
-                    best_score = eval;
+                    best_score = eval.eval;
                 }
             }
-            (best_move, best_score)
+            (
+                best_move,
+                EvalResult {
+                    eval: best_score,
+                    nodes,
+                    seldepth,
+                },
+            )
         } else {
             // We have no legal moves. If we are in check, it's checkmate. If not, it's stalemate
             if self.in_check(self.to_play) {
-                (None, Evaluation::lost())
+                (
+                    None,
+                    EvalResult {
+                        eval: Evaluation::lost(),
+                        nodes: 1,
+                        seldepth: 1,
+                    },
+                )
             } else {
-                (None, Evaluation::draw())
+                (
+                    None,
+                    EvalResult {
+                        eval: Evaluation::draw(),
+                        nodes: 1,
+                        seldepth: 1,
+                    },
+                )
             }
         }
     }
 
-    pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
+    pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> EvalResult {
         let mut alpha = alpha;
         let stand_pat = self.eval(alpha, beta, self.to_play);
         if stand_pat >= beta {
-            return beta;
+            return EvalResult {
+                eval: beta,
+                seldepth: 1,
+                nodes: 1,
+            };
         }
         if alpha < stand_pat {
             alpha = stand_pat;
         }
+        let mut nodes = 0;
+        let mut seldepth = 0;
         let opponent_pieces = match self.to_play {
             Color::Black => self.white_pieces(),
             Color::White => self.black_pieces(),
@@ -393,13 +455,20 @@ impl Board {
 
             if value >= Evaluation::draw() && !self.in_check(!self.to_play) {
                 let span = trace_span!("quiesece", alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered();
-                let eval = -self.quiesce(-beta, -alpha.inc_mate()).dec_mate();
+                let eval_res = self.quiesce(-beta, -alpha.inc_mate());
+                let eval = -eval_res.eval.dec_mate();
+                nodes += eval_res.nodes;
+                seldepth = max(seldepth, eval_res.seldepth + 1);
                 span.record("eval", format!("{eval}"));
                 drop(span);
                 if eval >= beta {
                     self.undo_move(&m);
 
-                    return beta;
+                    return EvalResult {
+                        eval: beta,
+                        seldepth,
+                        nodes,
+                    };
                 }
                 if eval > alpha {
                     alpha = eval;
@@ -407,7 +476,11 @@ impl Board {
             }
             self.undo_move(&m);
         }
-        alpha
+        EvalResult {
+            eval: alpha,
+            seldepth,
+            nodes,
+        }
     }
 
     pub fn alpha_beta<const N: usize>(
@@ -417,9 +490,16 @@ impl Board {
         target_depth: u16,
         cache: &SharedHashMap<N>,
         should_stop: Arc<AtomicBool>,
-    ) -> Evaluation {
+    ) -> EvalResult {
+        let mut seldepth = 0;
+        let mut nodes = 1;
+
         if should_stop.load(Ordering::Acquire) {
-            return Evaluation::draw();
+            return EvalResult {
+                eval: Evaluation::draw(),
+                seldepth: 0,
+                nodes: 0,
+            };
         }
         let mut best_move = None;
         let cached_val = cache.get(self.hash);
@@ -439,7 +519,11 @@ impl Board {
                     || (node_type == NodeType::Lower && eval >= beta))
             {
                 tracing::event!(Level::INFO, name = "Retrieved from cache", "eval" = %eval);
-                return eval;
+                return EvalResult {
+                    eval,
+                    seldepth: 0,
+                    nodes: 1,
+                };
             }
         }
         // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't
@@ -448,7 +532,7 @@ impl Board {
             let span = trace_span!("quiesece", alpha = %alpha, beta = %beta, eval = field::Empty)
                 .entered();
             let eval = self.quiesce(alpha, beta);
-            span.record("eval", format!("{eval}"));
+            span.record("eval", format!("{}", eval.eval));
             return eval;
         }
         let mut alpha = alpha;
@@ -482,19 +566,24 @@ impl Board {
                         }
                     }
                 }
-                let eval = if is_three_fold {
-                    Evaluation::draw()
+                let eval_res = if is_three_fold {
+                    EvalResult {
+                        eval: Evaluation::draw(),
+                        nodes: 1,
+                        seldepth: 1,
+                    }
                 } else {
-                    -self
-                        .alpha_beta(
-                            -beta,
-                            -alpha.inc_mate(),
-                            target_depth,
-                            cache,
-                            should_stop.clone(),
-                        )
-                        .dec_mate()
+                    self.alpha_beta(
+                        -beta,
+                        -alpha.inc_mate(),
+                        target_depth,
+                        cache,
+                        should_stop.clone(),
+                    )
                 };
+                let eval = -eval_res.eval.dec_mate();
+                nodes += eval_res.nodes;
+                seldepth = max(seldepth, eval_res.seldepth + 1);
                 span.record("eval", format!("{eval}"));
                 drop(span);
 
@@ -513,7 +602,11 @@ impl Board {
                         );
                     }
                     tracing::event!(Level::INFO, name = "Beta cutoff", "eval" = %eval, "beta" = %beta);
-                    return beta;
+                    return EvalResult {
+                        eval: beta,
+                        nodes,
+                        seldepth,
+                    };
                 }
 
                 if eval > alpha {
@@ -562,7 +655,11 @@ impl Board {
                 .0,
             );
         }
-        eval
+        EvalResult {
+            eval,
+            nodes,
+            seldepth,
+        }
     }
 
     #[tracing::instrument]
@@ -750,8 +847,8 @@ mod tests {
     fn white_better() {
         let b = Board::from_fen("rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1")
             .expect("failed to parse fen");
-        let eval_white = b.eval(Evaluation::lost(), Evaluation::won(),Color::White);
-        let eval_black = b.eval(Evaluation::lost(), Evaluation::won(),Color::Black);
+        let eval_white = b.eval(Evaluation::lost(), Evaluation::won(), Color::White);
+        let eval_black = b.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(eval_white.0 > 0);
         assert!(eval_black.0 < 0);
         assert!(eval_black == -eval_white)
@@ -760,8 +857,8 @@ mod tests {
     fn black_better() {
         let b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w - - 0 1")
             .expect("failed to parse fen");
-        let eval_white = b.eval(Evaluation::lost(), Evaluation::won(),Color::White);
-        let eval_black = b.eval(Evaluation::lost(), Evaluation::won(),Color::Black);
+        let eval_white = b.eval(Evaluation::lost(), Evaluation::won(), Color::White);
+        let eval_black = b.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(eval_white.0 < 0);
         assert!(eval_black.0 > 0);
         assert!(eval_black == -eval_white)
@@ -810,7 +907,7 @@ mod tests {
         assert_eq!(best_move.from, h1());
         assert_eq!(best_move.to, h8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval, Evaluation::m1());
+        assert_eq!(eval.eval, Evaluation::m1());
     }
     #[test]
     fn won() {
@@ -820,7 +917,7 @@ mod tests {
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (best_move, eval) = b.best_move(4, &pool, cache.clone(), None);
         assert!(best_move.is_none());
-        assert_eq!(eval, Evaluation::won());
+        assert_eq!(eval.eval, Evaluation::won());
     }
     #[test]
     fn lost() {
@@ -830,7 +927,7 @@ mod tests {
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (best_move, eval) = b.best_move(4, &pool, cache.clone(), None);
         assert!(best_move.is_none());
-        assert_eq!(eval, Evaluation::lost());
+        assert_eq!(eval.eval, Evaluation::lost());
     }
     #[test]
     fn stalemate() {
@@ -839,7 +936,7 @@ mod tests {
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (best_move, eval) = b.best_move(4, &pool, cache.clone(), None);
         assert!(best_move.is_none());
-        assert_eq!(eval, Evaluation::draw());
+        assert_eq!(eval.eval, Evaluation::draw());
     }
     #[test]
     fn draw() {
@@ -847,13 +944,14 @@ mod tests {
         let pool = threadpool::ThreadPool::new(1);
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (_, eval) = b.best_move(4, &pool, cache.clone(), None);
-        assert_eq!(eval, Evaluation::draw());
+        println!("Eval: {}", eval.eval);
+        assert_eq!(eval.eval, Evaluation::draw());
 
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (_, eval) = b.best_move(4, &pool, cache.clone(), None);
-        assert_eq!(eval, Evaluation::draw());
+        assert_eq!(eval.eval, Evaluation::draw());
     }
     #[test]
     fn mates() {
@@ -865,18 +963,18 @@ mod tests {
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
-        println!("Eval: {}", eval);
+        println!("Eval: {}", eval.eval);
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, h1());
         assert_eq!(best_move.to, h8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval, Evaluation::_m3());
+        assert_eq!(eval.eval, Evaluation::_m3());
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (best_move, eval) = b.best_move(4, &pool, cache.clone(), None);
-        println!("Eval: {}", eval);
+        println!("Eval: {}", eval.eval);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
@@ -884,38 +982,38 @@ mod tests {
         assert_eq!(best_move.from, g6());
         assert_eq!(best_move.to, g8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval, Evaluation::m1());
+        assert_eq!(eval.eval, Evaluation::m1());
 
         let mut b = Board::from_fen("k5RN/7R/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (best_move, eval) = b.best_move(4, &pool, cache.clone(), None);
-        println!("Eval: {}", eval);
+        println!("Eval: {}", eval.eval);
         assert!(best_move.is_none());
-        assert_eq!(eval, Evaluation::lost());
+        assert_eq!(eval.eval, Evaluation::lost());
 
         let mut b =
             Board::from_fen("k6N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (best_move, eval) = b.best_move(4, &pool, cache.clone(), None);
-        println!("Eval: {}", eval);
+        println!("Eval: {}", eval.eval);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, g6());
         assert_eq!(best_move.to, g8());
-        assert_eq!(eval, Evaluation::m1());
+        assert_eq!(eval.eval, Evaluation::m1());
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (best_move, eval) = b.best_move(4, &pool, cache.clone(), None);
-        println!("Eval: {}", eval);
+        println!("Eval: {}", eval.eval);
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         assert_eq!(best_move.piece, Piece::King);
         assert_eq!(best_move.from, b8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval, -Evaluation::_m2());
+        assert_eq!(eval.eval, -Evaluation::_m2());
     }
     #[test]
     fn bishop_knight_mate() {
@@ -927,8 +1025,8 @@ mod tests {
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
         println!("Best Move: {}", best_move);
-        println!("Eval: {}", eval);
-        assert!(eval.mate_in().is_some());
+        println!("Eval: {}", eval.eval);
+        assert!(eval.eval.mate_in().is_some());
     }
     #[test]
     fn eval_flipped() {
@@ -1036,7 +1134,7 @@ mod tests {
             4,
             &cache,
             should_stop,
-        );
+        ).eval;
         println!("Eval: {}", eval);
         assert!(eval < Evaluation::draw());
     }
@@ -1310,11 +1408,11 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (_, move_eval) = board.best_move(5, &pool, cache.clone(), None);
 
-        let evalw = board.eval(Evaluation::lost(), Evaluation::won(),Color::White);
-        let evalb = board.eval(Evaluation::lost(), Evaluation::won(),Color::Black);
+        let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
+        let evalb = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(evalw != Evaluation::draw());
         assert!(evalb != Evaluation::draw());
-        assert!(move_eval != Evaluation::draw());
+        assert!(move_eval.eval != Evaluation::draw());
     }
     #[test]
     fn doubled_pawns() {
@@ -1382,7 +1480,7 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let evalb = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(evalw != Evaluation::draw());
         assert!(evalb != Evaluation::draw());
-        assert!(move_eval != Evaluation::draw());
+        assert!(move_eval.eval != Evaluation::draw());
         assert!(best_move.unwrap().to != d4());
     }
 }
