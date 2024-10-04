@@ -5,6 +5,10 @@ mod move_generation;
 mod moves;
 mod posn;
 mod sliding_attacks;
+use evaluation::EG_TABLE;
+use evaluation::GAME_PHASE_INC;
+use evaluation::MG_TABLE;
+
 pub use crate::board::bitboard::*;
 pub use crate::board::moves::*;
 pub use crate::board::posn::*;
@@ -109,6 +113,11 @@ pub struct Board {
     // We track moves so that
     pub moves: Vec<u64>,
     pub last_irreversible: Vec<u16>,
+
+    pub mg_piece_values: [i16; 2],
+    pub eg_piece_values: [i16; 2],
+    // A progression of the game (out of 24)
+    pub game_phase: u8,
 }
 
 impl PartialEq for Board {
@@ -413,6 +422,11 @@ impl Board {
                 self.white_pieces[p as usize] |= pos;
             }
         };
+        let eg_val = EG_TABLE[c as usize][p as usize][pos.pos.ilog2() as usize];
+        let mg_val = MG_TABLE[c as usize][p as usize][pos.pos.ilog2() as usize];
+        self.eg_piece_values[c as usize] += eg_val;
+        self.mg_piece_values[c as usize] += mg_val;
+        self.game_phase += GAME_PHASE_INC[p as usize];
         self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
     }
     pub fn remove_piece(&mut self, c: Color, p: Piece, pos: Posn) {
@@ -424,6 +438,11 @@ impl Board {
                 self.white_pieces[p as usize] &= !BitBoard::from(pos);
             }
         };
+        let eg_val = EG_TABLE[c as usize][p as usize][pos.pos.ilog2() as usize];
+        let mg_val = MG_TABLE[c as usize][p as usize][pos.pos.ilog2() as usize];
+        self.eg_piece_values[c as usize] -= eg_val;
+        self.mg_piece_values[c as usize] -= mg_val;
+        self.game_phase -= GAME_PHASE_INC[p as usize];
         self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
     }
     pub fn from_algeabraic(&self, m: &AlgebraicMove) -> Move {
@@ -773,6 +792,9 @@ pub fn empty_board(turn: Color) -> Board {
             },
         last_irreversible: vec![],
         moves: vec![],
+        mg_piece_values: [0, 0],
+        eg_piece_values: [0, 0],
+        game_phase: 0,
     }
 }
 

@@ -42,7 +42,8 @@ impl<const N: usize> SharedHashMap<N> {
         println!("Updates:          {}", updates);
         println!("Accepted:         {}", accepted);
         println!("Rejected:         {}", rejected);
-        println!( "Acceptance Rate: {:.5}",
+        println!(
+            "Acceptance Rate: {:.5}",
             accepted as f64 / (accepted + rejected) as f64
         );
     }

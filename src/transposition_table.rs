@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::{board::{evaluation::Evaluation, AlgebraicMove, Posn}, shared_hashmap::SharedHashMap};
+use crate::{
+    board::{evaluation::Evaluation, AlgebraicMove, Posn},
+    shared_hashmap::SharedHashMap,
+};
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy)]
 pub enum NodeType {
@@ -82,4 +85,4 @@ impl PackedTTEntry {
     }
 }
 
-pub type TranspositionTable = Arc<SharedHashMap<{1024 * 1024}>>;
+pub type TranspositionTable = Arc<SharedHashMap<{ 1024 * 1024 }>>;
