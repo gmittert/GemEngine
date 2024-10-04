@@ -8,7 +8,6 @@ pub struct SharedHashMapEntry {
 
 #[derive(Debug)]
 pub struct SharedHashMap<const N: usize> {
-    // 1GiB
     data: Vec<SharedHashMapEntry>,
     hits: AtomicUsize,
     misses: AtomicUsize,
@@ -18,6 +17,7 @@ pub struct SharedHashMap<const N: usize> {
     rejected: AtomicUsize,
     updates: AtomicUsize,
 }
+
 unsafe impl<const N: usize> Send for SharedHashMap<N> {}
 unsafe impl<const N: usize> Sync for SharedHashMap<N> {}
 impl<const N: usize> SharedHashMap<N> {
