@@ -1436,6 +1436,17 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
     }
 
     #[test]
+    #[ignore]
+    fn london() {
+        let pool = threadpool::ThreadPool::new(64);
+        let mut board = Board::from_fen(
+            "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
+        )
+            .expect("Invalid fen?");
+        board.it_depth_best_move(6, &pool);
+    }
+
+    #[test]
     fn repetition_bug2() {
         let pgn = r###"
 [Event "?"]

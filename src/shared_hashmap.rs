@@ -32,18 +32,17 @@ impl<const N: usize> SharedHashMap<N> {
         let accepted = self.accepted.load(Ordering::Relaxed);
         let rejected = self.rejected.load(Ordering::Relaxed);
         let updates = self.updates.load(Ordering::Relaxed);
-        println!("Hits: {}", hits);
-        println!("Misses: {}", misses);
+        println!("Hits:      {}", hits);
+        println!("Misses:    {}", misses);
         println!("Conflicts: {}", conflicts);
         println!(
-            "Hit Rate: {}",
+            "Hit Rate:  {:.5}",
             hits as f64 / (hits + misses + conflicts) as f64
         );
-        println!("Updates: {}", updates);
-        println!("Accepted: {}", accepted);
-        println!("Rejected: {}", rejected);
-        println!(
-            "Acceptance Rate: {}",
+        println!("Updates:          {}", updates);
+        println!("Accepted:         {}", accepted);
+        println!("Rejected:         {}", rejected);
+        println!( "Acceptance Rate: {:.5}",
             accepted as f64 / (accepted + rejected) as f64
         );
     }
