@@ -178,13 +178,13 @@ pub const EG_TABLE: [[[i16; 64]; 6]; 2] = {
 //   i64::MAX -2 as the opponent having mate in 2 and so on.
 // - Everything else is an evalutation in centipawns
 impl Evaluation {
-    fn won() -> Evaluation {
+    pub fn won() -> Evaluation {
         Evaluation(std::i16::MAX)
     }
-    fn draw() -> Evaluation {
+    pub fn draw() -> Evaluation {
         Evaluation(0)
     }
-    fn lost() -> Evaluation {
+    pub fn lost() -> Evaluation {
         Evaluation(std::i16::MIN + 1)
     }
     fn m1() -> Evaluation {

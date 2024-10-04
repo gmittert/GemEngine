@@ -6,6 +6,19 @@ use gem::{
     shared_hashmap::SharedHashMap,
 };
 
+pub fn eval_fn(c: &mut Criterion) {
+    c.bench_function("eval_start", |b| {
+        let board = board::starting_board();
+        b.iter(|| {
+            board.eval(
+                board::evaluation::Evaluation::lost(),
+                board::evaluation::Evaluation::won(),
+                board::Color::White,
+            );
+        })
+    });
+}
+
 pub fn start(c: &mut Criterion) {
     let mut group = c.benchmark_group("start");
     for num_cpus in [1, 2, 4, 8, 16, 32, 64].iter() {
@@ -46,4 +59,4 @@ pub fn london(c: &mut Criterion) {
     group.finish()
 }
 
-criterion_group!(evaluation, start, london);
+criterion_group!(evaluation, start, london, eval_fn);
