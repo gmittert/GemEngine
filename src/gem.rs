@@ -145,6 +145,7 @@ impl UciEngine for Gem {
             seldepth: Some(info.seldepth as usize),
             nodes_per_sec: Some(info.nodes_per_sec),
             nodes: Some(info.nodes),
+            hash_full: Some(info.hash_full),
             ..Default::default()
         };
         uci::info(info);

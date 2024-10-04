@@ -21,6 +21,10 @@ pub struct SharedHashMap<const N: usize> {
 unsafe impl<const N: usize> Send for SharedHashMap<N> {}
 unsafe impl<const N: usize> Sync for SharedHashMap<N> {}
 impl<const N: usize> SharedHashMap<N> {
+    pub fn hash_usage(&self) -> usize {
+        self.print_stats();
+        (1000 * self.accepted.load(Ordering::Relaxed)) / N
+    }
     pub fn print_stats(&self) {
         let hits = self.hits.load(Ordering::Relaxed);
         let misses = self.misses.load(Ordering::Relaxed);

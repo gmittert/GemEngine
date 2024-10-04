@@ -226,6 +226,7 @@ pub struct SearchInfo {
     pub nodes: usize,
     pub nodes_per_sec: usize,
     pub seldepth: u16,
+    pub hash_full: usize,
 }
 
 impl Board {
@@ -260,6 +261,7 @@ impl Board {
             nodes: eval.nodes,
             nodes_per_sec: eval.nodes / time.as_secs() as usize,
             time,
+            hash_full: cache.hash_usage(),
         };
         (m, eval.eval, info)
     }
@@ -1128,13 +1130,15 @@ mod tests {
         let best_score = Evaluation::lost();
         let cache = SharedHashMap::new();
         let should_stop = Arc::new(AtomicBool::new(false));
-        let eval = -board.alpha_beta::<1024>(
-            Evaluation::lost(),
-            -best_score.inc_mate(),
-            4,
-            &cache,
-            should_stop,
-        ).eval;
+        let eval = -board
+            .alpha_beta::<1024>(
+                Evaluation::lost(),
+                -best_score.inc_mate(),
+                4,
+                &cache,
+                should_stop,
+            )
+            .eval;
         println!("Eval: {}", eval);
         assert!(eval < Evaluation::draw());
     }
