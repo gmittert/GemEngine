@@ -733,7 +733,7 @@ impl Board {
         }
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn eval(&self, alpha: Evaluation, beta: Evaluation, to_play: Color) -> Evaluation {
         let mg_score: i32 = self.mg_piece_values[Color::White as usize] as i32
             - self.mg_piece_values[Color::Black as usize] as i32;
@@ -790,8 +790,8 @@ impl Board {
         let blocked_pawns =
             self.blocked_pawns(Color::White) as i16 - self.blocked_pawns(Color::Black) as i16;
         let phase2_eval = phase1_eval + attacks_diff as i16
-            - 20 * doubled_pawns
-            - 30 * isolated_pawns
+            - 10 * doubled_pawns
+            - 15 * isolated_pawns
             - 10 * blocked_pawns;
 
         tracing::event!(Level::INFO, name = "Phase2 eval", "eval" = %phase2_eval);
@@ -1700,5 +1700,39 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
         };
 
         assert!(move_eval.eval.0 < 0);
+    }
+    #[test]
+    fn eval_bug_bad_trade() {
+        let pgn = r###"
+[Event "?"]
+[Site "?"]
+[Date "2024.10.04"]
+[Round "?"]
+[White "gem"]
+[Black "Human"]
+[Result "0-1"]
+[ECO "A05"]
+[GameDuration "00:06:06"]
+[GameEndTime "2024-10-04T23:38:47.250 PDT"]
+[GameStartTime "2024-10-04T23:32:40.838 PDT"]
+[Opening "Reti Opening"]
+[PlyCount "39"]
+[Termination "adjudication"]
+[TimeControl "inf"]
+
+1. Nf3 {+0.29/8 5.0s} Nf6 {8.5s} 2. d4 {+0.08/7 5.0s} g6 {7.5s}
+3. Nc3 {+0.11/7 5.0s} d5 {10s} 4. e3 {+0.06/7 5.0s} Bg4 {71s}
+5. Be2 {+0.31/7 5.0s} Nc6 {16s} 6. Bb5 {+0.16/7 5.0s} a6 {8.3s}
+7. Bxc6+ {+0.77/6 5.0s} bxc6 {8.4s} 8. O-O {+0.38/7 5.0s} Qd6 {16s}
+9. h3 {+0.47/7 5.0s} Bxf3 {6.7s} 10. Qxf3 {+0.47/7 5.0s} Bg7 {8.1s}
+11. Rd1 {+0.39/7 5.0s} O-O {9.1s} 12. e4 {+1.00/6 5.0s} dxe4 {6.2s}
+13. Nxe4 {+0.83/7 5.0s} Nxe4 {6.0s} 14. Qxe4 {+0.79/7 5.0s} e5 {6.1s}
+15. Be3 {+1.05/6 5.0s} f5 {8.6s} 16. Qd3 {+0.50/7 5.0s} f4 {5.8s} *
+17. dxe5 {-0.22/7 5.0s} Qxd3 {7.9s} 18. Rxd3 {-0.29/7 5.0s} fxe3 {6.6s}
+19. Rxe3 {-0.71/7 5.0s} *
+"###;
+        let board = Board::from_pgn(pgn).expect("bad pgn?");
+        let eval = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
+        assert!(eval.0 < 0);
     }
 }
