@@ -481,6 +481,7 @@ impl Board {
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> EvalResult {
         let mut alpha = alpha;
         let stand_pat = self.eval(alpha, beta, self.to_play);
+        tracing::event!(Level::INFO, stand_pat = %stand_pat);
         if stand_pat >= beta {
             return EvalResult {
                 eval: beta,
@@ -519,7 +520,10 @@ impl Board {
                 - self.static_exchange_evaluation(capture.to, self.to_play);
 
             if value >= Evaluation::draw() && !self.in_check(!self.to_play) {
-                let span = trace_span!("quiesece", alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered();
+                let span = match self.to_play {
+                    Color::Black => trace_span!("quiesece white", inspecting = %m, alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered(),
+                    Color::White => trace_span!("quiesce black", inspecting = %m, alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered(),
+                };
                 let eval_res = self.quiesce(-beta, -alpha.inc_mate());
                 let eval = -eval_res.eval.dec_mate();
                 nodes += eval_res.nodes;
@@ -529,6 +533,7 @@ impl Board {
                 if eval >= beta {
                     self.undo_move(&m);
 
+                    tracing::event!(Level::INFO, name = "Beta cutoff", "eval" = %eval, "beta" = %beta);
                     return EvalResult {
                         eval: beta,
                         seldepth,
@@ -536,6 +541,7 @@ impl Board {
                     };
                 }
                 if eval > alpha {
+                    tracing::event!(Level::INFO, name = "Raised Alpha!", "alpha" = %alpha, "eval" = %eval);
                     alpha = eval;
                 }
             }
@@ -729,23 +735,35 @@ impl Board {
 
     #[tracing::instrument]
     pub fn eval(&self, alpha: Evaluation, beta: Evaluation, to_play: Color) -> Evaluation {
-        let mg_score = self.mg_piece_values[Color::White as usize]
-            - self.mg_piece_values[Color::Black as usize];
-        let eg_score = self.eg_piece_values[Color::White as usize]
-            - self.eg_piece_values[Color::Black as usize];
-        let mg_phase = self.game_phase as i16;
-        let eg_phase = 24 - mg_phase;
-        let phase1_eval = (mg_score * mg_phase + eg_score * eg_phase) / 24;
+        let mg_score: i32 = self.mg_piece_values[Color::White as usize] as i32
+            - self.mg_piece_values[Color::Black as usize] as i32;
+        let eg_score: i32 = self.eg_piece_values[Color::White as usize] as i32
+            - self.eg_piece_values[Color::Black as usize] as i32;
+        let mg_phase: i32 = self.game_phase as i32;
+        let eg_phase: i32 = 24 - mg_phase;
+        let phase1_eval = (((mg_score * mg_phase) + (eg_score * eg_phase)) / 24) as i16;
 
         // Lazily evaluate the more expensive parts. If we're already too far out of range of alpha
         // and beta, don't bother trying to compute the minutia.
-        if (alpha.0 - phase1_eval) > 200 {
+        tracing::event!(Level::INFO,
+        name = "Phase1 eval",
+        "eval" = %phase1_eval,
+        "alpha" = %alpha,
+        "beta" = %beta,
+        "mg_score" = %mg_score,
+        "eg_score" = %eg_score,
+        "mg_phase" = %mg_phase,
+        "eg_phase" = %eg_phase
+        );
+        if alpha.0 > phase1_eval && alpha.0 - phase1_eval > 200 {
+            tracing::event!(Level::INFO, name = "Alpha too high");
             return match to_play {
                 Color::Black => -Evaluation(phase1_eval),
                 Color::White => Evaluation(phase1_eval),
             };
         }
-        if (phase1_eval - beta.0) > 200 {
+        if phase1_eval > beta.0 && (phase1_eval - beta.0) > 200 {
+            tracing::event!(Level::INFO, name = "Beta too low");
             return match to_play {
                 Color::Black => -Evaluation(phase1_eval),
                 Color::White => Evaluation(phase1_eval),
@@ -776,6 +794,7 @@ impl Board {
             - 30 * isolated_pawns
             - 10 * blocked_pawns;
 
+        tracing::event!(Level::INFO, name = "Phase2 eval", "eval" = %phase2_eval);
         match to_play {
             Color::Black => -Evaluation(phase2_eval),
             Color::White => Evaluation(phase2_eval),
@@ -1616,5 +1635,70 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         assert!(evalb != Evaluation::draw());
         assert!(move_eval.eval != Evaluation::draw());
         assert!(best_move.unwrap().to != d4());
+    }
+
+    #[test]
+    fn eval_bug3() {
+        let pgn = r###"
+[Event "?"]
+[Site "?"]
+[Date "2024.10.04"]
+[Round "?"]
+[White "Human"]
+[Black "gem"]
+[Result "1-0"]
+[ECO "B01"]
+[GameDuration "00:05:32"]
+[GameEndTime "2024-10-04T16:26:25.384 PDT"]
+[GameStartTime "2024-10-04T16:20:53.380 PDT"]
+[Opening "Scandinavian defense"]
+[PlyCount "45"]
+[TimeControl "inf"]
+
+1. e4 d5 {-0.19/7 5.0s} 2. exd5 {6.3s} Nf6 {-0.31/7 5.0s} 3. d4 {6.2s}
+Bg4 {-0.39/7 5.0s} 4. f3 {6.8s} Bf5 {-0.21/7 5.0s} 5. g4 {8.5s}
+Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
+8. Nc3 {6.2s} cxd5 {+0.43/6 5.0s} 9. cxd5 {8.8s} Nxd5 {+0.53/6 5.0s}
+10. h5 {6.4s} Bh7 {+0.26/7 5.0s} 11. Qb3 {6.7s} Nxc3 {+0.06/7 5.0s}
+12. Qxb7 {11s} Nd7 {+0.14/6 5.0s} 13. bxc3 {9.8s} Rc8 {+0.06/6 5.0s}
+14. Bd2 {9.1s} e5 {-0.08/6 5.0s} 15. dxe5 {7.9s} Rc7 {+0.04/6 5.0s}
+16. Qb3 {6.5s} Nxe5 {+0.11/6 5.0s} 17. Bf4 {6.8s} *"###;
+        let mut board = Board::from_pgn(pgn).expect("bad pgn?");
+        let pool = threadpool::ThreadPool::new(1);
+        let res = board.make_alg_move(&AlgebraicMove {
+            from: c7(),
+            to: d7(),
+            promotion: None,
+        });
+        assert!(res.is_ok());
+
+        let res = board.make_alg_move(&AlgebraicMove {
+            from: f4(),
+            to: e5(),
+            promotion: None,
+        });
+        assert!(res.is_ok());
+
+        let res = board.make_alg_move(&AlgebraicMove {
+            from: d8(),
+            to: h4(),
+            promotion: None,
+        });
+        assert!(res.is_ok());
+
+        let res = board.make_alg_move(&AlgebraicMove {
+            from: h1(),
+            to: h4(),
+            promotion: None,
+        });
+        assert!(res.is_ok());
+
+        let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
+        let (Some(_), move_eval) = board.best_move(1, &pool, cache.clone(), None) else {
+            assert!(false);
+            return;
+        };
+
+        assert!(move_eval.eval.0 < 0);
     }
 }
