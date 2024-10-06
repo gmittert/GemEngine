@@ -5,9 +5,9 @@ mod move_generation;
 mod moves;
 mod posn;
 mod sliding_attacks;
-use evaluation::EG_TABLE;
-use evaluation::GAME_PHASE_INC;
-use evaluation::MG_TABLE;
+use crate::piece_square_tables::EG_TABLE;
+use crate::piece_square_tables::GAME_PHASE_INC;
+use crate::piece_square_tables::MG_TABLE;
 
 pub use crate::board::bitboard::*;
 pub use crate::board::moves::*;
