@@ -364,7 +364,24 @@ impl Board {
         let mut seldepth = 0;
 
         let (tx, rx) = mpsc::channel();
-        for a in self.pseudo_legal_moves_it() {
+
+        let recapture = if let Some((p, _)) = self.moves.last() {
+            if let Some(capture) = self.get_smallest_attacker(*p, self.to_play) {
+                vec![AlgebraicMove {
+                    to: capture.to,
+                    from: capture.from,
+                    promotion: capture.promotion,
+                }]
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        }
+        .into_iter();
+        let moves = recapture.chain(self.pseudo_legal_moves_it());
+
+        for a in moves {
             let m = self.from_algeabraic(&a);
             if Some(Piece::King) == m.capture {
                 return (
@@ -388,7 +405,7 @@ impl Board {
 
                 if let Some(irr) = self.last_irreversible.last() {
                     if self.half_move - irr >= 8 {
-                        for prev_state in &self.moves[*irr as usize..] {
+                        for (_, prev_state) in &self.moves[*irr as usize..] {
                             if *prev_state == self.hash {
                                 tracing::event!(Level::ERROR, "Three fold!");
                                 let _ = tx.send((
@@ -608,12 +625,30 @@ impl Board {
         }
         let mut alpha = alpha;
         let mut had_legal_move = false;
-        let moves = match best_move {
+
+        let hash_move = match best_move {
             Some(m) => vec![m],
             None => vec![],
         }
-        .into_iter()
-        .chain(self.pseudo_legal_moves_it());
+        .into_iter();
+        let recapture = if let Some((p, _)) = self.moves.last() {
+            if let Some(capture) = self.get_smallest_attacker(*p, self.to_play) {
+                vec![AlgebraicMove {
+                    to: capture.to,
+                    from: capture.from,
+                    promotion: capture.promotion,
+                }]
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        }
+        .into_iter();
+
+        let moves = hash_move
+            .chain(recapture)
+            .chain(self.pseudo_legal_moves_it());
         let mut is_pv_node = false;
         for a in moves {
             let m = self.from_algeabraic(&a);
@@ -628,7 +663,7 @@ impl Board {
                 let mut is_three_fold = false;
                 if let Some(irr) = self.last_irreversible.last() {
                     if self.half_move - irr >= 8 {
-                        for prev_state in &self.moves[*irr as usize..] {
+                        for (_, prev_state) in &self.moves[*irr as usize..] {
                             if *prev_state == self.hash {
                                 tracing::event!(Level::ERROR, "Three fold!");
                                 is_three_fold = true;

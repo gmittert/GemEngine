@@ -111,7 +111,7 @@ pub struct Board {
     pub move_rights: Vec<MoveRights>,
     pub hash: u64,
     // We track moves so that
-    pub moves: Vec<u64>,
+    pub moves: Vec<(Posn, u64)>,
     pub last_irreversible: Vec<u16>,
 
     pub mg_piece_values: [i16; 2],
@@ -490,7 +490,7 @@ impl Board {
     pub fn make_move(&mut self, m: &Move) {
         self.half_move += 1;
 
-        self.moves.push(self.hash);
+        self.moves.push((m.to, self.hash));
         if m.is_castle_king || m.is_castle_queen || m.capture.is_some() || m.piece == Piece::Pawn {
             self.last_irreversible.push(self.half_move);
         }
