@@ -553,18 +553,40 @@ impl Board {
 
                 if eval >= beta {
                     self.undo_move(&m);
-                    let should_cache = if let Some(entry) = cached_val {
-                        self.half_move > PackedTTEntry(entry).depth()
-                    } else {
-                        true
+                    match cached_val {
+                        Some(entry) => {
+                            let mut expected = entry;
+                            while self.half_move > PackedTTEntry(expected).depth() {
+                                if let Err(v) = cache.update(
+                                    self.hash,
+                                    entry,
+                                    PackedTTEntry::new(
+                                        beta,
+                                        self.half_move,
+                                        best_move,
+                                        NodeType::Upper,
+                                    )
+                                    .0,
+                                ) {
+                                    expected = v;
+                                    continue;
+                                }
+                                break;
+                            }
+                        }
+                        None => {
+                            cache.insert(
+                                self.hash,
+                                PackedTTEntry::new(
+                                    beta,
+                                    self.half_move,
+                                    best_move,
+                                    NodeType::Upper,
+                                )
+                                .0,
+                            );
+                        }
                     };
-
-                    if should_cache {
-                        cache.insert(
-                            self.hash,
-                            PackedTTEntry::new(beta, self.half_move, best_move, NodeType::Upper).0,
-                        );
-                    }
                     tracing::event!(Level::INFO, name = "Beta cutoff", "eval" = %eval, "beta" = %beta);
                     return EvalResult {
                         eval: beta,

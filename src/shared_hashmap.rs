@@ -1,4 +1,4 @@
-use std::sync::atomic::{fence, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 #[derive(Debug)]
 pub struct SharedHashMapEntry {
@@ -18,6 +18,17 @@ pub struct SharedHashMap<const N: usize> {
     updates: AtomicUsize,
 }
 
+/// A very simple lockless hashmap that supports get/set. The map also supports updates, but only
+/// updates of values, the key must remain the same. This allows us to update the evaluation of a
+/// node if we compute the evaluation to a deeper later on due to reusing the cache between
+/// iteration of iterative deepening.
+///
+/// I can't think of a way to support updates without introducing some sort of read/write in flight
+/// bit(s) that readers would have to increment or check for invalidations. Since I'd like to
+/// optimize for as cheap reads as possible
+///
+/// Keys are stored next to the values they are associated with using modulo to find a spot. If the
+/// spot is already taken the insert will fail.
 unsafe impl<const N: usize> Send for SharedHashMap<N> {}
 unsafe impl<const N: usize> Sync for SharedHashMap<N> {}
 impl<const N: usize> SharedHashMap<N> {
@@ -65,18 +76,10 @@ impl<const N: usize> SharedHashMap<N> {
             updates: AtomicUsize::new(0),
         }
     }
-    pub fn clear(&self) {
-        for i in 0..N {
-            self.data[i].key.store(0, Ordering::Relaxed)
-        }
-        fence(Ordering::Release)
-    }
+
     pub fn get(&self, k: u64) -> Option<u64> {
-        if k == 1 || k == 0 {
-            return None;
-        }
         let pos: usize = k as usize % N;
-        let key = &self.data[pos].key;
+        let SharedHashMapEntry { key, val } = &self.data[pos];
         let header = key.load(Ordering::Acquire);
         if header == 0 {
             self.misses.fetch_add(1, Ordering::Relaxed);
@@ -87,37 +90,83 @@ impl<const N: usize> SharedHashMap<N> {
             return None;
         }
         self.hits.fetch_add(1, Ordering::Relaxed);
-        let v = *&self.data[pos].val.load(Ordering::Acquire);
-        Some(v)
+        // We have already synchronized on the aquire of the key so this is safe to be a relaxed
+        // load on the value. If we observe the desired key, the write of the value in a
+        // potentially different thread will be visible to us, and the read of the value here
+        // cannot be reordered before the load acquire of the key.
+        Some(val.load(Ordering::Relaxed))
     }
 
+    /// Store a new key value pair in the hashmap. `insert` will not overwrite an existing entry,
+    /// and will return a failure if something already exists in the desired hashmap position,
+    /// regardless of if the key matches.
+    ///
+    /// returns true if the pair was successfully stored in an empty cell else false.
     pub fn insert(&self, k: u64, v: u64) -> bool {
-        if k == 1 || k == 0 {
-            return false;
-        }
-        let pos: usize = k as usize % N;
-        let key = &self.data[pos].key;
-        let expected = key.load(Ordering::Acquire);
+        // We reserve values of 0 to indicate uninitialized cells. For our use of this hashmap
+        // where we store PackedTTEntries which contain a move, these can never be 0. (Consider
+        // that a move contains a from an to position, and h1 is the only position that's encoded
+        // as 0. Since a move can't be both to and from h1, at least one of "to" or "from" must be
+        // non zero).
+        assert_ne!(v, 0);
 
-        if expected != 0 && expected != k {
+        // Modulo is fine for now, our zorbrist keys are hopefully effectively random. Since we
+        // bail immediately if the spot is taken rather than trying to find a new one, we're not
+        // worried about bunching or needing a backup method.
+        let pos: usize = k as usize % N;
+        let SharedHashMapEntry { key, val } = &self.data[pos];
+
+        // Rather than checking the key, when we insert, we immediately check the value. If it's
+        // uninitialized, we claim it and overwrite it.
+        //
+        // The trick we'll rely on is that we're only allowed to replace an unintialized value, and
+        // the atomic cmpexchg will ensure that only one writer actually gets to write that value.
+        //
+        // MEMORY ORDERING:
+        // - success: Relaxed is okay here, we only need the write to be atomic. Readers will first
+        //            read the key with Acquire, so they will synchronize with our Release when we
+        //            write the key. Since they synchronize, if a reader sees our key write, it
+        //            will also see our value write, even if the value write is "Relaxed".
+        //
+        // - failure: On a fail, we don't care about the value we loaded, we know it's not 0, so we
+        //            bail no matter what. Admittedly, there might be an improvement opportunity
+        //            here where we could check the entry that beat us to it, and if we're deeper
+        //            than it for the same position, we automatically replace it, but let's keep
+        //            the concerns separate for now and let the caller figure it out.
+        if let Err(_) = val.compare_exchange(0, v, Ordering::Relaxed, Ordering::Relaxed) {
             self.rejected.fetch_add(1, Ordering::Relaxed);
             return false;
         }
-        if expected == k {
-            self.updates.fetch_add(1, Ordering::Relaxed);
-        }
 
-        let res = key.compare_exchange(expected, 1, Ordering::AcqRel, Ordering::Relaxed);
-        match res {
-            Ok(_) => {
-                self.accepted.fetch_add(1, Ordering::Relaxed);
-                self.data[pos].val.store(v, Ordering::Release);
-                key.store(k, Ordering::Release);
-                true
+        // We successfully claimed the value slot. We're the only one allowed to write the key, so
+        // we can do so without a cmpxchg. We do need to write with Release semantics so that a
+        // getter will synchronize and be sure to see the correct value that we just wrote.
+        key.store(k, Ordering::Release);
+        self.accepted.fetch_add(1, Ordering::Relaxed);
+        true
+    }
+
+    /// Update an existing key in the hashmap from a known existing value to a new one.
+    ///
+    /// Returns the value previously contained in the hashmap. On a success, this will be equal to
+    /// `from`.
+    pub fn update(&self, k: u64, from: u64, to: u64) -> Result<u64, u64> {
+        let pos: usize = k as usize % N;
+        let SharedHashMapEntry { key, val } = &self.data[pos];
+        let header = key.load(Ordering::Acquire);
+        // It's a caller error if the caller tries to update a cell with the wrong key.
+        assert_eq!(header, k);
+
+        // We don't really care about the ordering on success or failure here. The data will be
+        // valid regardless of whether a reader gets the old or new value.
+        match val.compare_exchange(from, to, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(v) => {
+                self.updates.fetch_add(1, Ordering::Relaxed);
+                Ok(v)
             }
-            Err(_) => {
+            Err(v) => {
                 self.rejected.fetch_add(1, Ordering::Relaxed);
-                false
+                Err(v)
             }
         }
     }
@@ -167,8 +216,8 @@ mod tests {
             assert_eq!(val, true);
         }
         for i in 2..1026 {
-            let val = map.insert(i, i + 1024);
-            assert_eq!(val, true);
+            let val = map.update(i, i, i + 1024);
+            assert_eq!(val, Ok(i));
         }
         for i in 2..1026 {
             let val = map.get(i);
