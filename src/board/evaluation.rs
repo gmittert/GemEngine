@@ -650,16 +650,19 @@ impl Board {
 
     #[tracing::instrument(skip(self))]
     pub fn eval(&self, alpha: Evaluation, beta: Evaluation, to_play: Color) -> Evaluation {
-        let mg_score: i32 = self.mg_piece_values[Color::White as usize] as i32
-            - self.mg_piece_values[Color::Black as usize] as i32;
-        let eg_score: i32 = self.eg_piece_values[Color::White as usize] as i32
-            - self.eg_piece_values[Color::Black as usize] as i32;
+        let mg_score =
+            self.mg_piece_values[to_play as usize] - self.mg_piece_values[!to_play as usize];
+        let eg_score =
+            self.eg_piece_values[to_play as usize] - self.eg_piece_values[!to_play as usize];
         let mg_phase: i32 = self.game_phase as i32;
         let eg_phase: i32 = 24 - mg_phase;
-        let phase1_eval = (((mg_score * mg_phase) + (eg_score * eg_phase)) / 24) as i16;
+        // It's okay to cast back to an i16 here:
+        //
+        // We're taking a weighted average of eg and mg scores here. The intermediate computation
+        // may overflow an i16, but won't once we divide by 24.
+        let phase1_eval =
+            (((mg_score as i32 * mg_phase) + (eg_score as i32 * eg_phase)) / 24) as i16;
 
-        // Lazily evaluate the more expensive parts. If we're already too far out of range of alpha
-        // and beta, don't bother trying to compute the minutia.
         tracing::event!(Level::INFO,
         name = "Phase1 eval",
         "eval" = %phase1_eval,
@@ -670,19 +673,15 @@ impl Board {
         "mg_phase" = %mg_phase,
         "eg_phase" = %eg_phase
         );
-        if alpha.0 > phase1_eval && alpha.0 - phase1_eval > 200 {
+        // Lazily evaluate the more expensive parts. If we're already too far out of range of alpha
+        // and beta, don't bother trying to compute the minutia.
+        if alpha.0 as i32 - phase1_eval as i32 > 200 {
             tracing::event!(Level::INFO, name = "Alpha too high");
-            return match to_play {
-                Color::Black => -Evaluation(phase1_eval),
-                Color::White => Evaluation(phase1_eval),
-            };
+            return Evaluation(phase1_eval);
         }
-        if phase1_eval > beta.0 && (phase1_eval - beta.0) > 200 {
+        if phase1_eval as i32 - beta.0 as i32 > 200 {
             tracing::event!(Level::INFO, name = "Beta too low");
-            return match to_play {
-                Color::Black => -Evaluation(phase1_eval),
-                Color::White => Evaluation(phase1_eval),
-            };
+            return Evaluation(phase1_eval);
         }
 
         let attacks_white = self.rook_attacks(Color::White)
@@ -704,16 +703,17 @@ impl Board {
             self.isolated_pawns(Color::White) as i16 - self.isolated_pawns(Color::Black) as i16;
         let blocked_pawns =
             self.blocked_pawns(Color::White) as i16 - self.blocked_pawns(Color::Black) as i16;
-        let phase2_eval = phase1_eval + attacks_diff as i16
-            - 10 * doubled_pawns
-            - 15 * isolated_pawns
-            - 10 * blocked_pawns;
+        let eval_refinements =
+            attacks_diff as i16 - 10 * doubled_pawns - 15 * isolated_pawns - 10 * blocked_pawns;
+
+        let phase2_eval = phase1_eval
+            + match to_play {
+                Color::Black => -eval_refinements,
+                Color::White => eval_refinements,
+            };
 
         tracing::event!(Level::INFO, name = "Phase2 eval", "eval" = %phase2_eval);
-        match to_play {
-            Color::Black => -Evaluation(phase2_eval),
-            Color::White => Evaluation(phase2_eval),
-        }
+        Evaluation(phase2_eval)
     }
 
     // The number of doubled pawns a side has
@@ -1542,7 +1542,6 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
 14. Bd2 {9.1s} e5 {-0.08/6 5.0s} 15. dxe5 {7.9s} Rc7 {+0.04/6 5.0s}
 16. Qb3 {6.5s} Nxe5 {+0.11/6 5.0s} 17. Bf4 {6.8s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
-        let pool = threadpool::ThreadPool::new(1);
         let res = board.make_alg_move(&AlgebraicMove {
             from: c7(),
             to: d7(),
@@ -1571,6 +1570,7 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
         });
         assert!(res.is_ok());
 
+        let pool = threadpool::ThreadPool::new(1);
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (Some(_), move_eval) = board.best_move(1, &pool, cache.clone(), None) else {
             assert!(false);
@@ -1612,5 +1612,21 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
         let board = Board::from_pgn(pgn).expect("bad pgn?");
         let eval = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(eval.0 < 0);
+    }
+    #[test]
+    fn mate_in_2_format() {
+        let fen = "6k1/p6p/3p2p1/3P1B2/2Q3n1/N1P5/Pr1B2P1/R3RK1q w - - 1 23";
+        let mut board = Board::from_fen(fen).expect("bad fen?");
+        let pool = threadpool::ThreadPool::new(1);
+        let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
+        let (Some(_), move_eval) = board.best_move(6, &pool, cache.clone(), None) else {
+            assert!(false);
+            return;
+        };
+        let Some(mated_in) = move_eval.eval.mated_in() else {
+            assert!(false);
+            return;
+        };
+        assert_eq!(mated_in, 4);
     }
 }

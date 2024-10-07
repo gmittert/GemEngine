@@ -254,10 +254,11 @@ pub fn info(info_block: Info) {
     if let Some(score) = info_block.score {
         print!(" score");
         let eval = score.eval;
+        // UCI needs M in moves, our evaluation stores mate in plies.
         if let Some(m) = eval.mate_in() {
-            print!(" mate {m}")
+            print!(" mate {}", (m + 1) / 2)
         } else if let Some(m) = eval.mated_in() {
-            print!(" mate -{m}")
+            print!(" mate -{}", (m + 1) / 2)
         } else {
             let Evaluation(cp) = eval;
             print!(" cp {}", cp as i64)
