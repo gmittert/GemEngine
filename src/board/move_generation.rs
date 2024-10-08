@@ -1144,7 +1144,7 @@ mod tests {
     fn rook_moves_empty() {
         for i in 0..64 {
             let mut board = empty_board(Color::White);
-            board.white_pieces[Piece::Rook as usize] = BitBoard::from(Posn { pos: 1 << i });
+            board.add_piece(Color::White, Piece::Rook, Posn { pos: 1 << i });
             let mut moves = vec![];
             board.rook_moves(&mut moves);
             assert_eq!(moves.len(), 14);
@@ -1154,14 +1154,18 @@ mod tests {
                 before.undo_move(&m);
                 assert_eq!(before, board);
             }
+            board.remove_piece(Color::White, Piece::Rook, Posn { pos: 1 << i });
         }
     }
 
     #[test]
     fn rook_moves_blocked_ally() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Rook as usize] = BitBoard::from(d5());
-        board.white_pieces[Piece::Pawn as usize] = d4() | d6() | c5() | e5();
+        board.add_piece(Color::White, Piece::Rook, d5());
+        board.add_piece(Color::White, Piece::Pawn, d4());
+        board.add_piece(Color::White, Piece::Pawn, d6());
+        board.add_piece(Color::White, Piece::Pawn, c5());
+        board.add_piece(Color::White, Piece::Pawn, e5());
         let mut moves = vec![];
         board.rook_moves(&mut moves);
         assert_eq!(moves.len(), 0);
@@ -1170,8 +1174,11 @@ mod tests {
     #[test]
     fn rook_moves_blocked_opponent() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Rook as usize] = BitBoard::from(d5());
-        board.black_pieces[Piece::Pawn as usize] = d4() | d6() | c5() | e5();
+        board.add_piece(Color::White, Piece::Rook, d5());
+        board.add_piece(Color::Black, Piece::Pawn, d4());
+        board.add_piece(Color::Black, Piece::Pawn, d6());
+        board.add_piece(Color::Black, Piece::Pawn, c5());
+        board.add_piece(Color::Black, Piece::Pawn, e5());
         let mut moves = vec![];
         board.rook_moves(&mut moves);
         assert_eq!(moves.len(), 4);
@@ -1186,7 +1193,7 @@ mod tests {
     #[test]
     fn bishop_moves_empty() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(a1());
+        board.add_piece(Color::White, Piece::Bishop, a1());
         let mut moves = vec![];
         board.bishop_moves(&mut moves);
         assert_eq!(moves.len(), 7);
@@ -1201,8 +1208,11 @@ mod tests {
     #[test]
     fn bishop_moves_blocked_ally() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(d5());
-        board.white_pieces[Piece::Pawn as usize] = e6() | e4() | c6() | c4();
+        board.add_piece(Color::White, Piece::Bishop, d5());
+        board.add_piece(Color::White, Piece::Pawn, e6());
+        board.add_piece(Color::White, Piece::Pawn, e4());
+        board.add_piece(Color::White, Piece::Pawn, c6());
+        board.add_piece(Color::White, Piece::Pawn, c4());
         let mut moves = vec![];
         board.bishop_moves(&mut moves);
         assert_eq!(moves.len(), 0);
@@ -1211,8 +1221,11 @@ mod tests {
     #[test]
     fn bishop_moves_blocked_opponent() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Bishop as usize] = BitBoard::from(d5());
-        board.black_pieces[Piece::Pawn as usize] = e6() | e4() | c6() | c4();
+        board.add_piece(Color::White, Piece::Bishop, d5());
+        board.add_piece(Color::Black, Piece::Pawn, e6());
+        board.add_piece(Color::Black, Piece::Pawn, e4());
+        board.add_piece(Color::Black, Piece::Pawn, c6());
+        board.add_piece(Color::Black, Piece::Pawn, c4());
         let mut moves = vec![];
         board.bishop_moves(&mut moves);
         assert_eq!(moves.len(), 4);
@@ -1227,7 +1240,7 @@ mod tests {
     #[test]
     fn queen_moves_empty() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Queen as usize] = BitBoard::from(a1());
+        board.add_piece(Color::White, Piece::Queen, a1());
         let mut moves = vec![];
         board.queen_moves(&mut moves);
         assert_eq!(moves.len(), 21);
@@ -1237,8 +1250,9 @@ mod tests {
             before.undo_move(&m);
             assert_eq!(before, board);
         }
+        board.remove_piece(Color::White, Piece::Queen, a1());
 
-        board.white_pieces[Piece::Queen as usize] = BitBoard::from(d5());
+        board.add_piece(Color::White, Piece::Queen, d5());
         moves.clear();
         board.queen_moves(&mut moves);
         assert_eq!(moves.len(), 27);
@@ -1248,14 +1262,22 @@ mod tests {
             before.undo_move(&m);
             assert_eq!(before, board);
         }
+        board.remove_piece(Color::White, Piece::Queen, d5());
     }
 
     #[test]
     fn queen_moves_blocked_ally() {
         let mut board = empty_board(Color::White);
         board.white_pieces[Piece::Queen as usize] = BitBoard::from(d5());
-        board.white_pieces[Piece::Pawn as usize] =
-            e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
+        board.add_piece(Color::White, Piece::Queen, d5());
+        board.add_piece(Color::White, Piece::Pawn, e6());
+        board.add_piece(Color::White, Piece::Pawn, e4());
+        board.add_piece(Color::White, Piece::Pawn, c6());
+        board.add_piece(Color::White, Piece::Pawn, c4());
+        board.add_piece(Color::White, Piece::Pawn, d4());
+        board.add_piece(Color::White, Piece::Pawn, d6());
+        board.add_piece(Color::White, Piece::Pawn, c5());
+        board.add_piece(Color::White, Piece::Pawn, e5());
         let mut moves = vec![];
         board.queen_moves(&mut moves);
         assert_eq!(moves.len(), 0);
@@ -1264,9 +1286,15 @@ mod tests {
     #[test]
     fn queen_moves_blocked_opponent() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Queen as usize] = BitBoard::from(d5());
-        board.black_pieces[Piece::Pawn as usize] =
-            e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
+        board.add_piece(Color::White, Piece::Queen, d5());
+        board.add_piece(Color::Black, Piece::Pawn, e6());
+        board.add_piece(Color::Black, Piece::Pawn, e4());
+        board.add_piece(Color::Black, Piece::Pawn, c6());
+        board.add_piece(Color::Black, Piece::Pawn, c4());
+        board.add_piece(Color::Black, Piece::Pawn, d4());
+        board.add_piece(Color::Black, Piece::Pawn, d6());
+        board.add_piece(Color::Black, Piece::Pawn, c5());
+        board.add_piece(Color::Black, Piece::Pawn, e5());
         let mut moves = vec![];
         board.queen_moves(&mut moves);
         assert_eq!(moves.len(), 8);
@@ -1311,9 +1339,15 @@ mod tests {
     #[test]
     fn king_moves_blocked_ally() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::King as usize] = BitBoard::from(d5());
-        board.white_pieces[Piece::Knight as usize] =
-            e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
+        board.add_piece(Color::White, Piece::King, d5());
+        board.add_piece(Color::White, Piece::Knight, e6());
+        board.add_piece(Color::White, Piece::Knight, e4());
+        board.add_piece(Color::White, Piece::Knight, c6());
+        board.add_piece(Color::White, Piece::Knight, c4());
+        board.add_piece(Color::White, Piece::Knight, d6());
+        board.add_piece(Color::White, Piece::Knight, d4());
+        board.add_piece(Color::White, Piece::Knight, c5());
+        board.add_piece(Color::White, Piece::Knight, e5());
         let mut moves = vec![];
         board.king_moves(&mut moves);
         assert_eq!(moves.len(), 0);
@@ -1322,9 +1356,15 @@ mod tests {
     #[test]
     fn king_moves_blocked_opponent() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::King as usize] = BitBoard::from(d5());
-        board.black_pieces[Piece::Knight as usize] =
-            e6() | e4() | c6() | c4() | d4() | d6() | c5() | e5();
+        board.add_piece(Color::White, Piece::King, d5());
+        board.add_piece(Color::Black, Piece::Knight, e6());
+        board.add_piece(Color::Black, Piece::Knight, e4());
+        board.add_piece(Color::Black, Piece::Knight, c6());
+        board.add_piece(Color::Black, Piece::Knight, c4());
+        board.add_piece(Color::Black, Piece::Knight, d6());
+        board.add_piece(Color::Black, Piece::Knight, d4());
+        board.add_piece(Color::Black, Piece::Knight, c5());
+        board.add_piece(Color::Black, Piece::Knight, e5());
         let mut moves = vec![];
         board.king_moves(&mut moves);
         assert_eq!(moves.len(), 8);
@@ -1339,7 +1379,7 @@ mod tests {
     #[test]
     fn knight_moves_empty() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(a1());
+        board.add_piece(Color::White, Piece::Knight, a1());
         let mut moves = vec![];
         board.knight_moves(&mut moves);
         assert_eq!(moves.len(), 2);
@@ -1349,8 +1389,9 @@ mod tests {
             before.undo_move(&m);
             assert_eq!(before, board);
         }
+        board.remove_piece(Color::White, Piece::Knight, a1());
 
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(d5());
+        board.add_piece(Color::White, Piece::Knight, d5());
         moves.clear();
         board.knight_moves(&mut moves);
         assert_eq!(moves.len(), 8);
@@ -1360,8 +1401,9 @@ mod tests {
             before.undo_move(&m);
             assert_eq!(before, board);
         }
+        board.remove_piece(Color::White, Piece::Knight, d5());
 
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(a5());
+        board.add_piece(Color::White, Piece::Knight, a5());
         moves.clear();
         board.knight_moves(&mut moves);
         assert_eq!(moves.len(), 4);
@@ -1371,14 +1413,21 @@ mod tests {
             before.undo_move(&m);
             assert_eq!(before, board);
         }
+        board.remove_piece(Color::White, Piece::Knight, a5());
     }
 
     #[test]
     fn knight_moves_blocked_ally() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(d5());
-        board.white_pieces[Piece::Pawn as usize] =
-            e7() | e3() | c7() | c3() | f4() | f6() | b4() | b6();
+        board.add_piece(Color::White, Piece::Knight, d5());
+        board.add_piece(Color::White, Piece::Pawn, e7());
+        board.add_piece(Color::White, Piece::Pawn, e3());
+        board.add_piece(Color::White, Piece::Pawn, c7());
+        board.add_piece(Color::White, Piece::Pawn, c3());
+        board.add_piece(Color::White, Piece::Pawn, f4());
+        board.add_piece(Color::White, Piece::Pawn, f6());
+        board.add_piece(Color::White, Piece::Pawn, b4());
+        board.add_piece(Color::White, Piece::Pawn, b6());
         let mut moves = vec![];
         board.knight_moves(&mut moves);
         assert_eq!(moves.len(), 0);
@@ -1387,9 +1436,15 @@ mod tests {
     #[test]
     fn knight_moves_blocked_opponent() {
         let mut board = empty_board(Color::White);
-        board.white_pieces[Piece::Knight as usize] = BitBoard::from(d5());
-        board.black_pieces[Piece::Pawn as usize] =
-            e7() | e3() | c7() | c3() | f4() | f6() | b4() | b6();
+        board.add_piece(Color::White, Piece::Knight, d5());
+        board.add_piece(Color::Black, Piece::Pawn, e7());
+        board.add_piece(Color::Black, Piece::Pawn, e3());
+        board.add_piece(Color::Black, Piece::Pawn, c7());
+        board.add_piece(Color::Black, Piece::Pawn, c3());
+        board.add_piece(Color::Black, Piece::Pawn, f4());
+        board.add_piece(Color::Black, Piece::Pawn, f6());
+        board.add_piece(Color::Black, Piece::Pawn, b4());
+        board.add_piece(Color::Black, Piece::Pawn, b6());
         let mut moves = vec![];
         board.knight_moves(&mut moves);
         assert_eq!(moves.len(), 8);
