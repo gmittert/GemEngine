@@ -118,6 +118,7 @@ pub struct Board {
     pub eg_piece_values: [i16; 2],
     // A progression of the game (out of 24)
     pub game_phase: u8,
+    pub killer_moves: [[Option<AlgebraicMove>; 2]; 16],
 }
 
 impl PartialEq for Board {
@@ -482,6 +483,22 @@ impl Board {
         }
     }
 
+    /// Killer moves may not always apply.
+    pub fn check_killer(&self, m: &AlgebraicMove) -> bool {
+        // We better have a piece on the from square.
+        let Some(piece) = self.query_pos(m.from, self.to_play) else {
+            return false;
+        };
+        match piece {
+            Piece::Pawn => return self.pawn_moves_it().any(|x| x == *m),
+            Piece::Rook => self.rook_moves_it().any(|x| x == *m),
+            Piece::Knight => self.knight_moves_it().any(|x| x == *m),
+            Piece::Bishop => self.bishop_moves_it().any(|x| x == *m),
+            Piece::Queen => self.queen_moves_it().any(|x| x == *m),
+            Piece::King => self.king_moves_it().any(|x| x == *m),
+        }
+    }
+
     pub fn move_piece(&mut self, c: Color, p: Piece, from: Posn, to: Posn) {
         self.remove_piece(c, p, from);
         self.add_piece(c, p, to);
@@ -795,6 +812,7 @@ pub fn empty_board(turn: Color) -> Board {
         mg_piece_values: [0, 0],
         eg_piece_values: [0, 0],
         game_phase: 0,
+        killer_moves: [[None, None]; 16],
     }
 }
 

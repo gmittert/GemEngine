@@ -504,8 +504,31 @@ impl Board {
         }
         .into_iter();
 
+        let killer_moves = {
+            if target_depth - self.half_move >= 16 {
+                vec![]
+            } else {
+                let killer_idx = target_depth - self.half_move;
+                let killer_moves = self.killer_moves[killer_idx as usize];
+                let mut killers = vec![];
+                if let Some(m0) = killer_moves[0] {
+                    if self.check_killer(&m0) {
+                        killers.push(m0)
+                    }
+                }
+                if let Some(m1) = killer_moves[1] {
+                    if self.check_killer(&m1) {
+                        killers.push(m1)
+                    }
+                }
+                killers
+            }
+        }
+        .into_iter();
+
         let moves = hash_move
             .chain(recapture)
+            .chain(killer_moves)
             .chain(self.pseudo_legal_moves_it());
         let mut is_pv_node = false;
         for a in moves {
@@ -587,6 +610,22 @@ impl Board {
                             );
                         }
                     };
+                    if m.capture.is_none() {
+                        // This is a quiet move that caused a beta cutoff, record this as a killer
+                        // move! Since it's a strong move that didn't involve capturing anything,
+                        // it's likely strong for a lot of other moves at this level.
+                        let killer_idx = (target_depth - self.half_move) as usize;
+                        let killer_moves = self.killer_moves[killer_idx];
+                        let new_move = Some(AlgebraicMove {
+                            to: m.to,
+                            from: m.from,
+                            promotion: m.promotion,
+                        });
+                        if killer_moves[0] != new_move && killer_moves[1] != new_move {
+                            self.killer_moves[killer_idx][1] = self.killer_moves[killer_idx][0];
+                            self.killer_moves[killer_idx][0] = new_move
+                        }
+                    }
                     tracing::event!(Level::INFO, name = "Beta cutoff", "eval" = %eval, "beta" = %beta);
                     return EvalResult {
                         eval: beta,
