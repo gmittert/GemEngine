@@ -585,7 +585,7 @@ impl Board {
                                     entry,
                                     PackedTTEntry::new(
                                         beta,
-                                        self.half_move,
+                                        target_depth,
                                         best_move,
                                         NodeType::Upper,
                                     )
@@ -600,13 +600,8 @@ impl Board {
                         None => {
                             cache.insert(
                                 self.hash,
-                                PackedTTEntry::new(
-                                    beta,
-                                    self.half_move,
-                                    best_move,
-                                    NodeType::Upper,
-                                )
-                                .0,
+                                PackedTTEntry::new(beta, target_depth, best_move, NodeType::Upper)
+                                    .0,
                             );
                         }
                     };
@@ -654,31 +649,60 @@ impl Board {
             }
         };
 
-        let should_cache = if let Some(entry) = cached_val {
-            self.half_move > PackedTTEntry(entry).depth()
-        } else {
-            true
-        };
-
-        if should_cache {
-            cache.insert(
-                self.hash,
-                PackedTTEntry::new(
-                    eval,
-                    self.half_move,
-                    best_move.map(|m| AlgebraicMove {
-                        to: m.to,
-                        from: m.from,
-                        promotion: m.promotion,
-                    }),
-                    if is_pv_node {
-                        NodeType::Exact
-                    } else {
-                        NodeType::Lower
-                    },
-                )
-                .0,
-            );
+        match cached_val {
+            Some(entry) => {
+                let mut expected = entry;
+                tracing::event!(Level::INFO, name = "Attempting update", target_depth = %target_depth, other_depth = %PackedTTEntry(expected).depth());
+                while target_depth > PackedTTEntry(expected).depth() {
+                    if let Err(v) = cache.update(
+                        self.hash,
+                        entry,
+                        PackedTTEntry::new(
+                            eval,
+                            target_depth,
+                            best_move.map(|m| AlgebraicMove {
+                                to: m.to,
+                                from: m.from,
+                                promotion: m.promotion,
+                            }),
+                            if is_pv_node {
+                                NodeType::Exact
+                            } else {
+                                NodeType::Lower
+                            },
+                        )
+                        .0,
+                    ) {
+                        expected = v;
+                        tracing::event!(Level::INFO, name = "update failed");
+                        continue;
+                    }
+                    tracing::event!(Level::INFO, name = "update success");
+                    break;
+                }
+                tracing::event!(Level::INFO, name = "update done");
+            }
+            None => {
+                tracing::event!(Level::INFO, name = "inserting!");
+                cache.insert(
+                    self.hash,
+                    PackedTTEntry::new(
+                        eval,
+                        target_depth,
+                        best_move.map(|m| AlgebraicMove {
+                            to: m.to,
+                            from: m.from,
+                            promotion: m.promotion,
+                        }),
+                        if is_pv_node {
+                            NodeType::Exact
+                        } else {
+                            NodeType::Lower
+                        },
+                    )
+                    .0,
+                );
+            }
         }
         EvalResult {
             eval,
