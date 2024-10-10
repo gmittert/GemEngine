@@ -85,4 +85,5 @@ impl PackedTTEntry {
     }
 }
 
-pub type TranspositionTable = Arc<SharedHashMap<{ 1024 * 1024 }>>;
+// 256MB with 16 bytes per entry
+pub type TranspositionTable = Arc<SharedHashMap<{ 256 * 1024 * 1024 / 16 }>>;
