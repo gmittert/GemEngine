@@ -564,6 +564,58 @@ impl Iterator for PsuedoLegalMoves {
     }
 }
 
+/// This is terrible, but we need an input that changes each time we call it and we don't want to
+/// pay for the cost of generating a _real_ random number. This only needs to be "random enough" to
+/// shuffle our move generation a bit so the thread pool threads diverge.
+fn random_number() -> u64 {
+    rand::random()
+}
+
+pub struct PsuedoLegalRandomizedMoves {
+    iter: (
+        KnightMoves,
+        BishopMoves,
+        RookMoves,
+        QueenMoves,
+        PawnMoves,
+        KingMoves,
+    ),
+}
+impl PsuedoLegalRandomizedMoves {
+    fn new(board: &Board) -> PsuedoLegalRandomizedMoves {
+        PsuedoLegalRandomizedMoves {
+            iter: (
+                board.knight_moves_it(),
+                board.bishop_moves_it(),
+                board.rook_moves_it(),
+                board.queen_moves_it(),
+                board.pawn_moves_it(),
+                board.king_moves_it(),
+            ),
+        }
+    }
+}
+impl Iterator for PsuedoLegalRandomizedMoves {
+    type Item = AlgebraicMove;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let random = random_number() / 10;
+        for i in 0..6 {
+            if let Some(m) = match (random + i) % 6 {
+                0 => self.iter.0.next(),
+                1 => self.iter.1.next(),
+                2 => self.iter.2.next(),
+                3 => self.iter.3.next(),
+                4 => self.iter.4.next(),
+                _ => self.iter.5.next(),
+            } {
+                return Some(m);
+            }
+        }
+        None
+    }
+}
+
 impl Board {
     pub fn queen_attacks(&self, color: Color) -> BitBoard {
         let queens = match color {
@@ -1133,6 +1185,9 @@ impl Board {
     }
     pub fn pseudo_legal_moves_it(&self) -> PsuedoLegalMoves {
         PsuedoLegalMoves::new(self)
+    }
+    pub fn pseudo_legal_randomized_moves_it(&self) -> PsuedoLegalRandomizedMoves {
+        PsuedoLegalRandomizedMoves::new(self)
     }
 }
 

@@ -529,7 +529,7 @@ impl Board {
         let moves = hash_move
             .chain(recapture)
             .chain(killer_moves)
-            .chain(self.pseudo_legal_moves_it());
+            .chain(self.pseudo_legal_randomized_moves_it());
         let mut is_pv_node = false;
         for a in moves {
             let m = self.from_algeabraic(&a);
