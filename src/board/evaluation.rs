@@ -283,8 +283,8 @@ impl Board {
                 queue.execute(move || {
                     let best_score = Evaluation::lost();
                     let span = match to_play {
-                        Color::Black => trace_span!("white", inspecting = %m, alpha = Evaluation::lost().0, beta = -best_score.inc_mate().0, eval = field::Empty).entered(),
-                        Color::White => trace_span!("black", inspecting = %m, alpha = Evaluation::lost().0, beta = -best_score.inc_mate().0, eval = field::Empty).entered(),
+                        Color::Black => trace_span!("white", piece = %m.piece, to = %m.to, alpha = Evaluation::lost().0, beta = -best_score.inc_mate().0, eval = field::Empty).entered(),
+                        Color::White => trace_span!("black", piece = %m.piece, to = %m.to, alpha = Evaluation::lost().0, beta = -best_score.inc_mate().0, eval = field::Empty).entered(),
                     };
                     // Check for 3 fold repetition
                     let eval_res = new_b
@@ -463,16 +463,14 @@ impl Board {
             let unpacked = PackedTTEntry(entry);
             // We can use this cache entry if:
             // - The node is deep enough
-            // - The entry is exact, or the upper bound <= alpha or lowerbound >= beta
+            // - The entry is exact, or the upper bound <= alpha and lowerbound >= beta
             let node_type = unpacked.node_type();
             let eval = unpacked.eval();
             // If not, if the entry has a best move, start with it and hope that it gives us a nice
             // alpha to start with that should cause lots of cut offs.
             best_move = unpacked.best_move();
             if unpacked.depth() >= target_depth
-                && (node_type == NodeType::Exact
-                    || (node_type == NodeType::Upper && eval < alpha)
-                    || (node_type == NodeType::Lower && eval >= beta))
+                && (node_type == NodeType::Exact || (eval < alpha && eval >= beta))
             {
                 tracing::event!(
                     Level::INFO,
@@ -558,8 +556,8 @@ impl Board {
             if !self.in_check(!self.to_play) {
                 had_legal_move = true;
                 let span = match self.to_play {
-                    Color::Black => trace_span!("white", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
-                    Color::White => trace_span!("black", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
+                    Color::Black => trace_span!("white", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
+                    Color::White => trace_span!("black", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
                 };
                 // Check for 3 fold repetition
                 let mut is_three_fold = false;
@@ -1735,5 +1733,22 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
             return;
         };
         assert_eq!(mated_in, 4);
+    }
+
+    #[test]
+    fn another_eval_bug() {
+        let fen = "r5k1/1p1b2p1/2p1R1Q1/7p/8/P6P/q4PPK/4R3 b - - 1 29";
+        let mut board = Board::from_fen(fen).expect("bad fen?");
+        let pool = threadpool::ThreadPool::new(8);
+
+        let cache: TranspositionTable = Arc::new(SharedHashMap::new());
+        let (Some(best_move), move_eval) = board.best_move(6, &pool, cache, None) else {
+            assert!(false);
+            return;
+        };
+        println!("Best move: {}", best_move);
+        assert!(best_move.piece != Piece::Queen);
+        println!("Eval: {}", move_eval.eval);
+        assert!(move_eval.eval == Evaluation(33));
     }
 }
