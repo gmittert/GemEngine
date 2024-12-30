@@ -1,9 +1,16 @@
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use portable_atomic::AtomicU128;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug)]
 pub struct SharedHashMapEntry {
-    key: AtomicU64,
-    val: AtomicU64,
+    data: AtomicU128,
+}
+impl SharedHashMapEntry {
+    fn new(key: u64, value: u64) -> Self {
+        Self {
+            data: AtomicU128::new(((key as u128) << 64) | value as u128),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -60,10 +67,7 @@ impl<const N: usize> SharedHashMap<N> {
     pub fn new() -> SharedHashMap<N> {
         let mut vec = Vec::with_capacity(N);
         for _ in 0..N {
-            vec.push(SharedHashMapEntry {
-                key: AtomicU64::new(0),
-                val: AtomicU64::new(0),
-            });
+            vec.push(SharedHashMapEntry::new(0, 0));
         }
         SharedHashMap {
             data: vec,
@@ -78,8 +82,8 @@ impl<const N: usize> SharedHashMap<N> {
 
     pub fn get(&self, k: u64) -> Option<u64> {
         let pos: usize = k as usize % N;
-        let SharedHashMapEntry { key, val } = &self.data[pos];
-        let header = key.load(Ordering::Acquire);
+        let entry = self.data[pos].data.load(Ordering::Relaxed);
+        let header = (entry >> 64) as u64;
         if header == 0 {
             self.misses.fetch_add(1, Ordering::Relaxed);
             return None;
@@ -89,11 +93,7 @@ impl<const N: usize> SharedHashMap<N> {
             return None;
         }
         self.hits.fetch_add(1, Ordering::Relaxed);
-        // We have already synchronized on the aquire of the key so this is safe to be a relaxed
-        // load on the value. If we observe the desired key, the write of the value in a
-        // potentially different thread will be visible to us, and the read of the value here
-        // cannot be reordered before the load acquire of the key.
-        Some(val.load(Ordering::Relaxed))
+        Some(entry as u64)
     }
 
     /// Store a new key value pair in the hashmap. `insert` will not overwrite an existing entry,
@@ -113,36 +113,20 @@ impl<const N: usize> SharedHashMap<N> {
         // bail immediately if the spot is taken rather than trying to find a new one, we're not
         // worried about bunching or needing a backup method.
         let pos: usize = k as usize % N;
-        let SharedHashMapEntry { key, val } = &self.data[pos];
+        let entry = &self.data[pos].data;
 
-        // Rather than checking the key, when we insert, we immediately check the value. If it's
-        // uninitialized, we claim it and overwrite it.
+        // Rather than checking the key, when we insert, we just try to insert the value
         //
         // The trick we'll rely on is that we're only allowed to replace an unintialized value, and
         // the atomic cmpexchg will ensure that only one writer actually gets to write that value.
-        //
-        // MEMORY ORDERING:
-        // - success: Relaxed is okay here, we only need the write to be atomic. Readers will first
-        //            read the key with Acquire, so they will synchronize with our Release when we
-        //            write the key. Since they synchronize, if a reader sees our key write, it
-        //            will also see our value write, even if the value write is "Relaxed".
-        //
-        // - failure: On a fail, we don't care about the value we loaded, we know it's not 0, so we
-        //            bail no matter what. Admittedly, there might be an improvement opportunity
-        //            here where we could check the entry that beat us to it, and if we're deeper
-        //            than it for the same position, we automatically replace it, but let's keep
-        //            the concerns separate for now and let the caller figure it out.
-        if let Err(_) = val.compare_exchange(0, v, Ordering::Relaxed, Ordering::Relaxed) {
+        let expected = ((k as u128) << 64) | v as u128;
+        if let Err(_) = entry.compare_exchange(0, expected, Ordering::Relaxed, Ordering::Relaxed) {
             self.rejected.fetch_add(1, Ordering::Relaxed);
-            return false;
+            false
+        } else {
+            self.accepted.fetch_add(1, Ordering::Relaxed);
+            true
         }
-
-        // We successfully claimed the value slot. We're the only one allowed to write the key, so
-        // we can do so without a cmpxchg. We do need to write with Release semantics so that a
-        // getter will synchronize and be sure to see the correct value that we just wrote.
-        key.store(k, Ordering::Release);
-        self.accepted.fetch_add(1, Ordering::Relaxed);
-        true
     }
 
     /// Update an existing key in the hashmap from a known existing value to a new one.
@@ -151,21 +135,24 @@ impl<const N: usize> SharedHashMap<N> {
     /// `from`.
     pub fn update(&self, k: u64, from: u64, to: u64) -> Result<u64, u64> {
         let pos: usize = k as usize % N;
-        let SharedHashMapEntry { key, val } = &self.data[pos];
-        let header = key.load(Ordering::Acquire);
-        // It's a caller error if the caller tries to update a cell with the wrong key.
-        assert_eq!(header, k);
 
         // We don't really care about the ordering on success or failure here. The data will be
         // valid regardless of whether a reader gets the old or new value.
-        match val.compare_exchange(from, to, Ordering::Relaxed, Ordering::Relaxed) {
+        let expected = ((k as u128) << 64) | from as u128;
+        let desired = ((k as u128) << 64) | to as u128;
+        match self.data[pos].data.compare_exchange(
+            expected,
+            desired,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
             Ok(v) => {
                 self.updates.fetch_add(1, Ordering::Relaxed);
-                Ok(v)
+                Ok(v as u64)
             }
             Err(v) => {
                 self.rejected.fetch_add(1, Ordering::Relaxed);
-                Err(v)
+                Err(v as u64)
             }
         }
     }

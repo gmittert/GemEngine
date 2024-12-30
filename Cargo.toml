@@ -23,6 +23,7 @@ rand = "0.8.5"
 tracing = { version = "0.1", features = ["release_max_level_off"] }
 tracing-subscriber = "0.3.0"
 tracing-perfetto = "0.1.3"
+portable-atomic = { version = "1", default-features = false, features = ["require-cas"]}
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }
