@@ -73,11 +73,11 @@ impl UciEngine for Gem {
             use tracing_perfetto::PerfettoLayer;
             use tracing_subscriber::prelude::*;
 
-            let layer = PerfettoLayer::new(std::sync::Mutex::new(
-                    std::fs::File::create("gem.pb").unwrap(),
-            ))
-                .with_debug_annotations(true)
-                .with_filter_by_marker(|_|true);
+            let layer = PerfettoLayer::new(std::sync::Mutex::new(std::io::BufWriter::new(
+                std::fs::File::create("gem.pb").unwrap(),
+            )))
+            .with_debug_annotations(true)
+            .with_filter_by_marker(|_| true);
             tracing_subscriber::registry().with(layer).init();
         }
         Ok(())

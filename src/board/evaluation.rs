@@ -283,8 +283,8 @@ impl Board {
                 queue.execute(move || {
                     let best_score = Evaluation::lost();
                     let span = match to_play {
-                        Color::Black => trace_span!("white", inspecting = %m, alpha = %Evaluation::lost(), beta = %-best_score.inc_mate(), eval = field::Empty).entered(),
-                        Color::White => trace_span!("black", inspecting = %m, alpha = %Evaluation::lost(), beta = %-best_score.inc_mate(), eval = field::Empty).entered(),
+                        Color::Black => trace_span!("white", inspecting = %m, alpha = Evaluation::lost().0, beta = -best_score.inc_mate().0, eval = field::Empty).entered(),
+                        Color::White => trace_span!("black", inspecting = %m, alpha = Evaluation::lost().0, beta = -best_score.inc_mate().0, eval = field::Empty).entered(),
                     };
                     // Check for 3 fold repetition
                     let eval_res = new_b
@@ -297,7 +297,7 @@ impl Board {
                             );
                     let eval = -eval_res.eval.dec_mate();
 
-                    span.record("eval", format!("{eval}"));
+                    span.record("eval", eval.0);
                     drop(span);
 
                     let _ = tx.send((EvalResult{
@@ -356,7 +356,7 @@ impl Board {
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> EvalResult {
         let mut alpha = alpha;
         let stand_pat = self.eval(alpha, beta, self.to_play);
-        tracing::event!(Level::INFO, stand_pat = %stand_pat);
+        tracing::event!(Level::INFO, stand_pat = stand_pat.0);
         if stand_pat >= beta {
             return EvalResult {
                 eval: beta,
@@ -396,19 +396,24 @@ impl Board {
 
             if value >= Evaluation::draw() && !self.in_check(!self.to_play) {
                 let span = match self.to_play {
-                    Color::Black => trace_span!("quiesece white", inspecting = %m, alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered(),
-                    Color::White => trace_span!("quiesce black", inspecting = %m, alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered(),
+                    Color::Black => trace_span!("quiesece white", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
+                    Color::White => trace_span!("quiesce black", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
                 };
                 let eval_res = self.quiesce(-beta, -alpha.inc_mate());
                 let eval = -eval_res.eval.dec_mate();
                 nodes += eval_res.nodes;
                 seldepth = max(seldepth, eval_res.seldepth + 1);
-                span.record("eval", format!("{eval}"));
+                span.record("eval", eval.0);
                 drop(span);
                 if eval >= beta {
                     self.undo_move(&m);
 
-                    tracing::event!(Level::INFO, name = "Beta cutoff", "eval" = %eval, "beta" = %beta);
+                    tracing::event!(
+                        Level::INFO,
+                        name = "Beta cutoff",
+                        eval = eval.0,
+                        beta = beta.0
+                    );
                     return EvalResult {
                         eval: beta,
                         seldepth,
@@ -416,7 +421,12 @@ impl Board {
                     };
                 }
                 if eval > alpha {
-                    tracing::event!(Level::INFO, name = "Raised Alpha!", "alpha" = %alpha, "eval" = %eval);
+                    tracing::event!(
+                        Level::INFO,
+                        name = "Raised Alpha!",
+                        alpha = alpha.0,
+                        eval = eval.0
+                    );
                     alpha = eval;
                 }
             }
@@ -464,7 +474,13 @@ impl Board {
                     || (node_type == NodeType::Upper && eval < alpha)
                     || (node_type == NodeType::Lower && eval >= beta))
             {
-                tracing::event!(Level::INFO, name = "Retrieved from cache", "eval" = %eval);
+                tracing::event!(
+                    Level::INFO,
+                    name = "Retrieved from cache",
+                    eval = eval.0,
+                    "hash" = self.hash,
+                    ?node_type
+                );
                 return EvalResult {
                     eval,
                     seldepth: 0,
@@ -475,10 +491,15 @@ impl Board {
         // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't
         // want to compute taking a pawn with our queen and just stop computing there, for example.
         if self.half_move >= target_depth {
-            let span = trace_span!("quiesece", alpha = %alpha, beta = %beta, eval = field::Empty)
-                .entered();
+            let span = trace_span!(
+                "quiesece",
+                alpha = alpha.0,
+                beta = beta.0,
+                eval = field::Empty
+            )
+            .entered();
             let eval = self.quiesce(alpha, beta);
-            span.record("eval", format!("{}", eval.eval));
+            span.record("eval", eval.eval.0);
             return eval;
         }
         let mut alpha = alpha;
@@ -537,8 +558,8 @@ impl Board {
             if !self.in_check(!self.to_play) {
                 had_legal_move = true;
                 let span = match self.to_play {
-                    Color::Black => trace_span!("white", inspecting = %m, alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered(),
-                    Color::White => trace_span!("black", inspecting = %m, alpha = %-beta, beta = %-alpha.inc_mate(), eval = field::Empty).entered(),
+                    Color::Black => trace_span!("white", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
+                    Color::White => trace_span!("black", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
                 };
                 // Check for 3 fold repetition
                 let mut is_three_fold = false;
@@ -546,7 +567,6 @@ impl Board {
                     if self.half_move - irr >= 8 {
                         for (_, prev_state) in &self.moves[*irr as usize..] {
                             if *prev_state == self.hash {
-                                tracing::event!(Level::ERROR, "Three fold!");
                                 is_three_fold = true;
                                 break;
                             }
@@ -571,7 +591,7 @@ impl Board {
                 let eval = -eval_res.eval.dec_mate();
                 nodes += eval_res.nodes;
                 seldepth = max(seldepth, eval_res.seldepth + 1);
-                span.record("eval", format!("{eval}"));
+                span.record("eval", eval.0);
                 drop(span);
 
                 if eval >= beta {
@@ -598,6 +618,7 @@ impl Board {
                             }
                         }
                         None => {
+                            tracing::event!(Level::INFO, name = "inserting", eval = beta.0, hash = self.hash, node_type=?NodeType::Upper);
                             cache.insert(
                                 self.hash,
                                 PackedTTEntry::new(beta, target_depth, best_move, NodeType::Upper)
@@ -621,7 +642,12 @@ impl Board {
                             self.killer_moves[killer_idx][0] = new_move
                         }
                     }
-                    tracing::event!(Level::INFO, name = "Beta cutoff", "eval" = %eval, "beta" = %beta);
+                    tracing::event!(
+                        Level::INFO,
+                        name = "Beta cutoff",
+                        eval = eval.0,
+                        beta = beta.0
+                    );
                     return EvalResult {
                         eval: beta,
                         nodes,
@@ -630,7 +656,12 @@ impl Board {
                 }
 
                 if eval > alpha {
-                    tracing::event!(Level::INFO, name = "Raised Alpha!", "alpha" = %alpha, "eval" = %eval);
+                    tracing::event!(
+                        Level::INFO,
+                        name = "Raised Alpha!",
+                        alpha = alpha.0,
+                        eval = eval.0
+                    );
                     is_pv_node = true;
                     alpha = eval;
                     best_move = Some(a);
@@ -652,7 +683,12 @@ impl Board {
         match cached_val {
             Some(entry) => {
                 let mut expected = entry;
-                tracing::event!(Level::INFO, name = "Attempting update", target_depth = %target_depth, other_depth = %PackedTTEntry(expected).depth());
+                tracing::event!(
+                    Level::INFO,
+                    name = "Attempting update",
+                    target_depth = target_depth,
+                    other_depth = PackedTTEntry(expected).depth()
+                );
                 while target_depth > PackedTTEntry(expected).depth() {
                     if let Err(v) = cache.update(
                         self.hash,
@@ -683,7 +719,18 @@ impl Board {
                 tracing::event!(Level::INFO, name = "update done");
             }
             None => {
-                tracing::event!(Level::INFO, name = "inserting!");
+                let node_type = if is_pv_node {
+                    NodeType::Exact
+                } else {
+                    NodeType::Lower
+                };
+                tracing::event!(
+                    Level::INFO,
+                    name = "inserting",
+                    eval = eval.0,
+                    hash = self.hash,
+                    ?node_type
+                );
                 cache.insert(
                     self.hash,
                     PackedTTEntry::new(
@@ -694,11 +741,7 @@ impl Board {
                             from: m.from,
                             promotion: m.promotion,
                         }),
-                        if is_pv_node {
-                            NodeType::Exact
-                        } else {
-                            NodeType::Lower
-                        },
+                        node_type,
                     )
                     .0,
                 );
@@ -726,15 +769,16 @@ impl Board {
         let phase1_eval =
             (((mg_score as i32 * mg_phase) + (eg_score as i32 * eg_phase)) / 24) as i16;
 
-        tracing::event!(Level::INFO,
-        name = "Phase1 eval",
-        "eval" = %phase1_eval,
-        "alpha" = %alpha,
-        "beta" = %beta,
-        "mg_score" = %mg_score,
-        "eg_score" = %eg_score,
-        "mg_phase" = %mg_phase,
-        "eg_phase" = %eg_phase
+        tracing::event!(
+            Level::INFO,
+            name = "Phase1 eval",
+            eval = phase1_eval,
+            alpha = alpha.0,
+            beta = beta.0,
+            mg_score,
+            eg_score,
+            mg_phase,
+            eg_phase
         );
         // Lazily evaluate the more expensive parts. If we're already too far out of range of alpha
         // and beta, don't bother trying to compute the minutia.
@@ -775,7 +819,7 @@ impl Board {
                 Color::White => eval_refinements,
             };
 
-        tracing::event!(Level::INFO, name = "Phase2 eval", "eval" = %phase2_eval);
+        tracing::event!(Level::INFO, name = "Phase2 eval", "eval" = phase2_eval);
         Evaluation(phase2_eval)
     }
 
