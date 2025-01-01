@@ -1122,20 +1122,18 @@ impl Board {
                         continue;
                     }
                     if pos.rank() == promo_rank {
-                        for piece in [Piece::Queen, Piece::Rook, Piece::Knight, Piece::Bishop] {
-                            return Some(Move {
-                                from: i,
-                                to: pos,
-                                piece: Piece::Pawn,
-                                capture: self.query_pos(pos, !color),
-                                is_check: false,
-                                is_mate: false,
-                                is_en_passant: false,
-                                is_castle_king: false,
-                                is_castle_queen: false,
-                                promotion: Some(piece),
-                            });
-                        }
+                        return Some(Move {
+                            from: i,
+                            to: pos,
+                            piece: Piece::Pawn,
+                            capture: self.query_pos(pos, !color),
+                            is_check: false,
+                            is_mate: false,
+                            is_en_passant: false,
+                            is_castle_king: false,
+                            is_castle_queen: false,
+                            promotion: Some(Piece::Queen),
+                        });
                     } else {
                         return Some(Move {
                             from: i,
