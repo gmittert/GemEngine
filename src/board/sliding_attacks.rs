@@ -135,9 +135,10 @@ static ROOK_MASK: [u64; 64] = {
     arr
 };
 
+static mut ROOK_SLIDING_TABLE_INTERNAL: [[u64; 4096]; 64] = [[0; 4096]; 64];
+static mut BISHOP_SLIDING_TABLE_INTERNAL: [[u64; 512]; 64] = [[0; 512]; 64];
 lazy_static! {
-    static ref ROOK_SLIDING_TABLE: Vec<Vec<u64>> = {
-        let mut out = vec![vec![0; 4096]; 64];
+    static ref ROOK_SLIDING_TABLE: [[u64; 4096]; 64] = {
         for pos in ALL_POSNS {
             let num_bits = RBITS[pos.pos.ilog2() as usize];
             for idx in 0..(1 << num_bits) {
@@ -163,14 +164,14 @@ lazy_static! {
                 }
                 let key = u64::wrapping_mul(occupants, ROOK_MAGICS[pos.pos.ilog2() as usize])
                     >> (64 - num_bits);
-                out[pos.pos.ilog2() as usize][key as usize] = acc.0;
+                unsafe {
+                    ROOK_SLIDING_TABLE_INTERNAL[pos.pos.ilog2() as usize][key as usize] = acc.0
+                };
             }
         }
-        out
+        unsafe { ROOK_SLIDING_TABLE_INTERNAL }
     };
-    static ref BISHOP_SLIDING_TABLE: Vec<Vec<u64>> = {
-        let mut out = vec![vec![0; 512]; 64];
-
+    static ref BISHOP_SLIDING_TABLE: [[u64; 512]; 64] = {
         for pos in ALL_POSNS {
             let num_bits = BBITS[pos.pos.ilog2() as usize];
             for idx in 0..(1 << num_bits) {
@@ -196,10 +197,12 @@ lazy_static! {
                 }
                 let key = u64::wrapping_mul(occupants, BISHOP_MAGICS[pos.pos.ilog2() as usize])
                     >> (64 - num_bits);
-                out[pos.pos.ilog2() as usize][key as usize] = acc.0;
+                unsafe {
+                    BISHOP_SLIDING_TABLE_INTERNAL[pos.pos.ilog2() as usize][key as usize] = acc.0;
+                }
             }
         }
-        out
+        unsafe { BISHOP_SLIDING_TABLE_INTERNAL }
     };
 }
 
