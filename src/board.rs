@@ -108,17 +108,35 @@ pub struct Board {
     pub to_play: Color,
     pub half_move: u16,
     pub full_move: u16,
-    pub move_rights: Vec<MoveRights>,
     pub hash: u64,
-    // We track moves so that
-    pub moves: Vec<(Posn, u64)>,
-    pub last_irreversible: Vec<u16>,
 
     pub mg_piece_values: [i16; 2],
     pub eg_piece_values: [i16; 2],
     // A progression of the game (out of 24)
     pub game_phase: u8,
+
+    pub last_irreversible: Vec<u16>,
+    pub moves: Vec<(Posn, u64)>,
+    pub move_rights: Vec<MoveRights>,
     pub killer_moves: [[Option<AlgebraicMove>; 2]; 16],
+}
+
+pub struct BoardState {
+    pub black_pieces: [BitBoard; 6],
+    pub white_pieces: [BitBoard; 6],
+
+    pub to_play: Color,
+    pub half_move: u16,
+    pub full_move: u16,
+    pub hash: u64,
+
+    pub mg_piece_values: [i16; 2],
+    pub eg_piece_values: [i16; 2],
+    pub game_phase: u8,
+
+    pub last_irreversible_len: usize,
+    pub moves_len: usize,
+    pub move_rights_len: usize,
 }
 
 impl PartialEq for Board {
@@ -130,6 +148,9 @@ impl PartialEq for Board {
             && self.full_move == other.full_move
             && self.move_rights == other.move_rights
             && self.hash == other.hash
+            && self.game_phase == other.game_phase
+            && self.mg_piece_values == other.mg_piece_values
+            && self.eg_piece_values == other.eg_piece_values
     }
 }
 
@@ -502,6 +523,42 @@ impl Board {
     pub fn move_piece(&mut self, c: Color, p: Piece, from: Posn, to: Posn) {
         self.remove_piece(c, p, from);
         self.add_piece(c, p, to);
+    }
+
+    pub fn save_state(&self) -> BoardState {
+        BoardState {
+            black_pieces: self.black_pieces,
+            white_pieces: self.white_pieces,
+
+            to_play: self.to_play,
+            half_move: self.half_move,
+            full_move: self.full_move,
+            hash: self.hash,
+
+            mg_piece_values: self.mg_piece_values,
+            eg_piece_values: self.eg_piece_values,
+            game_phase: self.game_phase,
+
+            last_irreversible_len: self.last_irreversible.len(),
+            moves_len: self.moves.len(),
+            move_rights_len: self.move_rights.len(),
+        }
+    }
+
+    pub fn restore_state(&mut self, state: BoardState) {
+        self.black_pieces = state.black_pieces;
+        self.white_pieces = state.white_pieces;
+        self.to_play = state.to_play;
+        self.half_move = state.half_move;
+        self.full_move = state.full_move;
+        self.hash = state.hash;
+        self.mg_piece_values = state.mg_piece_values;
+        self.eg_piece_values = state.eg_piece_values;
+        self.game_phase = state.game_phase;
+
+        self.last_irreversible.truncate(state.last_irreversible_len);
+        self.moves.truncate(state.moves_len);
+        self.move_rights.truncate(state.move_rights_len);
     }
 
     pub fn make_move(&mut self, m: &Move) {
@@ -931,5 +988,62 @@ Nd7 {-4.00/9 5.0s, Draw by 3-fold repetition} *
     "###;
         let board = Board::from_pgn(pgn);
         assert!(board.is_some());
+    }
+
+    #[test]
+    fn save_restore() {
+        let mut board = starting_board();
+        let saved = board.save_state();
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: e2(),
+                to: e4(),
+                promotion: None,
+            })
+            .unwrap();
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: e7(),
+                to: e5(),
+                promotion: None,
+            })
+            .unwrap();
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: g1(),
+                to: f3(),
+                promotion: None,
+            })
+            .unwrap();
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: g8(),
+                to: f6(),
+                promotion: None,
+            })
+            .unwrap();
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: f3(),
+                to: e5(),
+                promotion: None,
+            })
+            .unwrap();
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: b8(),
+                to: c6(),
+                promotion: None,
+            })
+            .unwrap();
+        board
+            .make_alg_move(&AlgebraicMove {
+                from: d7(),
+                to: c6(),
+                promotion: None,
+            })
+            .unwrap();
+        board.restore_state(saved);
+        assert_eq!(board, starting_board());
     }
 }
