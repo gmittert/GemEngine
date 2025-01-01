@@ -13,8 +13,10 @@ use std::time::{Duration, Instant};
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
 pub struct Evaluation(pub i16);
 
+#[derive(Debug)]
 pub struct EvalResult {
     eval: Evaluation,
+    best_move: Option<AlgebraicMove>,
     seldepth: u16,
     nodes: usize,
 }
@@ -208,7 +210,6 @@ impl Board {
         cache: Arc<SharedHashMap<N>>,
         time: Option<Duration>,
     ) -> (Option<Move>, EvalResult) {
-        let mut had_legal_move = false;
         let target_depth = self.half_move + depth;
         let should_stop = Arc::new(AtomicBool::new(false));
         if let Some(sleep_for) = time {
@@ -218,139 +219,52 @@ impl Board {
                 should_stop.store(true, Ordering::Release);
             });
         }
-        let mut nodes = 0;
-        let mut seldepth = 0;
-
         let (tx, rx) = mpsc::channel();
 
-        let recapture = if let Some((p, _)) = self.moves.last() {
-            if let Some(capture) = self.get_smallest_attacker(*p, self.to_play) {
-                vec![AlgebraicMove {
-                    to: capture.to,
-                    from: capture.from,
-                    promotion: capture.promotion,
-                }]
-            } else {
-                vec![]
-            }
-        } else {
-            vec![]
-        }
-        .into_iter();
-        let moves = recapture.chain(self.pseudo_legal_moves_it());
-
-        for a in moves {
-            let m = self.from_algeabraic(&a);
-            if Some(Piece::King) == m.capture {
-                return (
-                    None,
-                    EvalResult {
-                        eval: Evaluation::won(),
-                        nodes: 1,
-                        seldepth: 1,
-                    },
+        for _ in 0..queue.max_count() {
+            let cloned_cache = cache.clone();
+            let mut new_b = self.clone();
+            let cloned_should_stop = should_stop.clone();
+            let cloned_tx = tx.clone();
+            queue.execute(move || {
+                let eval_res = new_b.alpha_beta(
+                    Evaluation::lost(),
+                    Evaluation::won(),
+                    target_depth,
+                    cloned_cache.as_ref(),
+                    cloned_should_stop,
                 );
-            }
-            self.make_move(&m);
-            if !self.in_check(!self.to_play) {
-                had_legal_move = true;
-                let tx = tx.clone();
-                let mut new_b = self.clone();
-                let m = m;
-                let cloned = cache.clone();
-                let should_stop = should_stop.clone();
-                let to_play = self.to_play;
 
-                if let Some(irr) = self.last_irreversible.last() {
-                    if self.half_move - irr >= 8 {
-                        for (_, prev_state) in &self.moves[*irr as usize..] {
-                            if *prev_state == self.hash {
-                                tracing::event!(Level::ERROR, "Three fold!");
-                                let _ = tx.send((
-                                    EvalResult {
-                                        eval: Evaluation::draw(),
-                                        nodes: 1,
-                                        seldepth: 1,
-                                    },
-                                    m,
-                                ));
-                                continue;
-                            }
-                        }
-                    }
-                }
-
-                queue.execute(move || {
-                    let best_score = Evaluation::lost();
-                    let span = match to_play {
-                        Color::Black => trace_span!("white", piece = %m.piece, to = %m.to, alpha = Evaluation::lost().0, beta = -best_score.inc_mate().0, eval = field::Empty).entered(),
-                        Color::White => trace_span!("black", piece = %m.piece, to = %m.to, alpha = Evaluation::lost().0, beta = -best_score.inc_mate().0, eval = field::Empty).entered(),
-                    };
-                    // Check for 3 fold repetition
-                    let eval_res = new_b
-                            .alpha_beta(
-                                Evaluation::lost(),
-                                -best_score.inc_mate(),
-                                target_depth,
-                                cloned.as_ref(),
-                                should_stop.clone(),
-                            );
-                    let eval = -eval_res.eval.dec_mate();
-
-                    span.record("eval", eval.0);
-                    drop(span);
-
-                    let _ = tx.send((EvalResult{
-                        eval,
-                        nodes: eval_res.nodes,
-                        seldepth: eval_res.seldepth,
-                    }, m));
-                });
-            }
-            self.undo_move(&m);
+                let _ = cloned_tx.send(eval_res);
+            });
         }
         drop(tx);
-        if had_legal_move {
-            let mut best_move = None;
-            let mut best_score = Evaluation::lost();
-            while let Ok((eval, m)) = rx.recv() {
-                nodes += eval.nodes;
-                seldepth = max(seldepth, eval.seldepth + 1);
-                if eval.eval > best_score {
-                    best_move = Some(m);
-                    best_score = eval.eval;
-                }
-            }
-            (
-                best_move,
-                EvalResult {
-                    eval: best_score,
-                    nodes,
-                    seldepth,
-                },
-            )
-        } else {
-            // We have no legal moves. If we are in check, it's checkmate. If not, it's stalemate
-            if self.in_check(self.to_play) {
-                (
-                    None,
-                    EvalResult {
-                        eval: Evaluation::lost(),
-                        nodes: 1,
-                        seldepth: 1,
-                    },
-                )
-            } else {
-                (
-                    None,
-                    EvalResult {
-                        eval: Evaluation::draw(),
-                        nodes: 1,
-                        seldepth: 1,
-                    },
-                )
-            }
+
+        let EvalResult {
+            eval,
+            best_move,
+            mut seldepth,
+            mut nodes,
+        } = rx.recv().expect("Failed to read from channel!?");
+        should_stop.store(true, Ordering::Relaxed);
+        while let Ok(EvalResult {
+            seldepth: added_seldepth,
+            nodes: added_nodes,
+            ..
+        }) = rx.recv()
+        {
+            nodes += added_nodes;
+            seldepth = max(seldepth, added_seldepth);
         }
+        (
+            best_move.map(|x| self.from_algeabraic(&x)),
+            EvalResult {
+                eval,
+                best_move,
+                seldepth,
+                nodes,
+            },
+        )
     }
 
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> EvalResult {
@@ -362,6 +276,7 @@ impl Board {
                 eval: beta,
                 seldepth: 1,
                 nodes: 1,
+                best_move: None,
             };
         }
         if alpha < stand_pat {
@@ -418,6 +333,7 @@ impl Board {
                         eval: beta,
                         seldepth,
                         nodes,
+                        best_move: None,
                     };
                 }
                 if eval > alpha {
@@ -436,6 +352,7 @@ impl Board {
             eval: alpha,
             seldepth,
             nodes,
+            best_move: None,
         }
     }
 
@@ -453,6 +370,7 @@ impl Board {
         if should_stop.load(Ordering::Acquire) {
             return EvalResult {
                 eval: Evaluation::draw(),
+                best_move: None,
                 seldepth: 0,
                 nodes: 0,
             };
@@ -481,6 +399,7 @@ impl Board {
                 );
                 return EvalResult {
                     eval,
+                    best_move,
                     seldepth: 0,
                     nodes: 1,
                 };
@@ -576,6 +495,7 @@ impl Board {
                         eval: Evaluation::draw(),
                         nodes: 1,
                         seldepth: 1,
+                        best_move: Some(a),
                     }
                 } else {
                     self.alpha_beta(
@@ -650,6 +570,7 @@ impl Board {
                         eval: beta,
                         nodes,
                         seldepth,
+                        best_move: Some(a),
                     };
                 }
 
@@ -749,6 +670,7 @@ impl Board {
             eval,
             nodes,
             seldepth,
+            best_move,
         }
     }
 
@@ -1007,12 +929,12 @@ mod tests {
     #[test]
     fn won() {
         let mut b =
-            Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
+            Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let pool = threadpool::ThreadPool::new(1);
         let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
         let (best_move, eval) = b.best_move(4, &pool, cache.clone(), None);
         assert!(best_move.is_none());
-        assert_eq!(eval.eval, Evaluation::won());
+        assert_eq!(eval.eval, -Evaluation::won());
     }
     #[test]
     fn lost() {
