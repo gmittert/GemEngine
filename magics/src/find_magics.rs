@@ -127,8 +127,8 @@ static BBITS: [u8; 64] = [
 ];
 
 fn find_rook_magic(pos: Posn, rng: &mut StdRng) {
-    let mask = ROOK_MASK[pos.pos.ilog2() as usize];
-    let num_bits = RBITS[pos.pos.ilog2() as usize];
+    let mask = ROOK_MASK[pos.idx() as usize];
+    let num_bits = RBITS[pos.idx() as usize];
 
     let mut bitset: [u64; 1 << 9];
     'outer: loop {
@@ -162,8 +162,8 @@ fn find_rook_magic(pos: Posn, rng: &mut StdRng) {
 }
 
 fn find_bishop_magic(pos: Posn, rng: &mut StdRng) {
-    let mask = BISHOP_MASK[pos.pos.ilog2() as usize];
-    let num_bits = BBITS[pos.pos.ilog2() as usize];
+    let mask = BISHOP_MASK[pos.idx() as usize];
+    let num_bits = BBITS[pos.idx() as usize];
 
     let mut bitset: [u64; 1 << 6];
     'outer: loop {

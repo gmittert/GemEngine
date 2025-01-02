@@ -25,7 +25,7 @@ impl ZobristNumbers {
             Color::White => 0,
             Color::Black => NUM_PIECES,
         };
-        self.piece_hashes[square.pos.ilog2() as usize][piece_id + color_offset]
+        self.piece_hashes[square.idx() as usize][piece_id + color_offset]
     }
 }
 

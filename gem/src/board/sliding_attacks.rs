@@ -11,19 +11,19 @@ use magics::ROOK_MASK;
 include!(concat!(env!("OUT_DIR"), "/magics.rs"));
 
 pub fn compute_rook_attacks(from: Posn, board: BitBoard) -> BitBoard {
-    let mask = ROOK_MASK[from.pos.ilog2() as usize];
-    let num_bits = RBITS[from.pos.ilog2() as usize];
-    let magic = ROOK_MAGICS[from.pos.ilog2() as usize];
+    let mask = ROOK_MASK[from.idx() as usize];
+    let num_bits = RBITS[from.idx() as usize];
+    let magic = ROOK_MAGICS[from.idx() as usize];
     let key = u64::wrapping_mul(board.0 & mask, magic) >> (64 - num_bits);
-    BitBoard(ROOK_SLIDING_TABLE[from.pos.ilog2() as usize][key as usize])
+    BitBoard(ROOK_SLIDING_TABLE[from.idx() as usize][key as usize])
 }
 
 pub fn compute_bishop_attacks(from: Posn, board: BitBoard) -> BitBoard {
-    let mask = BISHOP_MASK[from.pos.ilog2() as usize];
-    let num_bits = BBITS[from.pos.ilog2() as usize];
-    let magic = BISHOP_MAGICS[from.pos.ilog2() as usize];
+    let mask = BISHOP_MASK[from.idx() as usize];
+    let num_bits = BBITS[from.idx() as usize];
+    let magic = BISHOP_MAGICS[from.idx() as usize];
     let key = u64::wrapping_mul(board.0 & mask, magic) >> (64 - num_bits);
-    BitBoard(BISHOP_SLIDING_TABLE[from.pos.ilog2() as usize][key as usize])
+    BitBoard(BISHOP_SLIDING_TABLE[from.idx() as usize][key as usize])
 }
 
 #[cfg(test)]

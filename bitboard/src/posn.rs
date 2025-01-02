@@ -120,8 +120,24 @@ impl Posn {
         }
     }
 
+    #[inline]
+    pub const fn idx(&self) -> u32 {
+        // On the Author's machine, even though we know a priori that posns are non zero,
+        //
+        // ```
+        // unsafe {NonZero::new_unchecked(self.pos).ilog2()}
+        // ```
+        //
+        // compiles down to the same thing as just calling ilog2, so we just use the ilog2 call
+        // below.
+        //
+        // However, the #[inline] is quite necessary to not pay a 40% perf penalty for abstracting
+        // this into a function.
+        self.pos.ilog2()
+    }
+
     pub const fn rank(&self) -> Rank {
-        let first_bit = self.pos.ilog2();
+        let first_bit = self.idx();
         match (first_bit >> 3) & 0x7 {
             0 => Rank::One,
             1 => Rank::Two,
@@ -135,7 +151,7 @@ impl Posn {
     }
 
     pub const fn file(&self) -> File {
-        let first_bit = self.pos.ilog2();
+        let first_bit = self.idx();
         match first_bit & 0x7 {
             0 => File::H,
             1 => File::G,

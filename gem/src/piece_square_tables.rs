@@ -158,8 +158,8 @@ mod tests {
                 Piece::King,
             ] {
                 assert_eq!(
-                    MG_TABLE[Color::White as usize][piece as usize][posn.pos.ilog2() as usize],
-                    MG_TABLE[Color::Black as usize][piece as usize][flip(posn.pos.ilog2() as usize)],
+                    MG_TABLE[Color::White as usize][piece as usize][posn.idx() as usize],
+                    MG_TABLE[Color::Black as usize][piece as usize][flip(posn.idx() as usize)],
                 );
             }
         }
@@ -176,8 +176,8 @@ mod tests {
                 Piece::King,
             ] {
                 assert_eq!(
-                    EG_TABLE[Color::White as usize][piece as usize][posn.pos.ilog2() as usize],
-                    EG_TABLE[Color::Black as usize][piece as usize][flip(posn.pos.ilog2() as usize)],
+                    EG_TABLE[Color::White as usize][piece as usize][posn.idx() as usize],
+                    EG_TABLE[Color::Black as usize][piece as usize][flip(posn.idx() as usize)],
                 );
             }
         }

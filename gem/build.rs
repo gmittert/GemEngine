@@ -24,9 +24,9 @@ static mut BISHOP_SLIDING_TABLE: [[u64; 512]; 64] = [[0; 512]; 64];
 
 fn main() -> std::io::Result<()> {
     for pos in ALL_POSNS {
-        let num_bits = RBITS[pos.pos.ilog2() as usize];
+        let num_bits = RBITS[pos.idx() as usize];
         for idx in 0..(1 << num_bits) {
-            let mask = ROOK_MASK[pos.pos.ilog2() as usize];
+            let mask = ROOK_MASK[pos.idx() as usize];
             let occupants = pdep(mask, idx);
             let board = BitBoard(occupants);
 
@@ -46,16 +46,16 @@ fn main() -> std::io::Result<()> {
                     slide = shift(pos);
                 }
             }
-            let key = u64::wrapping_mul(occupants, ROOK_MAGICS[pos.pos.ilog2() as usize])
-                >> (64 - num_bits);
-            unsafe { ROOK_SLIDING_TABLE[pos.pos.ilog2() as usize][key as usize] = acc.0 };
+            let key =
+                u64::wrapping_mul(occupants, ROOK_MAGICS[pos.idx() as usize]) >> (64 - num_bits);
+            unsafe { ROOK_SLIDING_TABLE[pos.idx() as usize][key as usize] = acc.0 };
         }
     }
 
     for pos in ALL_POSNS {
-        let num_bits = BBITS[pos.pos.ilog2() as usize];
+        let num_bits = BBITS[pos.idx() as usize];
         for idx in 0..(1 << num_bits) {
-            let mask = BISHOP_MASK[pos.pos.ilog2() as usize];
+            let mask = BISHOP_MASK[pos.idx() as usize];
             let occupants = pdep(mask, idx);
             let board = BitBoard(occupants);
 
@@ -75,10 +75,10 @@ fn main() -> std::io::Result<()> {
                     slide = shift(pos);
                 }
             }
-            let key = u64::wrapping_mul(occupants, BISHOP_MAGICS[pos.pos.ilog2() as usize])
-                >> (64 - num_bits);
+            let key =
+                u64::wrapping_mul(occupants, BISHOP_MAGICS[pos.idx() as usize]) >> (64 - num_bits);
             unsafe {
-                BISHOP_SLIDING_TABLE[pos.pos.ilog2() as usize][key as usize] = acc.0;
+                BISHOP_SLIDING_TABLE[pos.idx() as usize][key as usize] = acc.0;
             }
         }
     }

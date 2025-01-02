@@ -440,8 +440,8 @@ impl Board {
                 self.white_pieces[p as usize] |= pos;
             }
         };
-        let eg_val = EG_TABLE[c as usize][p as usize][pos.pos.ilog2() as usize];
-        let mg_val = MG_TABLE[c as usize][p as usize][pos.pos.ilog2() as usize];
+        let eg_val = EG_TABLE[c as usize][p as usize][pos.idx() as usize];
+        let mg_val = MG_TABLE[c as usize][p as usize][pos.idx() as usize];
         self.eg_piece_values[c as usize] += eg_val;
         self.mg_piece_values[c as usize] += mg_val;
         self.game_phase += GAME_PHASE_INC[p as usize];
@@ -456,8 +456,8 @@ impl Board {
                 self.white_pieces[p as usize] &= !BitBoard::from(pos);
             }
         };
-        let eg_val = EG_TABLE[c as usize][p as usize][pos.pos.ilog2() as usize];
-        let mg_val = MG_TABLE[c as usize][p as usize][pos.pos.ilog2() as usize];
+        let eg_val = EG_TABLE[c as usize][p as usize][pos.idx() as usize];
+        let mg_val = MG_TABLE[c as usize][p as usize][pos.idx() as usize];
         self.eg_piece_values[c as usize] -= eg_val;
         self.mg_piece_values[c as usize] -= mg_val;
         self.game_phase -= GAME_PHASE_INC[p as usize];
