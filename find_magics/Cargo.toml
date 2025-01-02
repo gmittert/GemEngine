@@ -1,0 +1,8 @@
+[package]
+name = "find_magics"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gem = { path = "../gem" }
+rand = "0.8.5"

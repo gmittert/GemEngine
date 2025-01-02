@@ -1,37 +1,10 @@
-[package]
-name = "gem"
-version = "0.1.0"
-edition = "2021"
-
-[lib]
-name = "gem"
-path = "src/lib.rs"
-
-[[bin]]
-name = "gem"
-path = "src/bin/main.rs"
-
-[[bin]]
-name = "find_magics"
-path = "src/magics/find_magics.rs"
-
-[dependencies]
-paste = "1.0.15"
-threadpool = "1.8.1"
-lazy_static = "1.5.0"
-rand = "0.8.5"
-tracing = { version = "0.1.41", features = ["release_max_level_off"] }
-tracing-subscriber = "0.3.19"
-portable-atomic = { version = "1.10.0", default-features = false, features = ["require-cas"]}
-tracing-perfetto = "0.1.4"
-
-[dev-dependencies]
-criterion = { version = "0.5.1", features = ["html_reports"] }
-
-[[bench]]
-name = "gem_bench"
-harness = false
+[workspace]
+members = [ "find_magics",
+  "gem"
+]
+resolver = "2"
 
 [profile.rel-with-debug]
 inherits = "release"
 debug = true
+
