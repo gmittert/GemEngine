@@ -12,6 +12,7 @@ tracing-subscriber = "0.3.19"
 portable-atomic = { version = "1.10.0", default-features = false, features = ["require-cas"]}
 tracing-perfetto = "0.1.4"
 bitboard = { path = "../bitboard" }
+magics = { path = "../magics" }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
@@ -19,3 +20,7 @@ criterion = { version = "0.5.1", features = ["html_reports"] }
 [[bench]]
 name = "gem_bench"
 harness = false
+
+[build-dependencies]
+bitboard = { path = "../bitboard" }
+magics = { path = "../magics" }

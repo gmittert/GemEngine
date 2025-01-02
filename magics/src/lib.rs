@@ -1,3 +1,5 @@
+use bitboard::posn::Posn;
+
 pub static RBITS: [u8; 64] = [
     12, 11, 11, 11, 11, 11, 11, 12, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11,
     11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11,
@@ -158,3 +160,103 @@ pub static BISHOP_MAGICS: [u64; 64] = [
     0xc31404214090200,
     0x10040100440100,
 ];
+
+pub static BISHOP_MASK: [u64; 64] = {
+    let mut arr = [0; 64];
+    let mut i = 0;
+    while i < 64 {
+        let pos = Posn { pos: 1 << i };
+
+        let mut acc = 0;
+
+        let mut slide = pos.ne();
+        while let Some(pos) = slide {
+            if pos.ne().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.ne();
+        }
+
+        let mut slide = pos.se();
+        while let Some(pos) = slide {
+            if pos.se().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.se();
+        }
+
+        let mut slide = pos.nw();
+        while let Some(pos) = slide {
+            if pos.nw().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.nw();
+        }
+
+        let mut slide = pos.sw();
+        while let Some(pos) = slide {
+            if pos.sw().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.sw();
+        }
+
+        arr[i] = acc;
+        i += 1;
+    }
+    arr
+};
+
+pub static ROOK_MASK: [u64; 64] = {
+    let mut arr = [0; 64];
+    let mut i = 0;
+    while i < 64 {
+        let pos = Posn { pos: 1 << i };
+
+        let mut acc = 0;
+
+        let mut slide = pos.no();
+        while let Some(pos) = slide {
+            if pos.no().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.no();
+        }
+
+        let mut slide = pos.so();
+        while let Some(pos) = slide {
+            if pos.so().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.so();
+        }
+
+        let mut slide = pos.ea();
+        while let Some(pos) = slide {
+            if pos.ea().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.ea();
+        }
+
+        let mut slide = pos.we();
+        while let Some(pos) = slide {
+            if pos.we().is_none() {
+                break;
+            }
+            acc |= pos.pos;
+            slide = pos.we();
+        }
+
+        arr[i] = acc;
+        i += 1;
+    }
+    arr
+};

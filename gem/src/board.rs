@@ -1,5 +1,4 @@
 pub mod evaluation;
-mod magics;
 mod move_generation;
 mod sliding_attacks;
 use crate::piece_square_tables::EG_TABLE;
@@ -10,9 +9,9 @@ use crate::parser::Parser;
 use crate::pgn;
 use crate::pgn::GameTermination;
 use crate::zobrist::ZOBRIST_KEYS;
-use bitboard::moves::*;
+use bitboard::moves::{AlgebraicMove, Color, Move, Piece};
 use bitboard::posn::*;
-use bitboard::*;
+use bitboard::BitBoard;
 use std::fmt;
 
 #[derive(Debug, PartialEq)]

@@ -1,0 +1,19 @@
+[package]
+name = "magics"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitboard = { path = "../bitboard" }
+rand = "0.8.5"
+
+[[bin]]
+name = "find_magics"
+path = "src/find_magics.rs"
+
+[lib]
+name = "magics"
+path = "src/lib.rs"
+
+[build-dependencies]
+bitboard = { path = "../bitboard" }
