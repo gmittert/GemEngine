@@ -1,6 +1,6 @@
 pub mod moves;
 pub mod posn;
-use std::ops;
+use std::{num::NonZero, ops};
 
 use crate::posn::*;
 
@@ -13,11 +13,11 @@ impl BitBoard {
     }
 
     pub const fn from(p: Posn) -> BitBoard {
-        BitBoard { 0: p.pos }
+        BitBoard { 0: p.pos.get() }
     }
 
     pub const fn contains(&self, p: Posn) -> bool {
-        self.0 & p.pos != 0
+        self.0 & p.pos.get() != 0
     }
 
     pub const fn is_empty(&self) -> bool {
@@ -61,11 +61,15 @@ impl Iterator for BitBoard {
         if self.0 == 0x8000_0000_0000_0000 {
             let res = self.0;
             self.0 = 0;
-            return Some(Posn { pos: res });
+            return Some(Posn {
+                pos: unsafe { NonZero::new_unchecked(res) },
+            });
         }
         let lsb = (self.0 as i64) & -(self.0 as i64);
         self.0 &= self.0 - 1;
-        Some(Posn { pos: lsb as u64 })
+        Some(Posn {
+            pos: unsafe { NonZero::new_unchecked(lsb as u64) },
+        })
     }
 }
 

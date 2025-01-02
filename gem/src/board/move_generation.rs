@@ -1195,7 +1195,7 @@ mod tests {
     fn rook_moves_empty() {
         for i in 0..64 {
             let mut board = empty_board(Color::White);
-            board.add_piece(Color::White, Piece::Rook, Posn { pos: 1 << i });
+            board.add_piece(Color::White, Piece::Rook, Posn::from_idx(i).unwrap());
             let mut moves = vec![];
             board.rook_moves(&mut moves);
             assert_eq!(moves.len(), 14);
@@ -1205,7 +1205,7 @@ mod tests {
                 before.undo_move(&m);
                 assert_eq!(before, board);
             }
-            board.remove_piece(Color::White, Piece::Rook, Posn { pos: 1 << i });
+            board.remove_piece(Color::White, Piece::Rook, Posn::from_idx(i).unwrap());
         }
     }
 

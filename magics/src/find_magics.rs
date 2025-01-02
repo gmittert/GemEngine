@@ -6,7 +6,7 @@ static ROOK_MASK: [u64; 64] = {
     let mut arr = [0; 64];
     let mut i = 0;
     while i < 64 {
-        let pos = Posn { pos: 1 << i };
+        let pos = Posn::from_idx(i).unwrap();
 
         let mut acc = 0;
 
@@ -15,7 +15,7 @@ static ROOK_MASK: [u64; 64] = {
             if pos.no().is_none() {
                 break;
             }
-            acc |= pos.pos;
+            acc |= pos.pos.get();
             slide = pos.no();
         }
 
@@ -24,7 +24,7 @@ static ROOK_MASK: [u64; 64] = {
             if pos.so().is_none() {
                 break;
             }
-            acc |= pos.pos;
+            acc |= pos.pos.get();
             slide = pos.so();
         }
 
@@ -33,7 +33,7 @@ static ROOK_MASK: [u64; 64] = {
             if pos.ea().is_none() {
                 break;
             }
-            acc |= pos.pos;
+            acc |= pos.pos.get();
             slide = pos.ea();
         }
 
@@ -42,7 +42,7 @@ static ROOK_MASK: [u64; 64] = {
             if pos.we().is_none() {
                 break;
             }
-            acc |= pos.pos;
+            acc |= pos.pos.get();
             slide = pos.we();
         }
 
@@ -56,7 +56,7 @@ static BISHOP_MASK: [u64; 64] = {
     let mut arr = [0; 64];
     let mut i = 0;
     while i < 64 {
-        let pos = Posn { pos: 1 << i };
+        let pos = Posn::from_idx(i).unwrap();
 
         let mut acc = 0;
 
@@ -65,7 +65,7 @@ static BISHOP_MASK: [u64; 64] = {
             if pos.ne().is_none() {
                 break;
             }
-            acc |= pos.pos;
+            acc |= pos.pos.get();
             slide = pos.ne();
         }
 
@@ -74,7 +74,7 @@ static BISHOP_MASK: [u64; 64] = {
             if pos.se().is_none() {
                 break;
             }
-            acc |= pos.pos;
+            acc |= pos.pos.get();
             slide = pos.se();
         }
 
@@ -83,7 +83,7 @@ static BISHOP_MASK: [u64; 64] = {
             if pos.nw().is_none() {
                 break;
             }
-            acc |= pos.pos;
+            acc |= pos.pos.get();
             slide = pos.nw();
         }
 
@@ -92,7 +92,7 @@ static BISHOP_MASK: [u64; 64] = {
             if pos.sw().is_none() {
                 break;
             }
-            acc |= pos.pos;
+            acc |= pos.pos.get();
             slide = pos.sw();
         }
 

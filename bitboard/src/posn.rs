@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, num::NonZero};
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -109,14 +109,23 @@ impl fmt::Display for File {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[repr(transparent)]
 pub struct Posn {
-    pub pos: u64,
+    pub pos: NonZero<u64>,
 }
 
 impl Posn {
     pub const fn from(rank: Rank, file: File) -> Posn {
         Posn {
-            pos: 1 << ((8 * (rank as u8)) + (file as u8)),
+            pos: unsafe { NonZero::new_unchecked(1 << ((8 * (rank as u8)) + (file as u8))) },
+        }
+    }
+
+    pub const fn from_idx(i: usize) -> Option<Posn> {
+        if let Some(pos) = NonZero::new(1 << i) {
+            unsafe { std::mem::transmute(Posn { pos }) }
+        } else {
+            None
         }
     }
 
@@ -164,78 +173,99 @@ impl Posn {
         }
     }
 
-    const fn check(&self) -> Option<Posn> {
-        if self.pos == 0 {
-            return None;
-        }
-        Some(*self)
-    }
-    pub const fn no_unchecked(&self) -> Posn {
-        Posn { pos: self.pos << 8 }
-    }
-    pub const fn so_unchecked(&self) -> Posn {
-        Posn { pos: self.pos >> 8 }
-    }
-    pub const fn ea_unchecked(&self) -> Posn {
-        const A_FILE: u64 = 0x8080_8080_8080_8080;
-        Posn {
-            pos: (self.pos >> 1) & !A_FILE,
-        }
-    }
-    pub const fn we_unchecked(&self) -> Posn {
-        const H_FILE: u64 = 0x0101_0101_0101_0101;
-        Posn {
-            pos: (self.pos << 1) & !H_FILE,
-        }
-    }
-
     pub const fn no(&self) -> Option<Posn> {
-        self.no_unchecked().check()
+        let no = self.pos.get() << 8;
+        unsafe { std::mem::transmute(no) }
     }
     pub const fn so(&self) -> Option<Posn> {
-        self.so_unchecked().check()
+        let so = self.pos.get() >> 8;
+        unsafe { std::mem::transmute(so) }
     }
     pub const fn ea(&self) -> Option<Posn> {
-        self.ea_unchecked().check()
+        const A_FILE: u64 = 0x8080_8080_8080_8080;
+        let ea = (self.pos.get() >> 1) & !A_FILE;
+        unsafe { std::mem::transmute(ea) }
     }
     pub const fn we(&self) -> Option<Posn> {
-        self.we_unchecked().check()
+        const H_FILE: u64 = 0x0101_0101_0101_0101;
+        let we = (self.pos.get() << 1) & !H_FILE;
+        unsafe { std::mem::transmute(we) }
     }
     pub const fn nw(&self) -> Option<Posn> {
-        self.no_unchecked().we_unchecked().check()
+        let no = self.pos.get() << 8;
+        const H_FILE: u64 = 0x0101_0101_0101_0101;
+        let nw = (no << 1) & !H_FILE;
+        unsafe { std::mem::transmute(nw) }
     }
     pub const fn ne(&self) -> Option<Posn> {
-        self.no_unchecked().ea_unchecked().check()
+        let no = self.pos.get() << 8;
+        const A_FILE: u64 = 0x8080_8080_8080_8080;
+        let ne = (no >> 1) & !A_FILE;
+        unsafe { std::mem::transmute(ne) }
     }
     pub const fn sw(&self) -> Option<Posn> {
-        self.so_unchecked().we_unchecked().check()
+        let so = self.pos.get() >> 8;
+        const H_FILE: u64 = 0x0101_0101_0101_0101;
+        let sw = (so << 1) & !H_FILE;
+        unsafe { std::mem::transmute(sw) }
     }
     pub const fn se(&self) -> Option<Posn> {
-        self.so_unchecked().ea_unchecked().check()
+        let so = self.pos.get() >> 8;
+        const A_FILE: u64 = 0x8080_8080_8080_8080;
+        let se = (so >> 1) & !A_FILE;
+        unsafe { std::mem::transmute(se) }
     }
     pub const fn nnw(&self) -> Option<Posn> {
-        self.no_unchecked().no_unchecked().we_unchecked().check()
+        let nno = self.pos.get() << 16;
+        const H_FILE: u64 = 0x0101_0101_0101_0101;
+        let nnw = (nno << 1) & !H_FILE;
+        unsafe { std::mem::transmute(nnw) }
     }
     pub const fn nne(&self) -> Option<Posn> {
-        self.no_unchecked().no_unchecked().ea_unchecked().check()
+        let nno = self.pos.get() << 16;
+        const A_FILE: u64 = 0x8080_8080_8080_8080;
+        let nne = (nno >> 1) & !A_FILE;
+        unsafe { std::mem::transmute(nne) }
     }
     pub const fn nww(&self) -> Option<Posn> {
-        self.no_unchecked().we_unchecked().we_unchecked().check()
+        let no = self.pos.get() << 8;
+        const H_FILE: u64 = 0x0101_0101_0101_0101;
+        let nw = (no << 1) & !H_FILE;
+        let nww = (nw << 1) & !H_FILE;
+        unsafe { std::mem::transmute(nww) }
     }
     pub const fn nee(&self) -> Option<Posn> {
-        self.no_unchecked().ea_unchecked().ea_unchecked().check()
+        let no = self.pos.get() << 8;
+        const A_FILE: u64 = 0x8080_8080_8080_8080;
+        let ne = (no >> 1) & !A_FILE;
+        let nee = (ne >> 1) & !A_FILE;
+        unsafe { std::mem::transmute(nee) }
     }
     pub const fn ssw(&self) -> Option<Posn> {
-        self.so_unchecked().so_unchecked().we_unchecked().check()
+        let sso = self.pos.get() >> 16;
+        const H_FILE: u64 = 0x0101_0101_0101_0101;
+        let ssw = (sso << 1) & !H_FILE;
+        unsafe { std::mem::transmute(ssw) }
     }
     pub const fn sse(&self) -> Option<Posn> {
-        self.so_unchecked().so_unchecked().ea_unchecked().check()
+        let sso = self.pos.get() >> 16;
+        const A_FILE: u64 = 0x8080_8080_8080_8080;
+        let sse = (sso >> 1) & !A_FILE;
+        unsafe { std::mem::transmute(sse) }
     }
     pub const fn sww(&self) -> Option<Posn> {
-        self.so_unchecked().we_unchecked().we_unchecked().check()
+        let so = self.pos.get() >> 8;
+        const H_FILE: u64 = 0x0101_0101_0101_0101;
+        let sw = (so << 1) & !H_FILE;
+        let sww = (sw << 1) & !H_FILE;
+        unsafe { std::mem::transmute(sww) }
     }
     pub const fn see(&self) -> Option<Posn> {
-        self.so_unchecked().ea_unchecked().ea_unchecked().check()
+        let so = self.pos.get() >> 8;
+        const A_FILE: u64 = 0x8080_8080_8080_8080;
+        let se = (so >> 1) & !A_FILE;
+        let see = (se >> 1) & !A_FILE;
+        unsafe { std::mem::transmute(see) }
     }
 }
 

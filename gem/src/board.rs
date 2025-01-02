@@ -788,29 +788,35 @@ impl fmt::Display for Board {
         let mut chars: [char; 64] = ['.'; 64];
 
         for i in 0..64 as usize {
-            if self.black_pieces[Piece::King as usize].contains(Posn { pos: 1 << i }) {
+            if self.black_pieces[Piece::King as usize].contains(Posn::from_idx(i).unwrap()) {
                 chars[i] = '♔'
-            } else if self.black_pieces[Piece::Queen as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.black_pieces[Piece::Queen as usize].contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♕'
-            } else if self.black_pieces[Piece::Knight as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.black_pieces[Piece::Knight as usize].contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♘'
-            } else if self.black_pieces[Piece::Pawn as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.black_pieces[Piece::Pawn as usize].contains(Posn::from_idx(i).unwrap()) {
                 chars[i] = '♙'
-            } else if self.black_pieces[Piece::Bishop as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.black_pieces[Piece::Bishop as usize].contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♗'
-            } else if self.black_pieces[Piece::Rook as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.black_pieces[Piece::Rook as usize].contains(Posn::from_idx(i).unwrap()) {
                 chars[i] = '♖'
-            } else if self.white_pieces[Piece::King as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.white_pieces[Piece::King as usize].contains(Posn::from_idx(i).unwrap()) {
                 chars[i] = '♚'
-            } else if self.white_pieces[Piece::Queen as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.white_pieces[Piece::Queen as usize].contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♛'
-            } else if self.white_pieces[Piece::Knight as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.white_pieces[Piece::Knight as usize].contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♞'
-            } else if self.white_pieces[Piece::Pawn as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.white_pieces[Piece::Pawn as usize].contains(Posn::from_idx(i).unwrap()) {
                 chars[i] = '♟'
-            } else if self.white_pieces[Piece::Bishop as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.white_pieces[Piece::Bishop as usize].contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♝'
-            } else if self.white_pieces[Piece::Rook as usize].contains(Posn { pos: 1 << i }) {
+            } else if self.white_pieces[Piece::Rook as usize].contains(Posn::from_idx(i).unwrap()) {
                 chars[i] = '♜'
             }
         }
