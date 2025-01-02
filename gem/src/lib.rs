@@ -1,3 +1,4 @@
+#![feature(new_zeroed_alloc)]
 pub mod board;
 pub mod gem;
 pub mod parser;

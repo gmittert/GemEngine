@@ -5,17 +5,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub struct SharedHashMapEntry {
     data: AtomicU128,
 }
-impl SharedHashMapEntry {
-    fn new(key: u64, value: u64) -> Self {
-        Self {
-            data: AtomicU128::new(((key as u128) << 64) | value as u128),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct SharedHashMap<const N: usize> {
-    data: Vec<SharedHashMapEntry>,
+    data: Box<[SharedHashMapEntry; N]>,
     hits: AtomicUsize,
     misses: AtomicUsize,
     conflicts: AtomicUsize,
@@ -65,12 +58,14 @@ impl<const N: usize> SharedHashMap<N> {
         );
     }
     pub fn new() -> SharedHashMap<N> {
-        let mut vec = Vec::with_capacity(N);
-        for _ in 0..N {
-            vec.push(SharedHashMapEntry::new(0, 0));
-        }
+        // We use the nightly "new_zeroed" because doing a regular box new causes a stack overflow
+        // on non release builds. We also can't just do a `vec![SharedHashMapEntry::new(0,0); N]`
+        // because the atomics are not clonable.
+        let data = Box::<[SharedHashMapEntry; N]>::new_zeroed();
+        let data = unsafe { data.assume_init() };
+
         SharedHashMap {
-            data: vec,
+            data,
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
             conflicts: AtomicUsize::new(0),
