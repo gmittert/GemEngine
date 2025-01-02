@@ -122,29 +122,15 @@ impl Posn {
     }
 
     pub const fn from_idx(i: usize) -> Option<Posn> {
-        if let Some(pos) = NonZero::new(1 << i) {
-            unsafe { std::mem::transmute(Posn { pos }) }
-        } else {
-            None
-        }
+        unsafe { std::mem::transmute((1 as u64) << i) }
     }
 
     #[inline]
     pub const fn idx(&self) -> u32 {
-        // On the Author's machine, even though we know a priori that posns are non zero,
-        //
-        // ```
-        // unsafe {NonZero::new_unchecked(self.pos).ilog2()}
-        // ```
-        //
-        // compiles down to the same thing as just calling ilog2, so we just use the ilog2 call
-        // below.
-        //
-        // However, the #[inline] is quite necessary to not pay a 40% perf penalty for abstracting
-        // this into a function.
         self.pos.ilog2()
     }
 
+    #[inline]
     pub const fn rank(&self) -> Rank {
         let first_bit = self.idx();
         match (first_bit >> 3) & 0x7 {
@@ -159,6 +145,7 @@ impl Posn {
         }
     }
 
+    #[inline]
     pub const fn file(&self) -> File {
         let first_bit = self.idx();
         match first_bit & 0x7 {
