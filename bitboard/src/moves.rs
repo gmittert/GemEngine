@@ -1,4 +1,4 @@
-use crate::board::posn::*;
+use crate::posn::*;
 use std::fmt;
 use std::ops::Not;
 
@@ -91,7 +91,7 @@ impl AlgebraicMove {
 }
 #[cfg(test)]
 mod tests {
-    use crate::board::*;
+    use crate::moves::*;
 
     #[test]
     pub fn parse_alg_move() {

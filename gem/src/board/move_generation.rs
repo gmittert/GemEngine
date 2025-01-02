@@ -1,7 +1,5 @@
-pub use crate::board::moves::*;
-pub use crate::board::posn::*;
 use crate::board::sliding_attacks;
-pub use crate::board::*;
+use crate::board::*;
 
 #[derive(Debug, Clone, Copy)]
 enum PawnMovesState {

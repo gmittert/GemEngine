@@ -1,6 +1,8 @@
+pub mod moves;
+pub mod posn;
 use std::ops;
 
-use crate::board::posn::*;
+use crate::posn::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub struct BitBoard(pub u64);
@@ -131,7 +133,8 @@ impl ops::BitOr<BitBoard> for Posn {
 
 #[cfg(test)]
 mod tests {
-    use crate::board::*;
+    use crate::posn::*;
+
     #[test]
     pub fn bitboard_iter() {
         let b = a1() | a2() | b1() | b2();

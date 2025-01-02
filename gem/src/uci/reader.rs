@@ -1,4 +1,5 @@
-use crate::{board::AlgebraicMove, uci::UciEngine};
+use crate::uci::UciEngine;
+use bitboard::moves::AlgebraicMove;
 
 use super::GoOptions;
 

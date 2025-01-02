@@ -1,21 +1,18 @@
-pub mod bitboard;
 pub mod evaluation;
 mod magics;
 mod move_generation;
-mod moves;
-mod posn;
 mod sliding_attacks;
 use crate::piece_square_tables::EG_TABLE;
 use crate::piece_square_tables::GAME_PHASE_INC;
 use crate::piece_square_tables::MG_TABLE;
 
-pub use crate::board::bitboard::*;
-pub use crate::board::moves::*;
-pub use crate::board::posn::*;
 use crate::parser::Parser;
 use crate::pgn;
 use crate::pgn::GameTermination;
 use crate::zobrist::ZOBRIST_KEYS;
+use bitboard::moves::*;
+use bitboard::posn::*;
+use bitboard::*;
 use std::fmt;
 
 #[derive(Debug, PartialEq)]

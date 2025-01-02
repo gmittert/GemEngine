@@ -1,6 +1,6 @@
 use tracing::{field, trace_span, Level};
 
-pub use crate::board::*;
+use crate::board::*;
 use crate::shared_hashmap::SharedHashMap;
 use crate::transposition_table::{NodeType, PackedTTEntry, TranspositionTable};
 use std::cmp::max;

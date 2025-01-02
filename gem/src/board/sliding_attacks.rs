@@ -2,8 +2,8 @@ use crate::board::magics::BBITS;
 use crate::board::magics::BISHOP_MAGICS;
 use crate::board::magics::RBITS;
 use crate::board::magics::ROOK_MAGICS;
-use crate::board::BitBoard;
-use crate::board::Posn;
+use bitboard::posn::Posn;
+use bitboard::BitBoard;
 use lazy_static::lazy_static;
 use std::arch::asm;
 

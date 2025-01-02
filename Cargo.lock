@@ -51,6 +51,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
+name = "bitboard"
+version = "0.1.0"
+dependencies = [
+ "paste",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -238,7 +245,7 @@ checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 name = "find_magics"
 version = "0.1.0"
 dependencies = [
- "gem",
+ "bitboard",
  "rand",
 ]
 
@@ -246,9 +253,9 @@ dependencies = [
 name = "gem"
 version = "0.1.0"
 dependencies = [
+ "bitboard",
  "criterion",
  "lazy_static",
- "paste",
  "portable-atomic",
  "rand",
  "threadpool",

@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use crate::{
-    board::{evaluation::Evaluation, AlgebraicMove, Posn},
-    shared_hashmap::SharedHashMap,
-};
+use crate::{board::evaluation::Evaluation, shared_hashmap::SharedHashMap};
+use bitboard::moves::AlgebraicMove;
+use bitboard::posn::Posn;
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy)]
 pub enum NodeType {

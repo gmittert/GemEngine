@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
+use bitboard::moves::Color;
+use bitboard::posn::e5;
 use criterion::{criterion_group, BenchmarkId, Criterion};
 use gem::{
-    board::{self, e5, Board},
+    board::{self, Board},
     shared_hashmap::SharedHashMap,
 };
 
@@ -13,7 +15,7 @@ pub fn eval_fn(c: &mut Criterion) {
             board.eval(
                 board::evaluation::Evaluation::lost(),
                 board::evaluation::Evaluation::won(),
-                board::Color::White,
+                Color::White,
             );
         })
     });
@@ -64,14 +66,14 @@ pub fn static_exchange(c: &mut Criterion) {
         let fen = "r1b1r1k1/pp2q1pp/2nb1p2/2pppQ2/2NP1Bn1/2PB1N2/PP1KRPPP/4R3 w - - 2 15";
         let mut board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            board.static_exchange_evaluation(e5(), board::Color::White);
+            board.static_exchange_evaluation(e5(), Color::White);
         })
     });
     c.bench_function("static_exchange_short", |b| {
         let fen = "rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2";
         let mut board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            board.static_exchange_evaluation(e5(), board::Color::White);
+            board.static_exchange_evaluation(e5(), Color::White);
         })
     });
 }

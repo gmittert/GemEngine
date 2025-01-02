@@ -1,5 +1,5 @@
 [workspace]
-members = [ "find_magics",
+members = [ "bitboard", "find_magics",
   "gem"
 ]
 resolver = "2"

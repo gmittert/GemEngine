@@ -102,7 +102,7 @@ fn perft_inner(
         let preb = b.black_pieces();
         let prew = b.white_pieces();
         assert!(
-            preb & prew == board::BitBoard::empty(),
+            preb & prew == bitboard::BitBoard::empty(),
             "Before making move: {m}, black ({:?}) overlapped with white ({:?})",
             preb,
             prew,
@@ -111,7 +111,7 @@ fn perft_inner(
         let mb = b.black_pieces();
         let mw = b.white_pieces();
         assert!(
-            mb & mw == board::BitBoard::empty(),
+            mb & mw == bitboard::BitBoard::empty(),
             "After making move: {m}, black ({:?}) overlapped with white ({:?})",
             mb,
             mw
@@ -146,7 +146,7 @@ fn perft_inner(
         let postb = b.black_pieces();
         let postw = b.white_pieces();
         assert!(
-            postb & postw == board::BitBoard::empty(),
+            postb & postw == bitboard::BitBoard::empty(),
             "After undoing move: {m}, black ({:?}) overlapped with white ({:?})",
             postb,
             postw,

@@ -1,6 +1,9 @@
 use std::fmt;
 
-use crate::board::{evaluation::Evaluation, AlgebraicMove, Move, Piece};
+use crate::board::evaluation::Evaluation;
+use bitboard::moves::AlgebraicMove;
+use bitboard::moves::Move;
+use bitboard::moves::Piece;
 pub mod reader;
 
 #[derive(Default, PartialEq)]

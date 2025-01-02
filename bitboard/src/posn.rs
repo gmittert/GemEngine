@@ -66,8 +66,7 @@ impl File {
 }
 #[cfg(test)]
 mod tests {
-    use crate::board::File;
-    use crate::board::Rank;
+    use crate::posn::*;
 
     #[test]
     pub fn parse_rank() {

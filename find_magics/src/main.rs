@@ -1,4 +1,4 @@
-use gem::board::*;
+use bitboard::posn::*;
 use rand::prelude::*;
 use std::{arch::asm, io};
 

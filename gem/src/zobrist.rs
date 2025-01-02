@@ -1,4 +1,6 @@
-use crate::board::{Color, Piece, Posn};
+use bitboard::moves::Color;
+use bitboard::moves::Piece;
+use bitboard::posn::Posn;
 
 const NUM_PIECES: usize = 6;
 const NUM_SQUARES: usize = 64;

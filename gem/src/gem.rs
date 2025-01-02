@@ -113,7 +113,7 @@ impl UciEngine for Gem {
     fn position(
         &mut self,
         fen: &str,
-        moves: Vec<crate::board::AlgebraicMove>,
+        moves: Vec<bitboard::moves::AlgebraicMove>,
     ) -> Result<(), String> {
         self.board = Board::from_fen(fen).ok_or(format!("Failed to parse fen: {}", fen))?;
         for m in &moves {
