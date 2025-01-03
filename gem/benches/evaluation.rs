@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use bitboard::moves::Color;
 use bitboard::posn::e5;
 use criterion::{criterion_group, BenchmarkId, Criterion};
@@ -30,9 +28,9 @@ pub fn start(c: &mut Criterion) {
             |b, &num_cpus| {
                 let mut board = board::starting_board();
                 let pool = threadpool::ThreadPool::new(num_cpus);
-                let cache: Arc<SharedHashMap<1024>> = Arc::new(SharedHashMap::new());
+                let cache: SharedHashMap<1024> = SharedHashMap::new();
                 b.iter(|| {
-                    board.best_move(4, &pool, cache.clone(), None);
+                    board.best_move(4, &pool, &cache, None);
                 })
             },
         );

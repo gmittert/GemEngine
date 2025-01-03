@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{board::evaluation::Evaluation, shared_hashmap::SharedHashMap};
 use bitboard::moves::AlgebraicMove;
 use bitboard::posn::Posn;
@@ -85,4 +83,4 @@ impl PackedTTEntry {
 }
 
 // 256MB with 16 bytes per entry
-pub type TranspositionTable = Arc<SharedHashMap<{ 256 * 1024 * 1024 / 16 }>>;
+pub type TranspositionTable = SharedHashMap<{ 256 * 1024 * 1024 / 16 }>;
