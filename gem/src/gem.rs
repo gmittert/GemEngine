@@ -45,7 +45,6 @@ impl GemOptions {
 
 pub struct Gem {
     board: Board,
-    work_queue: threadpool::ThreadPool,
     options: GemOptions,
 }
 
@@ -53,7 +52,6 @@ impl Gem {
     pub fn new() -> Gem {
         Gem {
             board: board::starting_board(),
-            work_queue: threadpool::ThreadPool::new(DEFAULT_THREADS),
             options: GemOptions::default(),
         }
     }
@@ -92,10 +90,7 @@ impl UciEngine for Gem {
         self.options
             .set_option(name, value)
             .and_then(|name| match name.as_str() {
-                "NumThreads" => {
-                    self.work_queue.set_num_threads(self.options.num_threads);
-                    Ok(())
-                }
+                "NumThreads" => Ok(()),
                 _ => panic!("Bad option set"),
             })
     }
@@ -125,7 +120,7 @@ impl UciEngine for Gem {
     fn go(&mut self, _options: crate::uci::GoOptions) -> Result<(), String> {
         let (m, eval, info) = self
             .board
-            .search_best_move_for(Duration::from_secs(5), &self.work_queue);
+            .search_best_move_for(Duration::from_secs(5), self.options.num_threads);
         let Some(best_move) = m else {
             return Err(format!("Failed to find best move on board: {}", self.board));
         };
