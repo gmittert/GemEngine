@@ -562,13 +562,6 @@ impl Iterator for PsuedoLegalMoves {
     }
 }
 
-/// This is terrible, but we need an input that changes each time we call it and we don't want to
-/// pay for the cost of generating a _real_ random number. This only needs to be "random enough" to
-/// shuffle our move generation a bit so the thread pool threads diverge.
-fn random_number() -> u64 {
-    rand::random()
-}
-
 pub struct PsuedoLegalRandomizedMoves {
     iter: (
         KnightMoves,
@@ -597,7 +590,7 @@ impl Iterator for PsuedoLegalRandomizedMoves {
     type Item = AlgebraicMove;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let random = random_number() / 10;
+        let random = rand::random::<u64>() / 10;
         for i in 0..6 {
             if let Some(m) = match (random + i) % 6 {
                 0 => self.iter.0.next(),
