@@ -3,7 +3,7 @@ use tracing::{field, trace_span, Level};
 use crate::board::*;
 use crate::shared_hashmap::SharedHashMap;
 use crate::transposition_table::{NodeType, PackedTTEntry, TranspositionTable};
-use std::cmp::max;
+use std::cmp::{max, min};
 use std::ops::{Add, AddAssign, Neg, Sub};
 use std::sync::atomic::{AtomicU16, AtomicUsize};
 use std::sync::OnceLock;
@@ -239,13 +239,19 @@ impl Board {
                     }
                 });
             }
-            if let Some(ref t) = time {
-                s.spawn(|| {
-                    sleep(*t);
-                    if result.set(None).is_ok() {
-                        let _ = &should_stop.store(true, Ordering::Relaxed);
+            if let Some(t) = time {
+                let end_time = Instant::now() + t;
+                while !should_stop.load(Ordering::Relaxed) {
+                    let now = Instant::now();
+                    if now >= end_time {
+                        if result.set(None).is_ok() {
+                            let _ = &should_stop.store(true, Ordering::Relaxed);
+                        };
+                        break;
                     }
-                });
+                    let remaining = end_time - now;
+                    sleep(min(remaining, Duration::from_millis(100)));
+                }
             }
         });
 
