@@ -608,6 +608,44 @@ impl Iterator for PsuedoLegalRandomizedMoves {
 }
 
 impl Board {
+    // Compute the vertical and horizontal ray attacks of the rooks and queens (used with
+    // bishop_queen_attacks to blend the queen attacks across two calls).
+    pub fn rook_queen_attacks(&self, color: Color) -> BitBoard {
+        let pieces = match color {
+            Color::White => {
+                self.white_pieces[Piece::Queen as usize] | self.white_pieces[Piece::Rook as usize]
+            }
+            Color::Black => {
+                self.black_pieces[Piece::Queen as usize] | self.black_pieces[Piece::Rook as usize]
+            }
+        };
+
+        let mut acc = BitBoard::empty();
+        for i in pieces {
+            acc |= sliding_attacks::compute_rook_attacks(i, self.pieces());
+        }
+        acc
+    }
+
+    // Compute the diagonal ray attacks of the bishops and queens (used with
+    // rook_queen_attacks to blend the queen attacks across two calls).
+    pub fn bishop_queen_attacks(&self, color: Color) -> BitBoard {
+        let pieces = match color {
+            Color::White => {
+                self.white_pieces[Piece::Queen as usize] | self.white_pieces[Piece::Bishop as usize]
+            }
+            Color::Black => {
+                self.black_pieces[Piece::Queen as usize] | self.black_pieces[Piece::Bishop as usize]
+            }
+        };
+
+        let mut acc = BitBoard::empty();
+        for i in pieces {
+            acc |= sliding_attacks::compute_bishop_attacks(i, self.pieces());
+        }
+        acc
+    }
+
     pub fn queen_attacks(&self, color: Color) -> BitBoard {
         let queens = match color {
             Color::White => self.white_pieces,
@@ -878,8 +916,8 @@ impl Board {
             .and_then(|x| Some(x.castling_ability.can_castle_king(self.to_play)))
             .unwrap_or(false)
         {
-            !self.in_check_pos(from.ea().unwrap(), self.to_play)
-                && !self.in_check_pos(from.ea().and_then(|x| x.ea()).unwrap(), self.to_play)
+            !self.attacked_by_side(from.ea().unwrap(), !self.to_play)
+                && !self.attacked_by_side(from.ea().and_then(|x| x.ea()).unwrap(), !self.to_play)
                 && !self.in_check(self.to_play)
                 && !self.pieces().contains(from.ea().unwrap())
                 && !self
@@ -895,8 +933,8 @@ impl Board {
             .and_then(|x| Some(x.castling_ability.can_castle_queen(self.to_play)))
             .unwrap_or(false)
         {
-            !self.in_check_pos(from.we().unwrap(), self.to_play)
-                && !self.in_check_pos(from.we().and_then(|x| x.we()).unwrap(), self.to_play)
+            !self.attacked_by_side(from.we().unwrap(), !self.to_play)
+                && !self.attacked_by_side(from.we().and_then(|x| x.we()).unwrap(), !self.to_play)
                 && !self.in_check(self.to_play)
                 && !self.pieces().contains(from.we().unwrap())
                 && !self

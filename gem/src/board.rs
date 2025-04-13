@@ -736,9 +736,8 @@ impl Board {
             Color::Black => self.black_pieces,
         }[Piece::King as usize];
 
-        let attacked = self.queen_attacks(!color)
-            | self.rook_attacks(!color)
-            | self.bishop_attacks(!color)
+        let attacked = self.rook_queen_attacks(!color)
+            | self.bishop_queen_attacks(!color)
             | self.knight_attacks(!color)
             | self.pawn_attacks(!color)
             | self.king_attacks(!color);
@@ -746,15 +745,23 @@ impl Board {
         king_pos & attacked != BitBoard::empty()
     }
 
-    pub fn in_check_pos(&self, pos: Posn, color: Color) -> bool {
-        let attacked = self.queen_attacks(!color)
-            | self.rook_attacks(!color)
-            | self.bishop_attacks(!color)
-            | self.knight_attacks(!color)
-            | self.pawn_attacks(!color)
-            | self.king_attacks(!color);
-
-        attacked.contains(pos)
+    pub fn attacked_by_side(&self, pos: Posn, color: Color) -> bool {
+        if self.pawn_attacks(color).contains(pos) {
+            return true;
+        }
+        if self.knight_attacks(color).contains(pos) {
+            return true;
+        }
+        if self.bishop_queen_attacks(color).contains(pos) {
+            return true;
+        }
+        if self.rook_queen_attacks(color).contains(pos) {
+            return true;
+        }
+        if self.king_attacks(color).contains(pos) {
+            return true;
+        }
+        return false;
     }
 
     pub fn white_pieces(&self) -> BitBoard {

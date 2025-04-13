@@ -711,14 +711,14 @@ impl Board {
             return Evaluation(phase1_eval);
         }
 
-        let attacks_white = self.rook_attacks(Color::White)
-            | self.queen_attacks(Color::White)
+        let attacks_white = self.rook_queen_attacks(Color::White)
+            | self.bishop_queen_attacks(Color::White)
             | self.king_attacks(Color::White)
             | self.pawn_attacks(Color::White)
             | self.knight_attacks(Color::White);
 
-        let attacks_black = self.rook_attacks(Color::Black)
-            | self.queen_attacks(Color::Black)
+        let attacks_black = self.rook_queen_attacks(Color::Black)
+            | self.bishop_queen_attacks(Color::Black)
             | self.king_attacks(Color::Black)
             | self.pawn_attacks(Color::Black)
             | self.knight_attacks(Color::Black);
