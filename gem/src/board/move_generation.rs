@@ -675,9 +675,9 @@ impl Board {
         QueenMoves::new(queens, allied_pieces, self.pieces())
     }
 
-    pub fn queen_moves(&self, out: &mut Vec<Move>) {
+    pub fn queen_moves(&self, out: &mut Vec<AlgebraicMove>) {
         for i in self.queen_moves_it() {
-            out.push(self.from_algeabraic(&i));
+            out.push(i);
         }
     }
 
@@ -750,9 +750,9 @@ impl Board {
         RookMoves::new(rooks, allied_pieces, self.pieces())
     }
 
-    pub fn rook_moves(&self, out: &mut Vec<Move>) {
+    pub fn rook_moves(&self, out: &mut Vec<AlgebraicMove>) {
         for i in self.rook_moves_it() {
-            out.push(self.from_algeabraic(&i));
+            out.push(i);
         }
     }
 
@@ -822,9 +822,9 @@ impl Board {
         BishopMoves::new(bishops, allied_pieces, self.pieces())
     }
 
-    pub fn bishop_moves(&self, out: &mut Vec<Move>) {
+    pub fn bishop_moves(&self, out: &mut Vec<AlgebraicMove>) {
         for i in self.bishop_moves_it() {
-            out.push(self.from_algeabraic(&i));
+            out.push(i);
         }
     }
 
@@ -957,9 +957,9 @@ impl Board {
         KingMoves::new(kings, allied_pieces, can_castle_queen, can_castle_king)
     }
 
-    pub fn king_moves(&self, out: &mut Vec<Move>) {
+    pub fn king_moves(&self, out: &mut Vec<AlgebraicMove>) {
         for i in self.king_moves_it() {
-            out.push(self.from_algeabraic(&i));
+            out.push(i);
         }
     }
 
@@ -1036,9 +1036,9 @@ impl Board {
         KnightMoves::new(knights, allied_pieces)
     }
 
-    pub fn knight_moves(&self, out: &mut Vec<Move>) {
+    pub fn knight_moves(&self, out: &mut Vec<AlgebraicMove>) {
         for i in self.knight_moves_it() {
-            out.push(self.from_algeabraic(&i));
+            out.push(i);
         }
     }
 
@@ -1119,9 +1119,9 @@ impl Board {
         )
     }
 
-    pub fn pawn_moves(&self, out: &mut Vec<Move>) {
+    pub fn pawn_moves(&self, out: &mut Vec<AlgebraicMove>) {
         for i in self.pawn_moves_it() {
-            out.push(self.from_algeabraic(&i));
+            out.push(i);
         }
     }
 
@@ -1216,6 +1216,22 @@ impl Board {
     pub fn pseudo_legal_randomized_moves_it(&self) -> PsuedoLegalRandomizedMoves {
         PsuedoLegalRandomizedMoves::new(self)
     }
+
+    pub fn fill_pseudo_legal_moves(&mut self, moves: &mut Vec<AlgebraicMove>) {
+        self.rook_moves(moves);
+        self.bishop_moves(moves);
+        self.queen_moves(moves);
+        self.knight_moves(moves);
+        self.king_moves(moves);
+        self.pawn_moves(moves);
+    }
+
+    pub fn generate_pseudo_legal_moves(&mut self) -> Vec<AlgebraicMove> {
+        let mut moves = vec![];
+        moves.reserve(32);
+        self.fill_pseudo_legal_moves(&mut moves);
+        moves
+    }
 }
 
 #[cfg(test)]
@@ -1231,7 +1247,8 @@ mod tests {
             board.rook_moves(&mut moves);
             assert_eq!(moves.len(), 14);
             let mut before = board.clone();
-            for m in &moves {
+            for am in &moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -1265,7 +1282,8 @@ mod tests {
         board.rook_moves(&mut moves);
         assert_eq!(moves.len(), 4);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1280,7 +1298,8 @@ mod tests {
         board.bishop_moves(&mut moves);
         assert_eq!(moves.len(), 7);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1312,7 +1331,8 @@ mod tests {
         board.bishop_moves(&mut moves);
         assert_eq!(moves.len(), 4);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1327,7 +1347,8 @@ mod tests {
         board.queen_moves(&mut moves);
         assert_eq!(moves.len(), 21);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1339,7 +1360,8 @@ mod tests {
         board.queen_moves(&mut moves);
         assert_eq!(moves.len(), 27);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1381,7 +1403,8 @@ mod tests {
         board.queen_moves(&mut moves);
         assert_eq!(moves.len(), 8);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1400,7 +1423,8 @@ mod tests {
         board.king_moves(&mut moves);
         assert_eq!(moves.len(), 3);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1411,7 +1435,8 @@ mod tests {
         board.king_moves(&mut moves);
         assert_eq!(moves.len(), 8);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1451,7 +1476,8 @@ mod tests {
         board.king_moves(&mut moves);
         assert_eq!(moves.len(), 8);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1466,7 +1492,8 @@ mod tests {
         board.knight_moves(&mut moves);
         assert_eq!(moves.len(), 2);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1478,7 +1505,8 @@ mod tests {
         board.knight_moves(&mut moves);
         assert_eq!(moves.len(), 8);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1490,7 +1518,8 @@ mod tests {
         board.knight_moves(&mut moves);
         assert_eq!(moves.len(), 4);
         let mut before = board.clone();
-        for m in &moves {
+        for am in &moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1531,7 +1560,8 @@ mod tests {
         board.knight_moves(&mut moves);
         assert_eq!(moves.len(), 8);
         let mut before = board.clone();
-        for m in moves {
+        for am in moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1630,7 +1660,8 @@ mod tests {
         board.pawn_moves(&mut moves);
         assert_eq!(moves.len(), 1);
         let mut before = board.clone();
-        for m in moves.clone() {
+        for am in moves.clone() {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1656,7 +1687,8 @@ mod tests {
         board.pawn_moves(&mut moves);
         assert_eq!(moves.len(), 1);
         let mut before = board.clone();
-        for m in moves.clone() {
+        for am in moves.clone() {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1681,7 +1713,8 @@ mod tests {
         board.pawn_moves(&mut moves);
         assert_eq!(moves.len(), 2);
         let mut before = board.clone();
-        for m in moves {
+        for am in moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1701,11 +1734,13 @@ mod tests {
         });
         board.pawn_moves(&mut moves);
         assert_eq!(moves.len(), 2);
-        assert_eq!(moves.last().unwrap().is_en_passant, true);
-        assert_eq!(moves.last().unwrap().from, d5());
-        assert_eq!(moves.last().unwrap().to, e6());
+        let last_move = board.from_algeabraic(moves.last().unwrap());
+        assert_eq!(last_move.is_en_passant, true);
+        assert_eq!(last_move.from, d5());
+        assert_eq!(last_move.to, e6());
         let mut before = board.clone();
-        for m in moves {
+        for am in moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1726,11 +1761,13 @@ mod tests {
         });
         board.pawn_moves(&mut moves);
         assert_eq!(moves.len(), 2);
-        assert_eq!(moves.last().unwrap().is_en_passant, true);
-        assert_eq!(moves.last().unwrap().from, d4());
-        assert_eq!(moves.last().unwrap().to, e3());
+        let last_move = board.from_algeabraic(moves.last().unwrap());
+        assert_eq!(last_move.is_en_passant, true);
+        assert_eq!(last_move.from, d4());
+        assert_eq!(last_move.to, e3());
         let mut before = board.clone();
-        for m in moves {
+        for am in moves {
+            let m = board.from_algeabraic(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1778,12 +1815,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -1797,12 +1836,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -1819,12 +1860,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_king, true);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -1838,12 +1881,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_king, true);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -1860,6 +1905,7 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -1879,12 +1925,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -1901,12 +1949,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_king, true);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -1920,12 +1970,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_king, true);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -1939,7 +1991,11 @@ mod tests {
                 Board::from_fen("8/8/8/8/8/8/8/R3K3 w - - 0 1").expect("Failed to parse fen");
             let mut moves = vec![];
             board.king_moves(&mut moves);
-            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            let only_castles: Vec<Move> = moves
+                .into_iter()
+                .map(|x| board.from_algeabraic(&x))
+                .filter(|x| x.is_castle_queen)
+                .collect();
             assert_eq!(only_castles.len(), 0);
         }
         {
@@ -1947,7 +2003,11 @@ mod tests {
                 Board::from_fen("8/8/8/8/8/8/8/R3K3 w Kkq - 0 1").expect("Failed to parse fen");
             let mut moves = vec![];
             board.king_moves(&mut moves);
-            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            let only_castles: Vec<Move> = moves
+                .into_iter()
+                .map(|x| board.from_algeabraic(&x))
+                .filter(|x| x.is_castle_queen)
+                .collect();
             assert_eq!(only_castles.len(), 0);
         }
     }
@@ -1958,7 +2018,11 @@ mod tests {
                 Board::from_fen("8/8/8/8/8/8/8/4K2R w - - 0 1").expect("Failed to parse fen");
             let mut moves = vec![];
             board.king_moves(&mut moves);
-            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            let only_castles: Vec<Move> = moves
+                .into_iter()
+                .map(|x| board.from_algeabraic(&x))
+                .filter(|x| x.is_castle_king)
+                .collect();
             assert_eq!(only_castles.len(), 0);
         }
         {
@@ -1966,7 +2030,11 @@ mod tests {
                 Board::from_fen("8/8/8/8/8/8/8/4K2R w Qkq - 0 1").expect("Failed to parse fen");
             let mut moves = vec![];
             board.king_moves(&mut moves);
-            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            let only_castles: Vec<Move> = moves
+                .into_iter()
+                .map(|x| board.from_algeabraic(&x))
+                .filter(|x| x.is_castle_king)
+                .collect();
             assert_eq!(only_castles.len(), 0);
         }
     }
@@ -1977,7 +2045,11 @@ mod tests {
                 Board::from_fen("r3k3/8/8/8/8/8/8/8 b - - 0 1").expect("Failed to parse fen");
             let mut moves = vec![];
             board.king_moves(&mut moves);
-            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            let only_castles: Vec<Move> = moves
+                .into_iter()
+                .map(|x| board.from_algeabraic(&x))
+                .filter(|x| x.is_castle_queen)
+                .collect();
             assert_eq!(only_castles.len(), 0);
         }
         {
@@ -1985,7 +2057,11 @@ mod tests {
                 Board::from_fen("r3k3/8/8/8/8/8/8/8 b KQk - 0 1").expect("Failed to parse fen");
             let mut moves = vec![];
             board.king_moves(&mut moves);
-            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_queen).collect();
+            let only_castles: Vec<Move> = moves
+                .into_iter()
+                .map(|x| board.from_algeabraic(&x))
+                .filter(|x| x.is_castle_queen)
+                .collect();
             assert_eq!(only_castles.len(), 0);
         }
     }
@@ -1996,7 +2072,11 @@ mod tests {
                 Board::from_fen("4k2r/8/8/8/8/8/8/8 b - - 0 1").expect("Failed to parse fen");
             let mut moves = vec![];
             board.king_moves(&mut moves);
-            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            let only_castles: Vec<Move> = moves
+                .into_iter()
+                .map(|x| board.from_algeabraic(&x))
+                .filter(|x| x.is_castle_king)
+                .collect();
             assert_eq!(only_castles.len(), 0);
         }
         {
@@ -2004,7 +2084,11 @@ mod tests {
                 Board::from_fen("4k2r/8/8/8/8/8/8/8 b KQq - 0 1").expect("Failed to parse fen");
             let mut moves = vec![];
             board.king_moves(&mut moves);
-            let only_castles: Vec<Move> = moves.into_iter().filter(|x| x.is_castle_king).collect();
+            let only_castles: Vec<Move> = moves
+                .into_iter()
+                .map(|x| board.from_algeabraic(&x))
+                .filter(|x| x.is_castle_king)
+                .collect();
             assert_eq!(only_castles.len(), 0);
         }
     }
@@ -2018,11 +2102,13 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 0);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2036,12 +2122,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert!(only_castles[0].is_castle_queen);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2055,12 +2143,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert!(only_castles[0].is_castle_king);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2074,12 +2164,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert!(only_castles[0].is_castle_king);
             let mut before = board.clone();
-            for m in moves {
+            for am in moves {
+                let m = board.from_algeabraic(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2096,11 +2188,13 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 0);
-            for m in moves {
+            for am in moves {
                 let before = board.clone();
+                let m = board.from_algeabraic(&am);
                 board.make_move(&m);
                 board.undo_move(&m);
                 assert_eq!(before, board);
@@ -2116,6 +2210,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 0);
@@ -2127,6 +2222,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2139,6 +2235,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2151,6 +2248,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2163,6 +2261,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2175,6 +2274,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
+                .map(|x| board.from_algeabraic(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2190,8 +2290,9 @@ mod tests {
             board.pawn_moves(&mut moves);
             assert_eq!(moves.len(), 4);
 
-            for m in moves {
+            for am in moves {
                 let before = board.clone();
+                let m = board.from_algeabraic(&am);
                 board.make_move(&m);
                 board.undo_move(&m);
                 assert_eq!(before, board);
@@ -2203,8 +2304,9 @@ mod tests {
             let mut moves = vec![];
             board.pawn_moves(&mut moves);
             assert_eq!(moves.len(), 4);
-            for m in moves {
+            for am in moves {
                 let before = board.clone();
+                let m = board.from_algeabraic(&am);
                 board.make_move(&m);
                 board.undo_move(&m);
                 assert_eq!(before, board);

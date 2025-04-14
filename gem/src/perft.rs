@@ -97,8 +97,9 @@ fn perft_inner(
         castles: 0,
         promotions: 0,
     };
-    let moves = board::generate_pseudo_legal_moves(b);
-    for m in &moves {
+    let moves = b.generate_pseudo_legal_moves();
+    for am in &moves {
+        let m = b.from_algeabraic(am);
         let preb = b.black_pieces();
         let prew = b.white_pieces();
         assert!(

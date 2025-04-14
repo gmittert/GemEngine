@@ -425,7 +425,7 @@ impl Board {
                 }
             }
             if m.to == to && m.promotion == promotion {
-                return Some(m);
+                return Some(self.from_algeabraic(&m));
             }
         }
         None
@@ -885,28 +885,6 @@ pub fn empty_board(turn: Color) -> Board {
 pub fn starting_board() -> Board {
     Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
         .expect("Failed to parse starting fen")
-}
-
-pub fn fill_pseudo_legal_moves(moves: &mut Vec<Move>, b: &Board) {
-    b.rook_moves(moves);
-    b.bishop_moves(moves);
-    b.queen_moves(moves);
-    b.knight_moves(moves);
-    b.king_moves(moves);
-    b.pawn_moves(moves);
-}
-
-pub fn generate_pseudo_legal_moves(b: &Board) -> Vec<Move> {
-    let mut moves = vec![];
-    moves.reserve(32);
-
-    b.rook_moves(&mut moves);
-    b.bishop_moves(&mut moves);
-    b.queen_moves(&mut moves);
-    b.knight_moves(&mut moves);
-    b.king_moves(&mut moves);
-    b.pawn_moves(&mut moves);
-    moves
 }
 
 #[cfg(test)]
