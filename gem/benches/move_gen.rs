@@ -1,4 +1,3 @@
-use bitboard::moves::AlgebraicMove;
 use criterion::{black_box, criterion_group, Criterion};
 use gem::board::Board;
 
@@ -16,10 +15,116 @@ pub fn knights(c: &mut Criterion) {
         let fen = "rnbqkbnr/pppppppp/N2N1N2/7N/1N2N3/3N2N1/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            let out: Vec<AlgebraicMove> = board.knight_moves_it().collect();
+            let mut out = vec![];
+            out.extend(board.knight_moves_it());
             black_box(out);
         })
     });
 }
 
-criterion_group!(iterative_compare, knights);
+pub fn rooks(c: &mut Criterion) {
+    c.bench_function("rooks", |b| {
+        let fen = "rnbqkbnr/pppppppp/1R3R2/3R4/R6R/2R1R3/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = vec![];
+            board.rook_moves(&mut out);
+            black_box(out);
+        })
+    });
+    c.bench_function("rooks_it", |b| {
+        let fen = "rnbqkbnr/pppppppp/1R3R2/3R4/R6R/2R1R3/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = vec![];
+            out.extend(board.rook_moves_it());
+            black_box(out);
+        })
+    });
+}
+
+pub fn bishops(c: &mut Criterion) {
+    c.bench_function("bishops", |b| {
+        let fen = "rnbqkbnr/pppppppp/1B3B2/3B4/B6B/2B1B3/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = vec![];
+            board.bishop_moves(&mut out);
+            black_box(out);
+        })
+    });
+    c.bench_function("bishops_it", |b| {
+        let fen = "rnbqkbnr/pppppppp/1B3B2/3B4/B6B/2B1B3/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = vec![];
+            out.extend(board.bishop_moves_it());
+            black_box(out);
+        })
+    });
+}
+
+pub fn queens(c: &mut Criterion) {
+    c.bench_function("queens", |b| {
+        let fen = "rnbqkbnr/pppppppp/1Q3Q2/3Q4/Q6Q/2Q1Q3/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = vec![];
+            board.queen_moves(&mut out);
+            black_box(out);
+        })
+    });
+    c.bench_function("queens_it", |b| {
+        let fen = "rnbqkbnr/pppppppp/1Q3Q2/3Q4/Q6Q/2Q1Q3/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = vec![];
+            out.extend(board.queen_moves_it());
+            black_box(out);
+        })
+    });
+}
+
+pub fn pawns(c: &mut Criterion) {
+    c.bench_function("pawns", |b| {
+        let fen = "r1b1k1r1/p2pqp1p/1pn2n1b/P1pPp1p1/1P1QP2P/N1P2P1N/5KP1/R1B2BR1 w q - 0 1";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = vec![];
+            board.pawn_moves(&mut out);
+            black_box(out);
+        })
+    });
+    c.bench_function("pawns_it", |b| {
+        let fen = "r1b1k1r1/p2pqp1p/1pn2n1b/P1pPp1p1/1P1QP2P/N1P2P1N/5KP1/R1B2BR1 w q - 0 1";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = vec![];
+            out.extend(board.pawn_moves_it());
+            black_box(out);
+        })
+    });
+}
+
+pub fn kings(c: &mut Criterion) {
+    c.bench_function("kings", |b| {
+        let fen = "r1b1k1r1/p2pqp1p/1pn2n1b/P1pPp1p1/1P1QP2P/N1P2P1N/5KP1/R1B2BR1 w q - 0 1";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = vec![];
+            board.king_moves(&mut out);
+            black_box(out);
+        })
+    });
+    c.bench_function("kings_it", |b| {
+        let fen = "r1b1k1r1/p2pqp1p/1pn2n1b/P1pPp1p1/1P1QP2P/N1P2P1N/5KP1/R1B2BR1 w q - 0 1";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = vec![];
+            out.extend(board.king_moves_it());
+            black_box(out);
+        })
+    });
+}
+
+criterion_group!(iterative_compare, knights, rooks, bishops, queens, pawns, kings);

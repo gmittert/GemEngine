@@ -676,8 +676,29 @@ impl Board {
     }
 
     pub fn queen_moves(&self, out: &mut Vec<AlgebraicMove>) {
-        for i in self.queen_moves_it() {
-            out.push(i);
+        let queens = match self.to_play {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Queen as usize];
+
+        let allied_pieces = match self.to_play {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        for i in queens {
+            let mut attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
+            attacks |= sliding_attacks::compute_rook_attacks(i, self.pieces());
+            for pos in attacks {
+                if allied_pieces.contains(pos) {
+                    continue;
+                }
+                out.push(AlgebraicMove {
+                    from: i,
+                    to: pos,
+                    promotion: None,
+                });
+            }
         }
     }
 
@@ -751,8 +772,28 @@ impl Board {
     }
 
     pub fn rook_moves(&self, out: &mut Vec<AlgebraicMove>) {
-        for i in self.rook_moves_it() {
-            out.push(i);
+        let rooks = match self.to_play {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Rook as usize];
+
+        let allied_pieces = match self.to_play {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        for i in rooks {
+            let attacks = sliding_attacks::compute_rook_attacks(i, self.pieces());
+            for pos in attacks {
+                if allied_pieces.contains(pos) {
+                    continue;
+                }
+                out.push(AlgebraicMove {
+                    from: i,
+                    to: pos,
+                    promotion: None,
+                });
+            }
         }
     }
 
@@ -823,8 +864,28 @@ impl Board {
     }
 
     pub fn bishop_moves(&self, out: &mut Vec<AlgebraicMove>) {
-        for i in self.bishop_moves_it() {
-            out.push(i);
+        let bishops = match self.to_play {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Bishop as usize];
+
+        let allied_pieces = match self.to_play {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        for i in bishops {
+            let attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
+            for pos in attacks {
+                if allied_pieces.contains(pos) {
+                    continue;
+                }
+                out.push(AlgebraicMove {
+                    from: i,
+                    to: pos,
+                    promotion: None,
+                });
+            }
         }
     }
 
