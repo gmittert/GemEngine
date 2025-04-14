@@ -1037,8 +1037,36 @@ impl Board {
     }
 
     pub fn knight_moves(&self, out: &mut Vec<AlgebraicMove>) {
-        for i in self.knight_moves_it() {
-            out.push(i);
+        let knights = match self.to_play {
+            Color::White => self.white_pieces[Piece::Knight as usize],
+            Color::Black => self.black_pieces[Piece::Knight as usize],
+        };
+        let allied_pieces = match self.to_play {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        for knight in knights {
+            out.extend(
+                [
+                    knight.see(),
+                    knight.sse(),
+                    knight.ssw(),
+                    knight.sww(),
+                    knight.nww(),
+                    knight.nnw(),
+                    knight.nne(),
+                    knight.nee(),
+                ]
+                .into_iter()
+                .filter_map(|a| a)
+                .filter(|a| !allied_pieces.contains(*a))
+                .map(|p| AlgebraicMove {
+                    from: knight,
+                    to: p,
+                    promotion: None,
+                }),
+            );
         }
     }
 
