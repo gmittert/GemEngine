@@ -1019,8 +1019,101 @@ impl Board {
     }
 
     pub fn king_moves(&self, out: &mut Vec<AlgebraicMove>) {
-        for i in self.king_moves_it() {
-            out.push(i);
+        let color = self.to_play;
+        let mut kings = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::King as usize];
+
+        let rooks = match color {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Rook as usize];
+
+        let allied_pieces = match color {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+        let from = kings.next().unwrap();
+
+        for m in [
+            from.no(),
+            from.ne(),
+            from.nw(),
+            from.ea(),
+            from.we(),
+            from.so(),
+            from.se(),
+            from.sw(),
+        ] {
+            if let Some(m) = m {
+                if !allied_pieces.contains(m) {
+                    out.push(AlgebraicMove {
+                        from,
+                        to: m,
+                        promotion: None,
+                    });
+                }
+            }
+        }
+
+        // Computing the ability to castle needs the board to compute castling through check
+        let can_castle_king = if self
+            .move_rights
+            .last()
+            .and_then(|x| Some(x.castling_ability.can_castle_king(self.to_play)))
+            .unwrap_or(false)
+        {
+            !self.attacked_by_side(from.ea().unwrap(), !self.to_play)
+                && !self.attacked_by_side(from.ea().and_then(|x| x.ea()).unwrap(), !self.to_play)
+                && !self.in_check(self.to_play)
+                && !self.pieces().contains(from.ea().unwrap())
+                && !self
+                    .pieces()
+                    .contains(from.ea().and_then(|x| x.ea()).unwrap())
+                && rooks.contains(from.ea().and_then(|x| x.ea()).and_then(|x| x.ea()).unwrap())
+        } else {
+            false
+        };
+        if can_castle_king {
+            out.push(AlgebraicMove {
+                from,
+                to: from.ea().and_then(|x| x.ea()).unwrap(),
+                promotion: None,
+            });
+        }
+        let can_castle_queen = if self
+            .move_rights
+            .last()
+            .and_then(|x| Some(x.castling_ability.can_castle_queen(self.to_play)))
+            .unwrap_or(false)
+        {
+            !self.attacked_by_side(from.we().unwrap(), !self.to_play)
+                && !self.attacked_by_side(from.we().and_then(|x| x.we()).unwrap(), !self.to_play)
+                && !self.in_check(self.to_play)
+                && !self.pieces().contains(from.we().unwrap())
+                && !self
+                    .pieces()
+                    .contains(from.we().and_then(|x| x.we()).unwrap())
+                && !self
+                    .pieces()
+                    .contains(from.we().and_then(|x| x.we()).and_then(|x| x.we()).unwrap())
+                && rooks.contains(
+                    from.we()
+                        .and_then(|x| x.we())
+                        .and_then(|x| x.we())
+                        .and_then(|x| x.we())
+                        .unwrap(),
+                )
+        } else {
+            false
+        };
+        if can_castle_queen {
+            out.push(AlgebraicMove {
+                from,
+                to: from.we().and_then(|x| x.we()).unwrap(),
+                promotion: None,
+            });
         }
     }
 
