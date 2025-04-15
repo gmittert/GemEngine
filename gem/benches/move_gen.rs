@@ -127,4 +127,12 @@ pub fn kings(c: &mut Criterion) {
     });
 }
 
-criterion_group!(iterative_compare, knights, rooks, bishops, queens, pawns, kings);
+criterion_group!(
+    iterative_compare,
+    knights,
+    rooks,
+    bishops,
+    queens,
+    pawns,
+    kings
+);

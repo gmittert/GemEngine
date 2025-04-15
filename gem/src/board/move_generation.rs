@@ -1209,8 +1209,113 @@ impl Board {
     }
 
     pub fn pawn_moves(&self, out: &mut Vec<AlgebraicMove>) {
-        for i in self.pawn_moves_it() {
-            out.push(i);
+        let promo_rank = match self.to_play {
+            Color::Black => Rank::One,
+            Color::White => Rank::Eight,
+        };
+        let pawns = match self.to_play {
+            Color::White => self.white_pieces,
+            Color::Black => self.black_pieces,
+        }[Piece::Pawn as usize];
+        let opponent_pieces = match self.to_play {
+            Color::White => self.black_pieces(),
+            Color::Black => self.white_pieces(),
+        };
+
+        for pawn in pawns {
+            let mpush_pos = match self.to_play {
+                Color::White => pawn.no(),
+                Color::Black => pawn.so(),
+            };
+            // Push 1
+            if let Some(push_pos) = mpush_pos {
+                if !self.pieces().contains(push_pos) {
+                    if push_pos.rank() == promo_rank {
+                        for piece in [Piece::Queen, Piece::Knight, Piece::Rook, Piece::Bishop] {
+                            out.push(AlgebraicMove {
+                                from: pawn,
+                                to: push_pos,
+                                promotion: Some(piece),
+                            });
+                        }
+                    } else {
+                        out.push(AlgebraicMove {
+                            from: pawn,
+                            to: push_pos,
+                            promotion: None,
+                        });
+                    }
+
+                    // Double Push (only if we could push 1)
+                    let can_double_push = match self.to_play {
+                        Color::White => pawn.rank() == Rank::Two,
+                        Color::Black => pawn.rank() == Rank::Seven,
+                    };
+                    if can_double_push {
+                        let mdouble_push_pos = match self.to_play {
+                            Color::White => pawn.no().and_then(|x| x.no()),
+                            Color::Black => pawn.so().and_then(|x| x.so()),
+                        };
+
+                        if let Some(double_push_pos) = mdouble_push_pos {
+                            if !self.pieces().contains(double_push_pos) {
+                                out.push(AlgebraicMove {
+                                    from: pawn,
+                                    to: double_push_pos,
+                                    promotion: None,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            for take in [
+                mpush_pos.and_then(|x| x.we()),
+                mpush_pos.and_then(|x| x.ea()),
+            ] {
+                if let Some(take_pos) = take {
+                    if opponent_pieces.contains(take_pos) {
+                        if take_pos.rank() == promo_rank {
+                            for piece in [Piece::Queen, Piece::Knight, Piece::Rook, Piece::Bishop] {
+                                out.push(AlgebraicMove {
+                                    from: pawn,
+                                    to: take_pos,
+                                    promotion: Some(piece),
+                                });
+                            }
+                        } else {
+                            out.push(AlgebraicMove {
+                                from: pawn,
+                                to: take_pos,
+                                promotion: None,
+                            });
+                        }
+                    }
+                }
+            }
+            // Take En Passant
+            if let Some(ep_target) = self.move_rights.last().and_then(|x| x.ep_target) {
+                let to = Posn::from(
+                    if self.to_play == Color::White {
+                        Rank::Six
+                    } else {
+                        Rank::Three
+                    },
+                    ep_target,
+                );
+                if (self.to_play == Color::White
+                    && (pawn.nw() == Some(to) || pawn.ne() == Some(to)))
+                    || (self.to_play == Color::Black
+                        && (pawn.sw() == Some(to) || pawn.se() == Some(to)))
+                {
+                    out.push(AlgebraicMove {
+                        from: pawn,
+                        to,
+                        promotion: None,
+                    });
+                }
+            }
         }
     }
 
