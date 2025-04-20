@@ -15,6 +15,7 @@ Cute Chess.
 
 - Multi core search
 - Alpha beta search
+- PV Search
 - Zobrist hashing
 - Magic bit boards
 - Lockless transposition tables

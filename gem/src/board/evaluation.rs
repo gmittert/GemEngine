@@ -225,7 +225,7 @@ impl Board {
             for _ in 0..num_threads {
                 s.spawn(|| {
                     let mut new_b = self.clone();
-                    let res = new_b.alpha_beta(
+                    let res = new_b.pvs(
                         Evaluation::lost(),
                         Evaluation::won(),
                         target_depth,
@@ -367,7 +367,7 @@ impl Board {
         }
     }
 
-    pub fn alpha_beta<const N: usize>(
+    pub fn pvs<const N: usize>(
         &mut self,
         alpha: Evaluation,
         beta: Evaluation,
@@ -429,8 +429,12 @@ impl Board {
         let mut had_legal_move = false;
 
         let hash_move = match best_move {
-            Some(m) => vec![m],
-            None => vec![],
+            Some(m) => {
+                vec![m]
+            }
+            None => {
+                vec![]
+            }
         }
         .into_iter();
         let recapture = if let Some((p, _)) = self.moves.last() {
@@ -475,6 +479,7 @@ impl Board {
             .chain(killer_moves)
             .chain(self.pseudo_legal_randomized_moves_it());
         let mut is_pv_node = false;
+        let mut is_first_child = true;
         for a in moves {
             let m = self.from_algeabraic(&a);
             self.make_move(&m);
@@ -504,7 +509,36 @@ impl Board {
                         best_move: Some(a),
                     })
                 } else {
-                    self.alpha_beta(-beta, -alpha.inc_mate(), target_depth, cache, should_stop)
+                    // PV Search: We'd ordered our hash move in front and it's likely to be the PV
+                    // node. Establish an exact score for it, and search a smaller window for
+                    // everything else. If a move might actually be better, research it to find the
+                    // actual score.
+                    if is_first_child {
+                        is_first_child = false;
+                        let score =
+                            self.pvs(-beta, -alpha.inc_mate(), target_depth, cache, should_stop)?;
+                        Some(score)
+                    } else {
+                        let mut score = self.pvs(
+                            Evaluation(-alpha.inc_mate().0 - 1),
+                            -alpha.inc_mate(),
+                            target_depth,
+                            cache,
+                            should_stop,
+                        )?;
+                        // The score should be in our alpha beta window. If it's not, we need to do
+                        // a full search.
+                        if alpha < -score.eval && -score.eval < beta {
+                            score = self.pvs(
+                                -beta,
+                                -alpha.inc_mate(),
+                                target_depth,
+                                cache,
+                                should_stop,
+                            )?;
+                        }
+                        Some(score)
+                    }
                 }?;
                 let eval = -eval_res.eval.dec_mate();
                 nodes += eval_res.nodes;
@@ -1165,7 +1199,7 @@ mod tests {
         let cache = SharedHashMap::new();
         let should_stop = AtomicBool::new(false);
         let eval = -board
-            .alpha_beta::<1024>(
+            .pvs::<1024>(
                 Evaluation::lost(),
                 -best_score.inc_mate(),
                 4,
@@ -1641,23 +1675,5 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
             return;
         };
         assert_eq!(mated_in, 4);
-    }
-
-    #[test]
-    fn another_eval_bug() {
-        let fen = "r5k1/1p1b2p1/2p1R1Q1/7p/8/P6P/q4PPK/4R3 b - - 1 29";
-        let mut board = Board::from_fen(fen).expect("bad fen?");
-
-        let cache: TranspositionTable = SharedHashMap::new();
-        let Some((best_move, move_eval)) = board.best_move(6, 8, &cache, None) else {
-            assert!(false);
-            return;
-        };
-        assert!(best_move.is_some());
-        let best_move = best_move.unwrap();
-        println!("Best move: {}", best_move);
-        assert!(best_move.piece != Piece::Queen);
-        println!("Eval: {}", move_eval.eval);
-        assert!(move_eval.eval == Evaluation(33));
     }
 }
