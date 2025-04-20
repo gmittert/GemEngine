@@ -232,13 +232,18 @@ impl Board {
                         cache,
                         &should_stop,
                     );
-                    let _ = &total_nodes.fetch_add(res.nodes, Ordering::AcqRel);
-                    let _ = &total_seldepth.fetch_max(res.seldepth, Ordering::AcqRel);
-                    if result.set(Some(res)).is_ok() {
+                    if let Some(ref r) = res {
+                        let _ = &total_nodes.fetch_add(r.nodes, Ordering::AcqRel);
+                        let _ = &total_seldepth.fetch_max(r.seldepth, Ordering::AcqRel);
+                    }
+                    if result.set(res).is_ok() {
                         let _ = &should_stop.store(true, Ordering::Relaxed);
                     }
                 });
             }
+            // If we have a maximum time to wait for, instead of waiting on the result directly, we
+            // watch a timer to wait for the timeout. We check every 100ms if any search has
+            // completed yet so we don't want too long.
             if let Some(t) = time {
                 let end_time = Instant::now() + t;
                 while !should_stop.load(Ordering::Relaxed) {
@@ -369,17 +374,12 @@ impl Board {
         target_depth: u16,
         cache: &SharedHashMap<N>,
         should_stop: &AtomicBool,
-    ) -> EvalResult {
+    ) -> Option<EvalResult> {
         let mut seldepth = 0;
         let mut nodes = 1;
 
         if should_stop.load(Ordering::Acquire) {
-            return EvalResult {
-                eval: Evaluation::draw(),
-                best_move: None,
-                seldepth: 0,
-                nodes: 0,
-            };
+            return None;
         }
         let mut best_move = None;
         let cached_val = cache.get(self.hash);
@@ -403,12 +403,12 @@ impl Board {
                     "hash" = self.hash,
                     ?node_type
                 );
-                return EvalResult {
+                return Some(EvalResult {
                     eval,
                     best_move,
                     seldepth: 0,
                     nodes: 1,
-                };
+                });
             }
         }
         // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't
@@ -423,7 +423,7 @@ impl Board {
             .entered();
             let eval = self.quiesce(alpha, beta);
             span.record("eval", eval.eval.0);
-            return eval;
+            return Some(eval);
         }
         let mut alpha = alpha;
         let mut had_legal_move = false;
@@ -497,15 +497,15 @@ impl Board {
                     }
                 }
                 let eval_res = if is_three_fold {
-                    EvalResult {
+                    Some(EvalResult {
                         eval: Evaluation::draw(),
                         nodes: 1,
                         seldepth: 1,
                         best_move: Some(a),
-                    }
+                    })
                 } else {
                     self.alpha_beta(-beta, -alpha.inc_mate(), target_depth, cache, should_stop)
-                };
+                }?;
                 let eval = -eval_res.eval.dec_mate();
                 nodes += eval_res.nodes;
                 seldepth = max(seldepth, eval_res.seldepth + 1);
@@ -566,12 +566,12 @@ impl Board {
                         eval = eval.0,
                         beta = beta.0
                     );
-                    return EvalResult {
+                    return Some(EvalResult {
                         eval: beta,
                         nodes,
                         seldepth,
                         best_move: Some(a),
-                    };
+                    });
                 }
 
                 if eval > alpha {
@@ -666,12 +666,12 @@ impl Board {
                 );
             }
         }
-        EvalResult {
+        Some(EvalResult {
             eval,
             nodes,
             seldepth,
             best_move,
-        }
+        })
     }
 
     #[tracing::instrument(skip(self))]
@@ -1172,6 +1172,7 @@ mod tests {
                 &cache,
                 &should_stop,
             )
+            .expect("Failed to resolve value")
             .eval;
         println!("Eval: {}", eval);
         assert!(eval < Evaluation::draw());
