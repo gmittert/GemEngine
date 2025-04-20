@@ -155,3 +155,17 @@ impl UciEngine for Gem {
         Err(format!("Quitting!"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{gem::Gem, uci};
+
+    #[test]
+    fn uci_integration_test() {
+        let mut gem = Gem::new();
+        let buffer = "position startpos moves d2d4 g8f6 b1c3 d7d5 c1f4 c8d7 g1f3 b8c6 e2e3 e7e6 a2a3 f6e4 c3e4 d5e4 f3g5 f8e7 g5e4 e8g8 f1c4 c6a5 c4d3 f7f5 e4g3 g7g5 f4e5 a5c6 e1g1 c6e5 d4e5 d8e8 c2c3 d7a4 d1e2 a8d8 d3c4 e8d7 e3e4 b7b5 c4a2 g8h8 b2b3 b5b4 b3a4 f5f4 g3h5 b4c3 e2g4 d7a4 h2h4 f4f3 g2f3 a4a3 a2e6 a3b2 h4g5 e7c5 a1b1 b2d2 g5g6 c5f2 f1f2 d2d1 g1h2 h7g6 g4g5 h8h7 f2g2 d1h1 h2h1 d8d1 b1d1 f8g8 h5f6 h7g7 g5g6 g7h8";
+        assert!(uci::reader::read_uci_line(&buffer, &mut gem).is_ok());
+        let buffer = "go infinite";
+        assert!(uci::reader::read_uci_line(&buffer, &mut gem).is_ok());
+    }
+}

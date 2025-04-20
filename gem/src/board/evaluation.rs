@@ -49,20 +49,23 @@ impl Evaluation {
     pub fn lost() -> Evaluation {
         Evaluation(std::i16::MIN + 1)
     }
-    fn m1() -> Evaluation {
+    pub fn m1() -> Evaluation {
         Evaluation(std::i16::MAX - 1)
     }
-    fn _m2() -> Evaluation {
+    pub fn m2() -> Evaluation {
         Evaluation(std::i16::MAX - 2)
     }
-    fn _m3() -> Evaluation {
+    pub fn m3() -> Evaluation {
         Evaluation(std::i16::MAX - 3)
     }
-    fn _m4() -> Evaluation {
+    pub fn m4() -> Evaluation {
         Evaluation(std::i16::MAX - 4)
     }
-    fn _m5() -> Evaluation {
+    pub fn m5() -> Evaluation {
         Evaluation(std::i16::MAX - 5)
+    }
+    pub fn m6() -> Evaluation {
+        Evaluation(std::i16::MAX - 6)
     }
     pub fn mate_in(&self) -> Option<usize> {
         if self.0 >= Self::won().0 - 100 {
@@ -583,15 +586,17 @@ impl Board {
                         // move! Since it's a strong move that didn't involve capturing anything,
                         // it's likely strong for a lot of other moves at this level.
                         let killer_idx = (target_depth - self.half_move) as usize;
-                        let killer_moves = self.killer_moves[killer_idx];
-                        let new_move = Some(AlgebraicMove {
-                            to: m.to,
-                            from: m.from,
-                            promotion: m.promotion,
-                        });
-                        if killer_moves[0] != new_move && killer_moves[1] != new_move {
-                            self.killer_moves[killer_idx][1] = self.killer_moves[killer_idx][0];
-                            self.killer_moves[killer_idx][0] = new_move
+                        if killer_idx < 16 {
+                            let killer_moves = self.killer_moves[killer_idx];
+                            let new_move = Some(AlgebraicMove {
+                                to: m.to,
+                                from: m.from,
+                                promotion: m.promotion,
+                            });
+                            if killer_moves[0] != new_move && killer_moves[1] != new_move {
+                                self.killer_moves[killer_idx][1] = self.killer_moves[killer_idx][0];
+                                self.killer_moves[killer_idx][0] = new_move
+                            }
                         }
                     }
                     tracing::event!(
@@ -1042,7 +1047,7 @@ mod tests {
         assert_eq!(best_move.from, h1());
         assert_eq!(best_move.to, h8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval.eval, Evaluation::_m3());
+        assert_eq!(eval.eval, Evaluation::m3());
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
@@ -1086,7 +1091,7 @@ mod tests {
         assert_eq!(best_move.piece, Piece::King);
         assert_eq!(best_move.from, b8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval.eval, -Evaluation::_m2());
+        assert_eq!(eval.eval, -Evaluation::m2());
     }
     #[test]
     fn bishop_knight_mate() {
@@ -1113,16 +1118,16 @@ mod tests {
     fn eval_formatted() {
         assert_eq!("M1", format!("{}", Evaluation::m1()));
         assert_eq!("-M1", format!("{}", -Evaluation::m1()));
-        assert_eq!("M2", format!("{}", Evaluation::_m2()));
-        assert_eq!("-M2", format!("{}", -Evaluation::_m2()));
+        assert_eq!("M2", format!("{}", Evaluation::m2()));
+        assert_eq!("-M2", format!("{}", -Evaluation::m2()));
     }
 
     #[test]
     fn mated_in_formatting() {
         assert_eq!(Some(1), Evaluation::m1().mate_in());
         assert_eq!(Some(1), (-Evaluation::m1()).mated_in());
-        assert_eq!(Some(2), Evaluation::_m2().mate_in());
-        assert_eq!(Some(2), (-Evaluation::_m2()).mated_in());
+        assert_eq!(Some(2), Evaluation::m2().mate_in());
+        assert_eq!(Some(2), (-Evaluation::m2()).mated_in());
     }
 
     #[test]
@@ -1675,5 +1680,15 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
             return;
         };
         assert_eq!(mated_in, 4);
+    }
+    #[test]
+    fn mate_1_disconnect() {
+        let fen = "6rk/p1p5/4BNQ1/4P3/4P3/2p2P2/6R1/3R3K w - - 1 39";
+        let mut board = Board::from_fen(fen).expect("bad fen?");
+        let Some((_, move_eval)) = board.it_depth_best_move(9, 32) else {
+            assert!(false);
+            return;
+        };
+        assert_eq!(move_eval.eval, Evaluation::m1());
     }
 }
