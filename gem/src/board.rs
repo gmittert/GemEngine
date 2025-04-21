@@ -1,5 +1,6 @@
 pub mod evaluation;
 mod move_generation;
+mod search;
 mod sliding_attacks;
 use crate::piece_square_tables::EG_TABLE;
 use crate::piece_square_tables::GAME_PHASE_INC;
