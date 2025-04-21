@@ -1,6 +1,8 @@
+use std::num::NonZero;
+
 use crate::shared_hashmap::Encodable;
 use crate::{board::evaluation::Evaluation, shared_hashmap::SharedHashMap};
-use bitboard::moves::AlgebraicMove;
+use bitboard::moves::{AlgebraicMove, Piece};
 use bitboard::posn::Posn;
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy)]
@@ -11,19 +13,17 @@ pub enum NodeType {
 }
 
 // Data Layout:
-//    32..35 From file
-//    36..39 From rank
-//    40..43 To file
-//    44..47 To rank
-//    48..55 promotion
-//    56..56 has best move
-//    57..58 Node Type
-//    59..63 5 bits unused
+//    0..4 From file
+//    4..8 From rank
+//    8..12 To file
+//    12..16 To rank
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PackedTTEntry {
     eval: Evaluation,
     depth: u16,
-    data: u32,
+    promo: Option<Piece>,
+    node_type: NodeType,
+    data: Option<NonZero<u16>>,
 }
 
 impl Encodable for PackedTTEntry {
@@ -43,18 +43,24 @@ impl PackedTTEntry {
         best_move: Option<AlgebraicMove>,
         node_type: NodeType,
     ) -> PackedTTEntry {
-        let mut data: u32 = 0;
-        if let Some(m) = best_move {
-            data |= m.from.file() as u32;
-            data |= (m.from.rank() as u32) << 4;
-            data |= (m.to.file() as u32) << 8;
-            data |= (m.to.rank() as u32) << 12;
-            data |= (m.promotion.map_or(7, |p| p as u32)) << 16;
-            data |= 1 << 24;
+        let (data, promo) = match best_move {
+            Some(AlgebraicMove{ from, to, promotion }) => {
+                let mut data: u16 = 0;
+                data |= from.file() as u16;
+                data |= (from.rank() as u16) << 4;
+                data |= (to.file() as u16) << 8;
+                data |= (to.rank() as u16) << 12;
+                (Some(NonZero::new(data).unwrap()), promotion)
+            }
+            None => (None, None)
+        };
+        PackedTTEntry {
+            eval,
+            depth,
+            promo,
+            node_type,
+            data,
         }
-        data |= (node_type as u32) << 25;
-
-        PackedTTEntry { eval, depth, data }
     }
     pub fn eval(&self) -> Evaluation {
         self.eval
@@ -64,34 +70,24 @@ impl PackedTTEntry {
         self.depth
     }
     pub fn best_move(&self) -> Option<AlgebraicMove> {
-        let best_move_bit = (self.data >> 24) & 0x1;
-        if best_move_bit == 0 {
-            return None;
-        }
-        let from_file = unsafe { std::mem::transmute(((self.data >> 0) & 0xf) as u8) };
-        let from_rank = unsafe { std::mem::transmute(((self.data >> 4) & 0xf) as u8) };
+        let data = self.data?.get();
+        let from_file = unsafe { std::mem::transmute(((data >> 0) & 0xf) as u8) };
+        let from_rank = unsafe { std::mem::transmute(((data >> 4) & 0xf) as u8) };
         let from = Posn::from(from_rank, from_file);
 
-        let to_file = unsafe { std::mem::transmute(((self.data >> 8) & 0xf) as u8) };
-        let to_rank = unsafe { std::mem::transmute(((self.data >> 12) & 0xf) as u8) };
+        let to_file = unsafe { std::mem::transmute(((data >> 8) & 0xf) as u8) };
+        let to_rank = unsafe { std::mem::transmute(((data >> 12) & 0xf) as u8) };
         let to = Posn::from(to_rank, to_file);
 
-        let promo_bits: u8 = (self.data >> 16) as u8;
-        let promotion = if promo_bits == 7 {
-            None
-        } else {
-            Some(unsafe { std::mem::transmute(promo_bits) })
-        };
         Some(AlgebraicMove {
             to,
             from,
-            promotion,
+            promotion: self.promo,
         })
     }
 
     pub fn node_type(&self) -> NodeType {
-        let bits: u8 = (self.data >> 25) as u8;
-        unsafe { std::mem::transmute(bits) }
+        self.node_type
     }
 }
 

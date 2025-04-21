@@ -3,7 +3,7 @@ use std::fmt;
 use std::ops::Not;
 
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Piece {
     Pawn = 0,
     Rook,
