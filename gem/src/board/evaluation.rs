@@ -516,7 +516,7 @@ impl Board {
                     // node. Establish an exact score for it, and search a smaller window for
                     // everything else. If a move might actually be better, research it to find the
                     // actual score.
-                    if is_first_child {
+                    if is_first_child || alpha.mate_in().is_some() || alpha.mated_in().is_some() {
                         is_first_child = false;
                         let score =
                             self.pvs(-beta, -alpha.inc_mate(), target_depth, cache, should_stop)?;
@@ -1685,10 +1685,33 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
     fn mate_1_disconnect() {
         let fen = "6rk/p1p5/4BNQ1/4P3/4P3/2p2P2/6R1/3R3K w - - 1 39";
         let mut board = Board::from_fen(fen).expect("bad fen?");
-        let Some((_, move_eval)) = board.it_depth_best_move(9, 32) else {
+        let Some((_, move_eval)) = board.it_depth_best_move(7, 32) else {
             assert!(false);
             return;
         };
         assert_eq!(move_eval.eval, Evaluation::m1());
+    }
+    #[test]
+    fn eval_bug4() {
+        let fen = "r1b1k2r/pp1n3p/6pN/4pp2/3P3Q/8/2q1KPPP/3R1B1R w kq - 0 19";
+        let mut board = Board::from_fen(fen).expect("bad fen?");
+        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let (_, move_eval) = board.best_move(6, 1, &cache, None).unwrap();
+        println!("move_eval: {}", move_eval.eval);
+        assert!(move_eval.eval.0 < 0);
+    }
+
+    #[test]
+    fn eval_prec() {
+        let e = Evaluation::m1();
+        let f = e.dec_mate();
+        let g = -f;
+        let h = -e.dec_mate();
+        let i = -(e.dec_mate());
+        let j = (-e).dec_mate();
+        assert_eq!(-Evaluation::m2(), g);
+        assert_eq!(-Evaluation::m2(), h);
+        assert_eq!(-Evaluation::m2(), i);
+        assert_eq!(-Evaluation::m2(), j);
     }
 }
