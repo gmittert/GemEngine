@@ -3,7 +3,7 @@ use bitboard::posn::e5;
 use criterion::{criterion_group, BenchmarkId, Criterion};
 use gem::{
     board::{self, Board},
-    shared_hashmap::SharedHashMap,
+    shared_hashmap::SharedHashMap, transposition_table::PackedTTEntry,
 };
 
 pub fn eval_fn(c: &mut Criterion) {
@@ -27,7 +27,7 @@ pub fn start(c: &mut Criterion) {
             num_cpus,
             |b, &num_cpus| {
                 let mut board = board::starting_board();
-                let cache: SharedHashMap<1024> = SharedHashMap::new();
+                let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
                 b.iter(|| {
                     board.best_move(4, num_cpus, &cache, None);
                 })

@@ -90,7 +90,7 @@ impl Board {
         &mut self,
         depth: u16,
         num_threads: usize,
-        cache: &SharedHashMap<N>,
+        cache: &SharedHashMap<PackedTTEntry, N>,
         time: Option<Duration>,
     ) -> Option<(Option<Move>, SearchResult)> {
         let target_depth = self.half_move + depth;
@@ -249,7 +249,7 @@ impl Board {
         alpha: Evaluation,
         beta: Evaluation,
         target_depth: u16,
-        cache: &SharedHashMap<N>,
+        cache: &SharedHashMap<PackedTTEntry, N>,
         should_stop: &AtomicBool,
     ) -> Option<SearchResult> {
         let mut seldepth = 0;
@@ -261,16 +261,15 @@ impl Board {
         let mut best_move = None;
         let cached_val = cache.get(self.hash);
         if let Some(entry) = cached_val {
-            let unpacked = PackedTTEntry(entry);
             // We can use this cache entry if:
             // - The node is deep enough
             // - The entry is exact, or the upper bound <= alpha and lowerbound >= beta
-            let node_type = unpacked.node_type();
-            let eval = unpacked.eval();
+            let node_type = entry.node_type();
+            let eval = entry.eval();
             // If not, if the entry has a best move, start with it and hope that it gives us a nice
             // alpha to start with that should cause lots of cut offs.
-            best_move = unpacked.best_move();
-            if unpacked.depth() >= target_depth
+            best_move = entry.best_move();
+            if entry.depth() >= target_depth
                 && (node_type == NodeType::Exact || (eval < alpha && eval >= beta))
             {
                 tracing::event!(
@@ -428,7 +427,7 @@ impl Board {
                     match cached_val {
                         Some(entry) => {
                             let mut expected = entry;
-                            while self.half_move > PackedTTEntry(expected).depth() {
+                            while self.half_move > expected.depth() {
                                 if let Err(v) = cache.update(
                                     self.hash,
                                     entry,
@@ -437,8 +436,7 @@ impl Board {
                                         target_depth,
                                         best_move,
                                         NodeType::Upper,
-                                    )
-                                    .0,
+                                    ),
                                 ) {
                                     expected = v;
                                     continue;
@@ -451,7 +449,7 @@ impl Board {
                             cache.insert(
                                 self.hash,
                                 PackedTTEntry::new(beta, target_depth, best_move, NodeType::Upper)
-                                    .0,
+                                    ,
                             );
                         }
                     };
@@ -519,9 +517,9 @@ impl Board {
                     Level::INFO,
                     name = "Attempting update",
                     target_depth = target_depth,
-                    other_depth = PackedTTEntry(expected).depth()
+                    other_depth = expected.depth()
                 );
-                while target_depth > PackedTTEntry(expected).depth() {
+                while target_depth > expected.depth() {
                     if let Err(v) = cache.update(
                         self.hash,
                         entry,
@@ -538,8 +536,7 @@ impl Board {
                             } else {
                                 NodeType::Lower
                             },
-                        )
-                        .0,
+                        ),
                     ) {
                         expected = v;
                         tracing::event!(Level::INFO, name = "update failed");
@@ -574,8 +571,7 @@ impl Board {
                             promotion: m.promotion,
                         }),
                         node_type,
-                    )
-                    .0,
+                    ),
                 );
             }
         }
@@ -597,7 +593,7 @@ mod tests {
     fn find_queen_take() {
         let mut b = Board::from_fen("4k3/pppppppp/8/8/7q/8/PPPPPPP1/RNBQKBNR w - - 0 1")
             .expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (best_move, _) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -611,7 +607,7 @@ mod tests {
     fn take_back_trade() {
         let mut b = Board::from_fen("rn1qkbnr/ppp2ppp/3pB3/4p3/4P3/5N2/PPPP1PPP/RNBQK2R b - - 0 1")
             .expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (best_move, _) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -625,7 +621,7 @@ mod tests {
     fn m1() {
         let mut b =
             Board::from_fen("1k6/ppp5/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -641,7 +637,7 @@ mod tests {
     fn won() {
         let mut b =
             Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_none());
         assert_eq!(eval.eval, -Evaluation::won());
@@ -651,7 +647,7 @@ mod tests {
     fn lost() {
         let mut b =
             Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_none());
         assert_eq!(eval.eval, Evaluation::lost());
@@ -660,7 +656,7 @@ mod tests {
     #[test]
     fn stalemate() {
         let mut b = Board::from_fen("k7/2Q5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_none());
         assert_eq!(eval.eval, Evaluation::draw());
@@ -669,13 +665,13 @@ mod tests {
     #[test]
     fn draw() {
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (_, eval) = b.best_move(4, 1, &cache, None).unwrap();
         println!("Eval: {}", eval.eval);
         assert!(eval.eval.0 < 100 && eval.eval.0 > -100);
 
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (_, eval) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(eval.eval.0 < 100 && eval.eval.0 > -100);
     }
@@ -683,7 +679,7 @@ mod tests {
     fn mates() {
         let mut b =
             Board::from_fen("1k6/pppr4/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -697,7 +693,7 @@ mod tests {
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -710,14 +706,14 @@ mod tests {
         assert_eq!(eval.eval, Evaluation::m1());
 
         let mut b = Board::from_fen("k5RN/7R/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         let (_, eval) = b.best_move(4, 1, &cache, None).unwrap();
         println!("Eval: {}", eval.eval);
         assert_eq!(eval.eval, Evaluation::lost());
 
         let mut b =
             Board::from_fen("k6N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry,1024> = SharedHashMap::new();
         let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -729,7 +725,7 @@ mod tests {
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry,1024> = SharedHashMap::new();
         let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -744,7 +740,7 @@ mod tests {
     fn bishop_knight_mate() {
         let mut b =
             Board::from_fen("8/8/8/1B6/5N2/6K1/8/6k1 w - - 0 1").expect("failed to parse fen");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry,1024> = SharedHashMap::new();
         let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -803,7 +799,7 @@ mod tests {
 41. Kd4 {+3.57/8 5.0s} Kh8 {5.8s} 42. Kd3 {+3.58/8 5.0s} Kh7 {4.9s}
 43. Kd4 {+3.57/8 5.0s} Rh8 {7.3s} 44. Kc4 {+3.58/8 5.0s} Rc8+ {6.7s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry,1024> = SharedHashMap::new();
         let (best_move, move_eval) = board.best_move(6, 64, &cache, None).unwrap();
 
         let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
@@ -869,7 +865,7 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
         });
         assert!(res.is_ok());
 
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry,1024> = SharedHashMap::new();
         let Some((_, move_eval)) = board.best_move(1, 1, &cache, None) else {
             assert!(false);
             return;
@@ -915,7 +911,7 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
     fn mate_in_2_format() {
         let fen = "6k1/p6p/3p2p1/3P1B2/2Q3n1/N1P5/Pr1B2P1/R3RK1q w - - 1 23";
         let mut board = Board::from_fen(fen).expect("bad fen?");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry,1024> = SharedHashMap::new();
         let Some((_, move_eval)) = board.best_move(6, 1, &cache, None) else {
             assert!(false);
             return;
@@ -940,7 +936,7 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
     fn eval_bug4() {
         let fen = "r1b1k2r/pp1n3p/6pN/4pp2/3P3Q/8/2q1KPPP/3R1B1R w kq - 0 19";
         let mut board = Board::from_fen(fen).expect("bad fen?");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry,1024> = SharedHashMap::new();
         let (_, move_eval) = board.best_move(6, 1, &cache, None).unwrap();
         println!("move_eval: {}", move_eval.eval);
         assert!(move_eval.eval.0 < 0);
@@ -1000,7 +996,7 @@ Re3+ {-3.98/8 5.0s} 50. Ka4 {+3.98/9 5.0s} Re2 {-4.00/9 5.0s}
 Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
 54. Ra8+ {+3.98/9 5.0s} Nb8 {-4.00/9 5.0s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry,1024> = SharedHashMap::new();
         let (_, move_eval) = board.best_move(5, 1, &cache, None).unwrap();
 
         let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
@@ -1069,7 +1065,7 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
             })
             .expect("bad move?");
 
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry,1024> = SharedHashMap::new();
         let (m, _) = board.best_move(4, 32, &cache, None).unwrap();
         assert!(m.unwrap().to != c5());
     }
@@ -1080,7 +1076,7 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
             "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
         )
         .expect("Invalid fen?");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry,1024> = SharedHashMap::new();
         board.best_move(4, 32, &cache, None);
     }
 
@@ -1089,7 +1085,7 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let mut board =
             Board::from_fen("rn2k2r/1b1p1p2/p2ppn2/1p1P3p/2P3q1/1PNBP3/P3R1PP/R4Q1K b Qkq - 0 1")
                 .expect("Invalid fen?");
-        let cache: SharedHashMap<1024> = SharedHashMap::new();
+        let cache: SharedHashMap<PackedTTEntry, 1024> = SharedHashMap::new();
         board.best_move(4, 64, &cache, None);
     }
 }

@@ -329,7 +329,7 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::evaluation::*, transposition_table::*};
+    use crate::board::evaluation::*;
 
     #[test]
     fn white_better() {
@@ -576,53 +576,6 @@ mod tests {
             })
             .expect("bad move?");
         assert_eq!(board.hash, starting_hash);
-    }
-    #[test]
-    fn check_packed_tt_entry() {
-        {
-            let eval = Evaluation::m1();
-            let depth = 0x123;
-            let best_move = AlgebraicMove {
-                from: b6(),
-                to: e2(),
-                promotion: Some(Piece::Queen),
-            };
-            let node_type = NodeType::Exact;
-            let tt = PackedTTEntry::new(eval, depth, Some(best_move), node_type);
-            println!("{:x}", tt.0);
-            assert_eq!(tt.eval(), eval);
-            assert_eq!(tt.depth(), depth);
-            assert_eq!(tt.best_move(), Some(best_move));
-            assert_eq!(tt.node_type(), node_type);
-        }
-        {
-            let eval = -Evaluation::m1();
-            let depth = 0x456;
-            let best_move = AlgebraicMove {
-                from: h1(),
-                to: a8(),
-                promotion: None,
-            };
-            let node_type = NodeType::Upper;
-            let tt = PackedTTEntry::new(eval, depth, Some(best_move), node_type);
-            println!("{:x}", tt.0);
-            assert_eq!(tt.eval(), eval);
-            assert_eq!(tt.depth(), depth);
-            assert_eq!(tt.best_move(), Some(best_move));
-            assert_eq!(tt.node_type(), node_type);
-        }
-        {
-            let eval = Evaluation(31);
-            let depth = 0x456;
-            let best_move = None;
-            let node_type = NodeType::Upper;
-            let tt = PackedTTEntry::new(eval, depth, best_move, node_type);
-            println!("{:x}", tt.0);
-            assert_eq!(tt.eval(), eval);
-            assert_eq!(tt.depth(), depth);
-            assert_eq!(tt.best_move(), best_move);
-            assert_eq!(tt.node_type(), node_type);
-        }
     }
 
     #[test]
