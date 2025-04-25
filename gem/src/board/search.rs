@@ -30,6 +30,7 @@ pub struct SearchResult {
     pub nodes: usize,
 }
 
+#[derive(PartialEq)]
 pub enum ExpectedNodeType {
     PV,
     Cut,
@@ -268,7 +269,7 @@ impl Board {
         }
 
         let cached_val = cache.get(self.hash, alpha, beta, target_depth);
-        let mut best_move = match cached_val {
+        let mut hash_move = match cached_val {
             CacheResult::Exact(best_move, eval) => {
                 return Some(SearchResult {
                     eval,
@@ -295,32 +296,32 @@ impl Board {
             span.record("eval", eval.eval.0);
             return Some(eval);
         }
+
+        if hash_move.is_none()
+            && node_type == ExpectedNodeType::PV
+            && target_depth - self.half_move > 2
+        {
+            // Do internal iterative deepening.
+            let search_result = self.pvs(
+                alpha,
+                beta,
+                target_depth - 2,
+                cache,
+                should_stop,
+                ExpectedNodeType::PV,
+            )?;
+            hash_move = search_result.best_move;
+        }
+
         let mut alpha = alpha;
         let mut had_legal_move = false;
 
-        let hash_move = match best_move {
-            Some(m) => {
-                vec![m]
-            }
-            None => {
-                vec![]
-            }
-        }
-        .into_iter();
         let recapture = if let Some((p, _)) = self.moves.last() {
-            if let Some(capture) = self.get_smallest_attacker(*p, self.to_play) {
-                vec![AlgebraicMove {
-                    to: capture.to,
-                    from: capture.from,
-                    promotion: capture.promotion,
-                }]
-            } else {
-                vec![]
-            }
+            self.get_smallest_attacker(*p, self.to_play)
+                .map(|m| m.algebraic_move())
         } else {
-            vec![]
-        }
-        .into_iter();
+            None
+        };
 
         let killer_moves = {
             if target_depth - self.half_move >= 16 {
@@ -345,11 +346,13 @@ impl Board {
         .into_iter();
 
         let moves = hash_move
-            .chain(recapture)
+            .into_iter()
+            .chain(recapture.into_iter())
             .chain(killer_moves)
             .chain(self.pseudo_legal_randomized_moves_it());
         let mut is_pv_node = false;
         let mut is_first_child = true;
+        let mut best_move = None;
         for a in moves {
             let m = self.from_algeabraic(&a);
             self.make_move(&m);
@@ -451,11 +454,7 @@ impl Board {
                         let killer_idx = (target_depth - self.half_move) as usize;
                         if killer_idx < 16 {
                             let killer_moves = self.killer_moves[killer_idx];
-                            let new_move = Some(AlgebraicMove {
-                                to: m.to,
-                                from: m.from,
-                                promotion: m.promotion,
-                            });
+                            let new_move = Some(m.algebraic_move());
                             if killer_moves[0] != new_move && killer_moves[1] != new_move {
                                 self.killer_moves[killer_idx][1] = self.killer_moves[killer_idx][0];
                                 self.killer_moves[killer_idx][0] = new_move

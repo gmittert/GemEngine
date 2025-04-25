@@ -1,5 +1,8 @@
 use portable_atomic::AtomicU128;
-use std::{marker::PhantomData, sync::atomic::{AtomicUsize, Ordering}};
+use std::{
+    marker::PhantomData,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 pub trait Encodable {
     fn from_u64(v: u64) -> Self;
@@ -23,7 +26,7 @@ pub struct SharedHashMapEntry<T: Encodable> {
 }
 
 #[derive(Debug)]
-pub struct SharedHashMap<T:Encodable, const N: usize> {
+pub struct SharedHashMap<T: Encodable, const N: usize> {
     data: Box<[SharedHashMapEntry<T>; N]>,
     hits: AtomicUsize,
     misses: AtomicUsize,

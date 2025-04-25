@@ -128,6 +128,16 @@ pub struct Move {
     pub is_castle_king: bool,
 }
 
+impl Move {
+    pub fn algebraic_move(&self) -> AlgebraicMove {
+        AlgebraicMove {
+            from: self.from,
+            to: self.to,
+            promotion: self.promotion,
+        }
+    }
+}
+
 impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let is_check = if self.is_check {
