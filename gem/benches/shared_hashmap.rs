@@ -5,14 +5,13 @@ use bitboard::{
 use criterion::{black_box, criterion_group, Criterion};
 use gem::{
     board::evaluation::Evaluation,
-    shared_hashmap::SharedHashMap,
     transposition_table::{NodeType, PackedTTEntry, TranspositionTable},
 };
 
 pub fn create(c: &mut Criterion) {
     c.bench_function("create_tt", |b| {
         b.iter(|| {
-            let cache: TranspositionTable = SharedHashMap::new();
+            let cache = TranspositionTable::<{ 256 * 1024 * 1024 / 16 }>::new();
             black_box(cache);
         })
     });

@@ -4,6 +4,7 @@ use crate::shared_hashmap::Encodable;
 use crate::{board::evaluation::Evaluation, shared_hashmap::SharedHashMap};
 use bitboard::moves::{AlgebraicMove, Piece};
 use bitboard::posn::Posn;
+use tracing::Level;
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy)]
 pub enum NodeType {
@@ -44,7 +45,11 @@ impl PackedTTEntry {
         node_type: NodeType,
     ) -> PackedTTEntry {
         let (data, promo) = match best_move {
-            Some(AlgebraicMove{ from, to, promotion }) => {
+            Some(AlgebraicMove {
+                from,
+                to,
+                promotion,
+            }) => {
                 let mut data: u16 = 0;
                 data |= from.file() as u16;
                 data |= (from.rank() as u16) << 4;
@@ -52,7 +57,7 @@ impl PackedTTEntry {
                 data |= (to.rank() as u16) << 12;
                 (Some(NonZero::new(data).unwrap()), promotion)
             }
-            None => (None, None)
+            None => (None, None),
         };
         PackedTTEntry {
             eval,
@@ -91,8 +96,102 @@ impl PackedTTEntry {
     }
 }
 
-// 256MB with 16 bytes per entry
-pub type TranspositionTable = SharedHashMap<PackedTTEntry, { 256 * 1024 * 1024 / 16 }>;
+pub enum CacheResult {
+    // We have already computed this exact position at a depth equal to or greater than required.
+    // We know it's exact value, or have computed that it's definitely a cut off.
+    //
+    // In this case, we can return the cached value immediately.
+    Exact(Option<AlgebraicMove>, Evaluation),
+    // We've already computed this position, but it's not to a deep enough depth, or the evaluation
+    // is within the alpha beta window.
+    //
+    // In this case, the move is probably a good starting point and will hopefully cause lots of
+    // cut offs in the sibling nodes.
+    HashMove(Option<AlgebraicMove>),
+    // We don't have this position in the cache.
+    Miss,
+}
+
+pub struct TranspositionTable<const N: usize>(SharedHashMap<PackedTTEntry, N>);
+impl<const N: usize> TranspositionTable<N> {
+    pub fn new() -> TranspositionTable<N> {
+        TranspositionTable::<N>(SharedHashMap::new())
+    }
+    pub fn hash_usage(&self) -> usize {
+        self.0.hash_usage()
+    }
+    pub fn get(
+        &self,
+        hash: u64,
+        alpha: Evaluation,
+        beta: Evaluation,
+        target_depth: u16,
+    ) -> CacheResult {
+        if let Some(entry) = self.0.get(hash) {
+            // We can use this cache entry if:
+            // - The node is deep enough
+            // - The entry is exact, or the upper bound <= alpha and lowerbound >= beta
+            let node_type = entry.node_type();
+            let eval = entry.eval();
+
+            if entry.depth() >= target_depth
+                && (node_type == NodeType::Exact || (eval < alpha && eval >= beta))
+            {
+                tracing::event!(
+                    Level::INFO,
+                    name = "Retrieved from cache",
+                    eval = eval.0,
+                    "hash" = hash,
+                    ?node_type
+                );
+                CacheResult::Exact(entry.best_move(), eval)
+            } else {
+                // If not, if the entry has a best move, start with it and hope that it gives us a nice
+                // alpha to start with that should cause lots of cut offs.
+                CacheResult::HashMove(entry.best_move())
+            }
+        } else {
+            CacheResult::Miss
+        }
+    }
+
+    pub fn update(
+        &self,
+        hash: u64,
+        eval: Evaluation,
+        best_move: Option<AlgebraicMove>,
+        depth: u16,
+        node_type: NodeType,
+    ) {
+        let mut expected = self.0.get(hash).unwrap();
+        while depth > expected.depth() {
+            if let Err(v) = self.0.update(
+                hash,
+                expected,
+                PackedTTEntry::new(eval, depth, best_move, node_type),
+            ) {
+                expected = v;
+                continue;
+            }
+            break;
+        }
+    }
+
+    pub fn insert(
+        &self,
+        hash: u64,
+        eval: Evaluation,
+        best_move: Option<AlgebraicMove>,
+        target_depth: u16,
+        node_type: NodeType,
+    ) {
+        tracing::event!(Level::INFO, name = "inserting", eval = eval.0, hash = hash, node_type=?NodeType::Upper);
+        self.0.insert(
+            hash,
+            PackedTTEntry::new(eval, target_depth, best_move, node_type),
+        );
+    }
+}
 
 #[cfg(test)]
 mod tests {
