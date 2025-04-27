@@ -58,7 +58,7 @@ impl Not for Color {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub struct AlgebraicMove {
     pub from: Posn,
     pub to: Posn,

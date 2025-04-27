@@ -2,7 +2,7 @@ use tracing::{field, trace_span, Level};
 
 use crate::board::evaluation::PIECE_VALUES;
 use crate::board::*;
-use crate::transposition_table::{CacheResult, NodeType, TranspositionTable};
+use crate::transposition_table::{CacheResult, NodeType, TranspositionTable, DEFAULT_TT_SIZE};
 use std::cmp::{max, min};
 use std::sync::atomic::{AtomicU16, AtomicUsize};
 use std::sync::OnceLock;
@@ -45,8 +45,7 @@ impl Board {
     ) -> (Option<Move>, Evaluation, SearchInfo) {
         let start = Instant::now();
         let end_time = start + time;
-        // 256MB with 16 bytes per entry
-        let cache = TranspositionTable::<{ 256 * 1024 * 1024 / 16 }>::new();
+        let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
         let (mut m, mut eval) = self.best_move(1, num_threads, &cache, None).unwrap();
         let mut depth = 2;
         loop {
@@ -80,7 +79,7 @@ impl Board {
         target_depth: u16,
         num_threads: usize,
     ) -> Option<(Option<Move>, SearchResult)> {
-        let cache = TranspositionTable::<{ 256 * 1024 * 1024 / 16 }>::new();
+        let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
         let Some(mut res) = self.best_move(1, num_threads, &cache, None) else {
             return None;
         };
@@ -357,6 +356,9 @@ impl Board {
             let m = self.from_algeabraic(&a);
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
+                if best_move.is_none() {
+                    best_move = Some(a);
+                }
                 had_legal_move = true;
                 let span = match self.to_play {
                     Color::Black => trace_span!("white", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),

@@ -96,6 +96,7 @@ impl PackedTTEntry {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum CacheResult {
     // We have already computed this exact position at a depth equal to or greater than required.
     // We know it's exact value, or have computed that it's definitely a cut off.
@@ -112,6 +113,8 @@ pub enum CacheResult {
     Miss,
 }
 
+// 256MB with 16 bytes per entry
+pub const DEFAULT_TT_SIZE: usize = 256 * 1024 * 1024 / 16;
 pub struct TranspositionTable<const N: usize>(SharedHashMap<PackedTTEntry, N>);
 impl<const N: usize> TranspositionTable<N> {
     pub fn new() -> TranspositionTable<N> {
@@ -196,6 +199,9 @@ impl<const N: usize> TranspositionTable<N> {
 #[cfg(test)]
 mod tests {
     use bitboard::{moves::Piece, posn::*};
+    use std::sync::atomic::AtomicBool;
+
+    use crate::board::search::ExpectedNodeType;
 
     use super::*;
 
@@ -262,6 +268,36 @@ mod tests {
             assert_eq!(tt.depth(), depth);
             assert_eq!(tt.best_move(), best_move);
             assert_eq!(tt.node_type(), node_type);
+        }
+    }
+
+    #[test]
+    fn expected_caching() {
+        let mut board = crate::board::starting_board();
+        let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
+        let should_stop = AtomicBool::new(false);
+        board.pvs(
+            Evaluation::lost(),
+            Evaluation::won(),
+            2,
+            &cache,
+            &should_stop,
+            ExpectedNodeType::PV,
+        );
+
+        let moves = board.generate_pseudo_legal_moves();
+        for m in moves {
+            let m = board.from_algeabraic(&m);
+            board.make_move(&m);
+            let cache_result = cache.get(board.hash, Evaluation(-1), Evaluation(1), 1);
+            // For each result, we should have a cache entry, and it should have a move associated
+            // with it.
+            match cache_result {
+                CacheResult::Exact(algebraic_move, _) => assert!(algebraic_move.is_some()),
+                CacheResult::HashMove(algebraic_move) => assert!(algebraic_move.is_some()),
+                CacheResult::Miss => assert_ne!(cache_result, CacheResult::Miss),
+            }
+            board.undo_move(&m);
         }
     }
 }

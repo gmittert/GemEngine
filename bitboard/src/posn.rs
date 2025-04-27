@@ -108,7 +108,7 @@ impl fmt::Display for File {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Posn {
     pub pos: NonZero<u64>,
