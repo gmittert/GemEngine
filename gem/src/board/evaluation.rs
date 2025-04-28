@@ -232,7 +232,7 @@ impl Board {
         ];
         let mut doubled_pawns: u8 = 0;
         for file in files {
-            let num_pawns = BitBoard(bits & file).len();
+            let num_pawns = (bits & file).count_ones();
             if num_pawns >= 2 {
                 doubled_pawns += num_pawns as u8;
             }
@@ -264,7 +264,7 @@ impl Board {
             let pawns_left = bits & files[file_idx - 1];
             let pawns_right = bits & files[file_idx + 1];
             if (pawns_left | pawns_right) == 0 {
-                isolated_pawns += BitBoard(bits & files[file_idx]).len() as u8;
+                isolated_pawns += (bits & files[file_idx]).count_ones() as u8;
             }
         }
         isolated_pawns
@@ -281,21 +281,14 @@ impl Board {
             Color::White => self.white_pieces(),
         };
 
-        let mut blocked_pawns: u8 = 0;
+        let shifted = match side {
+            Color::Black => pawns.0 >> 8,
+            Color::White => pawns.0 << 8,
+        };
 
-        for pawn in pawns {
-            if let Some(in_front) = if side == Color::White {
-                pawn.no()
-            } else {
-                pawn.so()
-            } {
-                if opponent_pieces.contains(in_front) || pawns.contains(in_front) {
-                    blocked_pawns += 1;
-                }
-            }
-        }
-
-        blocked_pawns
+        let blocked_locations = opponent_pieces.0 | pawns.0;
+        let blocked_pawns = shifted & blocked_locations;
+        blocked_pawns.count_ones() as u8
     }
 
     pub fn get_smallest_attacker(&self, p: Posn, side: Color) -> Option<Move> {

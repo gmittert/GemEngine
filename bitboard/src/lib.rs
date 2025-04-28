@@ -25,13 +25,7 @@ impl BitBoard {
     }
 
     pub const fn len(&self) -> usize {
-        let mut acc = self.0 as u64;
-        let mut count = 0;
-        while acc != 0 {
-            count += 1;
-            acc &= acc - 1
-        }
-        count
+        self.0.count_ones() as usize
     }
 }
 
