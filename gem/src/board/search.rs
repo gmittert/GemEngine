@@ -7,7 +7,6 @@ use std::cmp::{max, min};
 use std::sync::atomic::{AtomicU16, AtomicUsize};
 use std::sync::OnceLock;
 use std::sync::{atomic::AtomicBool, atomic::Ordering};
-use std::thread;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -201,9 +200,9 @@ impl Board {
         let result: OnceLock<Option<(Evaluation, Option<AlgebraicMove>)>> = OnceLock::new();
         let total_seldepth = AtomicU16::new(0);
         let total_nodes = AtomicUsize::new(0);
-        thread::scope(|s| {
+        rayon::scope(|s| {
             for _ in 0..num_threads {
-                s.spawn(|| {
+                s.spawn(|_| {
                     let mut new_b = self.clone();
                     let res = new_b.pvs(
                         Evaluation::lost(),

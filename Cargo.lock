@@ -251,6 +251,7 @@ dependencies = [
  "magics",
  "portable-atomic",
  "rand",
+ "rayon",
  "tracing",
  "tracing-perfetto",
  "tracing-subscriber",
