@@ -23,11 +23,111 @@ pub struct SearchInfo {
 }
 
 #[derive(Debug)]
-pub struct SearchResult {
-    pub eval: Evaluation,
-    pub best_move: Option<AlgebraicMove>,
-    pub seldepth: u16,
-    pub nodes: usize,
+pub enum SearchResult {
+    Completed {
+        eval: Evaluation,
+        best_move: Option<AlgebraicMove>,
+        seldepth: u16,
+        nodes: usize,
+    },
+    Aborted {
+        seldepth: u16,
+        nodes: usize,
+    },
+}
+
+impl SearchResult {
+    pub fn eval(&self) -> Option<Evaluation> {
+        match self {
+            SearchResult::Completed { eval, .. } => Some(*eval),
+            _ => None,
+        }
+    }
+    pub fn best_move(&self) -> Option<AlgebraicMove> {
+        match self {
+            SearchResult::Completed { best_move, .. } => *best_move,
+            _ => None,
+        }
+    }
+    pub fn seldepth(&self) -> u16 {
+        match self {
+            SearchResult::Completed { seldepth, .. } => *seldepth,
+            SearchResult::Aborted { seldepth, .. } => *seldepth,
+        }
+    }
+    pub fn nodes(&self) -> usize {
+        match self {
+            SearchResult::Completed { nodes, .. } => *nodes,
+            SearchResult::Aborted { nodes, .. } => *nodes,
+        }
+    }
+
+    #[must_use]
+    fn improve(&self, other: &SearchResult) -> SearchResult {
+        match (self, other) {
+            (
+                SearchResult::Completed {
+                    seldepth: s1,
+                    nodes: n1,
+                    ..
+                },
+                SearchResult::Completed {
+                    eval,
+                    best_move,
+                    seldepth,
+                    nodes,
+                },
+            ) => SearchResult::Completed {
+                eval: *eval,
+                best_move: *best_move,
+                seldepth: max(*s1, *seldepth),
+                nodes: n1 + nodes,
+            },
+            (
+                SearchResult::Completed {
+                    eval,
+                    best_move,
+                    seldepth: s1,
+                    nodes: n1,
+                },
+                SearchResult::Aborted { seldepth, nodes },
+            ) => SearchResult::Completed {
+                eval: *eval,
+                best_move: *best_move,
+                seldepth: max(*s1, *seldepth),
+                nodes: n1 + nodes,
+            },
+            (
+                SearchResult::Aborted {
+                    seldepth: s1,
+                    nodes: n1,
+                    ..
+                },
+                SearchResult::Completed {
+                    eval,
+                    best_move,
+                    seldepth,
+                    nodes,
+                },
+            ) => SearchResult::Completed {
+                eval: *eval,
+                best_move: *best_move,
+                nodes: n1 + nodes,
+                seldepth: max(*s1, *seldepth),
+            },
+            (
+                SearchResult::Aborted {
+                    seldepth: s1,
+                    nodes: n1,
+                    ..
+                },
+                SearchResult::Aborted { seldepth, nodes },
+            ) => SearchResult::Aborted {
+                seldepth: max(*s1, *seldepth),
+                nodes: n1 + nodes,
+            },
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -46,50 +146,47 @@ impl Board {
         let start = Instant::now();
         let end_time = start + time;
         let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
-        let (mut m, mut eval) = self.best_move(1, num_threads, &cache, None).unwrap();
+        let mut completed_search = self.best_move(1, num_threads, &cache, None);
         let mut depth = 2;
         loop {
             let now = Instant::now();
             if now >= end_time {
                 break;
             }
-            let Some((mp, evalp)) =
-                self.best_move(depth, num_threads, &cache, Some(end_time - now))
-            else {
-                break;
-            };
-            m = mp;
-            eval = evalp;
+            let evalp = self.best_move(depth, num_threads, &cache, Some(end_time - now));
+            completed_search = completed_search.improve(&evalp);
+            match evalp {
+                SearchResult::Aborted { .. } => break,
+                _ => (),
+            }
             depth += 1;
         }
-        let time = Instant::now() - start;
         let info = SearchInfo {
             depth,
-            seldepth: eval.seldepth,
-            nodes: eval.nodes,
-            nodes_per_sec: eval.nodes / time.as_secs() as usize,
+            seldepth: completed_search.seldepth(),
+            nodes: completed_search.nodes(),
+            nodes_per_sec: completed_search.nodes() / start.elapsed().as_secs() as usize,
             time,
             hash_full: cache.hash_usage(),
         };
-        (m, eval.eval, info)
+        (
+            completed_search
+                .best_move()
+                .map(|m| self.from_algeabraic(&m)),
+            completed_search.eval().unwrap(),
+            info,
+        )
     }
 
-    pub fn it_depth_best_move(
-        &mut self,
-        target_depth: u16,
-        num_threads: usize,
-    ) -> Option<(Option<Move>, SearchResult)> {
+    pub fn it_depth_best_move(&mut self, target_depth: u16, num_threads: usize) -> SearchResult {
         let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
-        let Some(mut res) = self.best_move(1, num_threads, &cache, None) else {
-            return None;
-        };
 
+        let mut res = self.best_move(1, num_threads, &cache, None);
         for depth in 1..target_depth {
-            if let Some(new_res) = self.best_move(depth + 1, num_threads, &cache, None) {
-                res = new_res
-            }
+            let res2 = self.best_move(depth + 1, num_threads, &cache, None);
+            res = res.improve(&res2);
         }
-        Some(res)
+        res
     }
 
     pub fn best_move<const N: usize>(
@@ -98,10 +195,10 @@ impl Board {
         num_threads: usize,
         cache: &TranspositionTable<N>,
         time: Option<Duration>,
-    ) -> Option<(Option<Move>, SearchResult)> {
+    ) -> SearchResult {
         let target_depth = self.half_move + depth;
         let should_stop = AtomicBool::new(false);
-        let result: OnceLock<Option<SearchResult>> = OnceLock::new();
+        let result: OnceLock<Option<(Evaluation, Option<AlgebraicMove>)>> = OnceLock::new();
         let total_seldepth = AtomicU16::new(0);
         let total_nodes = AtomicUsize::new(0);
         thread::scope(|s| {
@@ -116,12 +213,23 @@ impl Board {
                         &should_stop,
                         ExpectedNodeType::PV,
                     );
-                    if let Some(ref r) = res {
-                        let _ = &total_nodes.fetch_add(r.nodes, Ordering::AcqRel);
-                        let _ = &total_seldepth.fetch_max(r.seldepth, Ordering::AcqRel);
-                    }
-                    if result.set(res).is_ok() {
-                        let _ = &should_stop.store(true, Ordering::Relaxed);
+                    match res {
+                        SearchResult::Completed {
+                            eval,
+                            best_move,
+                            seldepth,
+                            nodes,
+                        } => {
+                            let _ = &total_nodes.fetch_add(nodes, Ordering::AcqRel);
+                            let _ = &total_seldepth.fetch_max(seldepth, Ordering::AcqRel);
+                            if result.set(Some((eval, best_move))).is_ok() {
+                                let _ = &should_stop.store(true, Ordering::Relaxed);
+                            }
+                        }
+                        SearchResult::Aborted { seldepth, nodes } => {
+                            let _ = &total_nodes.fetch_add(nodes, Ordering::AcqRel);
+                            let _ = &total_seldepth.fetch_max(seldepth, Ordering::AcqRel);
+                        }
                     }
                 });
             }
@@ -144,21 +252,18 @@ impl Board {
             }
         });
 
-        if let Some(SearchResult {
-            eval, best_move, ..
-        }) = result.wait()
-        {
-            Some((
-                best_move.map(|m| self.from_algeabraic(&m)),
-                SearchResult {
-                    eval: *eval,
-                    best_move: *best_move,
-                    seldepth: total_seldepth.load(Ordering::Acquire),
-                    nodes: total_nodes.load(Ordering::Acquire),
-                },
-            ))
+        if let Some((eval, best_move)) = result.wait() {
+            SearchResult::Completed {
+                eval: *eval,
+                best_move: *best_move,
+                seldepth: total_seldepth.load(Ordering::Acquire),
+                nodes: total_nodes.load(Ordering::Acquire),
+            }
         } else {
-            None
+            SearchResult::Aborted {
+                seldepth: total_seldepth.load(Ordering::Acquire),
+                nodes: total_nodes.load(Ordering::Acquire),
+            }
         }
     }
 
@@ -167,7 +272,7 @@ impl Board {
         let stand_pat = self.eval(alpha, beta, self.to_play);
         tracing::event!(Level::INFO, stand_pat = stand_pat.0);
         if stand_pat >= beta {
-            return SearchResult {
+            return SearchResult::Completed {
                 eval: beta,
                 seldepth: 1,
                 nodes: 1,
@@ -210,9 +315,20 @@ impl Board {
                     Color::White => trace_span!("quiesce black", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
                 };
                 let eval_res = self.quiesce(-beta, -alpha.inc_mate());
-                let eval = -eval_res.eval.dec_mate();
-                nodes += eval_res.nodes;
-                seldepth = max(seldepth, eval_res.seldepth + 1);
+
+                let eval = match eval_res {
+                    SearchResult::Completed {
+                        eval,
+                        seldepth: s1,
+                        nodes: n1,
+                        ..
+                    } => {
+                        nodes += n1;
+                        seldepth = max(seldepth, s1 + 1);
+                        -eval.dec_mate()
+                    }
+                    SearchResult::Aborted { .. } => panic!("Quience shouldn't abort"),
+                };
                 span.record("eval", eval.0);
                 drop(span);
                 if eval >= beta {
@@ -224,7 +340,7 @@ impl Board {
                         eval = eval.0,
                         beta = beta.0
                     );
-                    return SearchResult {
+                    return SearchResult::Completed {
                         eval: beta,
                         seldepth,
                         nodes,
@@ -243,7 +359,7 @@ impl Board {
             }
             self.undo_move(&m);
         }
-        SearchResult {
+        SearchResult::Completed {
             eval: alpha,
             seldepth,
             nodes,
@@ -259,23 +375,23 @@ impl Board {
         cache: &TranspositionTable<N>,
         should_stop: &AtomicBool,
         node_type: ExpectedNodeType,
-    ) -> Option<SearchResult> {
+    ) -> SearchResult {
         let mut seldepth = 0;
         let mut nodes = 1;
 
         if should_stop.load(Ordering::Acquire) {
-            return None;
+            return SearchResult::Aborted { seldepth, nodes };
         }
 
         let cached_val = cache.get(self.hash, alpha, beta, target_depth);
         let mut hash_move = match cached_val {
             CacheResult::Exact(best_move, eval) => {
-                return Some(SearchResult {
+                return SearchResult::Completed {
                     eval,
                     best_move,
                     seldepth,
                     nodes,
-                })
+                }
             }
             CacheResult::HashMove(m) => m,
             CacheResult::Miss => None,
@@ -291,9 +407,14 @@ impl Board {
                 eval = field::Empty
             )
             .entered();
-            let eval = self.quiesce(alpha, beta);
-            span.record("eval", eval.eval.0);
-            return Some(eval);
+
+            let res = self.quiesce(alpha, beta);
+            let eval = match res {
+                SearchResult::Completed { eval, .. } => eval,
+                SearchResult::Aborted { .. } => panic!("Quience shouldn't abort"),
+            };
+            span.record("eval", eval.0);
+            return res;
         }
 
         if hash_move.is_none()
@@ -301,15 +422,33 @@ impl Board {
             && target_depth - self.half_move > 2
         {
             // Do internal iterative deepening.
-            let search_result = self.pvs(
+            match self.pvs(
                 alpha,
                 beta,
                 target_depth - 2,
                 cache,
                 should_stop,
                 ExpectedNodeType::PV,
-            )?;
-            hash_move = search_result.best_move;
+            ) {
+                SearchResult::Completed {
+                    best_move: b1,
+                    seldepth: s1,
+                    nodes: n1,
+                    ..
+                } => {
+                    nodes += n1;
+                    seldepth = max(seldepth, s1 + 1);
+                    hash_move = b1;
+                }
+                SearchResult::Aborted {
+                    seldepth: s1,
+                    nodes: n1,
+                } => {
+                    nodes += n1;
+                    seldepth = max(seldepth, s1 + 1);
+                    return SearchResult::Aborted { seldepth, nodes };
+                }
+            }
         }
 
         let mut alpha = alpha;
@@ -377,12 +516,12 @@ impl Board {
                     }
                 }
                 let eval_res = if is_three_fold {
-                    Some(SearchResult {
+                    SearchResult::Completed {
                         eval: Evaluation::draw(),
-                        nodes: 1,
-                        seldepth: 1,
                         best_move: Some(a),
-                    })
+                        seldepth: 0,
+                        nodes: 1,
+                    }
                 } else {
                     // PV Search: We'd ordered our hash move in front and it's likely to be the PV
                     // node. Establish an exact score for it, and search a smaller window for
@@ -395,15 +534,14 @@ impl Board {
                             ExpectedNodeType::Cut => ExpectedNodeType::All,
                             ExpectedNodeType::All => ExpectedNodeType::Cut,
                         };
-                        let score = self.pvs(
+                        self.pvs(
                             -beta,
                             -alpha.inc_mate(),
                             target_depth,
                             cache,
                             should_stop,
                             expected_next_node,
-                        )?;
-                        Some(score)
+                        )
                     } else {
                         let expected_next_node = match node_type {
                             ExpectedNodeType::PV => ExpectedNodeType::Cut,
@@ -417,25 +555,47 @@ impl Board {
                             cache,
                             should_stop,
                             expected_next_node,
-                        )?;
-                        // The score should be in our alpha beta window. If it's not, we need to do
-                        // a full search.
-                        if alpha < -score.eval && -score.eval < beta {
-                            score = self.pvs(
-                                -beta,
-                                -alpha.inc_mate(),
-                                target_depth,
-                                cache,
-                                should_stop,
-                                ExpectedNodeType::PV,
-                            )?;
+                        );
+                        match score {
+                            SearchResult::Completed { eval, .. } => {
+                                // The score should be in our alpha beta window. If it's not, we need to do
+                                // a full search.
+                                if alpha < -eval && -eval < beta {
+                                    score = self.pvs(
+                                        -beta,
+                                        -alpha.inc_mate(),
+                                        target_depth,
+                                        cache,
+                                        should_stop,
+                                        ExpectedNodeType::PV,
+                                    );
+                                }
+                                score
+                            }
+                            a => a,
                         }
-                        Some(score)
                     }
-                }?;
-                let eval = -eval_res.eval.dec_mate();
-                nodes += eval_res.nodes;
-                seldepth = max(seldepth, eval_res.seldepth + 1);
+                };
+                let eval = match eval_res {
+                    SearchResult::Completed {
+                        eval,
+                        seldepth: s1,
+                        nodes: n1,
+                        ..
+                    } => {
+                        nodes += n1;
+                        seldepth = max(seldepth, s1 + 1);
+                        -eval.dec_mate()
+                    }
+                    SearchResult::Aborted {
+                        seldepth: s1,
+                        nodes: n1,
+                    } => {
+                        nodes += n1;
+                        seldepth = max(seldepth, s1 + 1);
+                        return SearchResult::Aborted { seldepth, nodes };
+                    }
+                };
                 span.record("eval", eval.0);
                 drop(span);
 
@@ -469,12 +629,12 @@ impl Board {
                         eval = eval.0,
                         beta = beta.0
                     );
-                    return Some(SearchResult {
+                    return SearchResult::Completed {
                         eval: beta,
                         nodes,
                         seldepth,
                         best_move: Some(a),
-                    });
+                    };
                 }
 
                 if eval > alpha {
@@ -515,12 +675,12 @@ impl Board {
                 cache.update(self.hash, eval, best_move, target_depth, node_type);
             }
         };
-        Some(SearchResult {
+        SearchResult::Completed {
             eval,
             nodes,
             seldepth,
             best_move,
-        })
+        }
     }
 }
 
@@ -534,9 +694,10 @@ mod tests {
         let mut b = Board::from_fen("4k3/pppppppp/8/8/7q/8/PPPPPPP1/RNBQKBNR w - - 0 1")
             .expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, _) = b.best_move(4, 1, &cache, None).unwrap();
+        let best_move = b.best_move(4, 1, &cache, None).best_move();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
+        let best_move = b.from_algeabraic(&best_move);
         println!("Best Move: {}", best_move);
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, h1());
@@ -548,9 +709,10 @@ mod tests {
         let mut b = Board::from_fen("rn1qkbnr/ppp2ppp/3pB3/4p3/4P3/5N2/PPPP1PPP/RNBQK2R b - - 0 1")
             .expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, _) = b.best_move(4, 1, &cache, None).unwrap();
+        let best_move = b.best_move(4, 1, &cache, None).best_move();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
+        let best_move = b.from_algeabraic(&best_move);
         println!("Best Move: {}", best_move);
         assert_eq!(best_move.piece, Piece::Pawn);
         assert_eq!(best_move.from, f7());
@@ -562,15 +724,18 @@ mod tests {
         let mut b =
             Board::from_fen("1k6/ppp5/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
+        let res = b.best_move(4, 1, &cache, None);
+        let best_move = res.best_move();
+        let eval = res.eval();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
+        let best_move = b.from_algeabraic(&best_move);
         println!("Best Move: {}", best_move);
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, h1());
         assert_eq!(best_move.to, h8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval.eval, Evaluation::m1());
+        assert_eq!(eval.unwrap(), Evaluation::m1());
     }
 
     #[test]
@@ -578,9 +743,11 @@ mod tests {
         let mut b =
             Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
+        let res = b.best_move(4, 1, &cache, None);
+        let best_move = res.best_move();
+        let eval = res.eval();
         assert!(best_move.is_none());
-        assert_eq!(eval.eval, -Evaluation::won());
+        assert_eq!(eval.unwrap(), -Evaluation::won());
     }
 
     #[test]
@@ -588,92 +755,108 @@ mod tests {
         let mut b =
             Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
+        let res = b.best_move(4, 1, &cache, None);
+        let best_move = res.best_move();
+        let eval = res.eval();
         assert!(best_move.is_none());
-        assert_eq!(eval.eval, Evaluation::lost());
+        assert_eq!(eval.unwrap(), Evaluation::lost());
     }
 
     #[test]
     fn stalemate() {
         let mut b = Board::from_fen("k7/2Q5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
+        let res = b.best_move(4, 1, &cache, None);
+        let best_move = res.best_move();
+        let eval = res.eval();
         assert!(best_move.is_none());
-        assert_eq!(eval.eval, Evaluation::draw());
+        assert_eq!(eval.unwrap(), Evaluation::draw());
     }
 
     #[test]
     fn draw() {
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (_, eval) = b.best_move(4, 1, &cache, None).unwrap();
-        println!("Eval: {}", eval.eval);
-        assert!(eval.eval.0 < 100 && eval.eval.0 > -100);
+        let eval = b.best_move(4, 1, &cache, None).eval().unwrap();
+        println!("Eval: {}", eval);
+        assert!(eval.0 < 100 && eval.0 > -100);
 
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (_, eval) = b.best_move(4, 1, &cache, None).unwrap();
-        assert!(eval.eval.0 < 100 && eval.eval.0 > -100);
+        let eval = b.best_move(4, 1, &cache, None).eval().unwrap();
+        assert!(eval.0 < 100 && eval.0 > -100);
     }
     #[test]
     fn mates() {
         let mut b =
             Board::from_fen("1k6/pppr4/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
+        let res = b.best_move(4, 1, &cache, None);
+        let best_move = res.best_move();
+        let eval = res.eval().unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
+        let best_move = b.from_algeabraic(&best_move);
         println!("Best Move: {}", best_move);
-        println!("Eval: {}", eval.eval);
+        println!("Eval: {}", eval);
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, h1());
         assert_eq!(best_move.to, h8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval.eval, Evaluation::m3());
+        assert_eq!(eval, Evaluation::m3());
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
+        let res = b.best_move(4, 1, &cache, None);
+        let best_move = res.best_move();
+        let eval = res.eval().unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        println!("Eval: {}", eval.eval);
+        let best_move = b.from_algeabraic(&best_move);
+        println!("Eval: {}", eval);
         println!("Best Move: {}", best_move);
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, g6());
         assert_eq!(best_move.to, g8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval.eval, Evaluation::m1());
+        assert_eq!(eval, Evaluation::m1());
 
         let mut b = Board::from_fen("k5RN/7R/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (_, eval) = b.best_move(4, 1, &cache, None).unwrap();
-        println!("Eval: {}", eval.eval);
-        assert_eq!(eval.eval, Evaluation::lost());
+        let eval = b.best_move(4, 1, &cache, None).eval().unwrap();
+        println!("Eval: {}", eval);
+        assert_eq!(eval, Evaluation::lost());
 
         let mut b =
             Board::from_fen("k6N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
+        let res = b.best_move(4, 1, &cache, None);
+        let best_move = res.best_move();
+        let eval = res.eval().unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        println!("Eval: {}", eval.eval);
+        let best_move = b.from_algeabraic(&best_move);
+        println!("Eval: {}", eval);
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, g6());
         assert_eq!(best_move.to, g8());
-        assert_eq!(eval.eval, Evaluation::m1());
+        assert_eq!(eval, Evaluation::m1());
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
+        let res = b.best_move(4, 1, &cache, None);
+        let best_move = res.best_move();
+        let eval = res.eval().unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        println!("Eval: {}", eval.eval);
+        let best_move = b.from_algeabraic(&best_move);
+        println!("Eval: {}", eval);
         assert_eq!(best_move.piece, Piece::King);
         assert_eq!(best_move.from, b8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval.eval, -Evaluation::m2());
+        assert_eq!(eval, -Evaluation::m2());
     }
 
     #[test]
@@ -681,12 +864,15 @@ mod tests {
         let mut b =
             Board::from_fen("8/8/8/1B6/5N2/6K1/8/6k1 w - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, eval) = b.best_move(4, 1, &cache, None).unwrap();
+        let res = b.best_move(4, 1, &cache, None);
+        let best_move = res.best_move();
+        let eval = res.eval().unwrap();
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
+        let best_move = b.from_algeabraic(&best_move);
         println!("Best Move: {}", best_move);
-        println!("Eval: {}", eval.eval);
-        assert!(eval.eval.mate_in().is_some());
+        println!("Eval: {}", eval);
+        assert!(eval.mate_in().is_some());
     }
 
     #[test]
@@ -740,13 +926,15 @@ mod tests {
 43. Kd4 {+3.57/8 5.0s} Rh8 {7.3s} 44. Kc4 {+3.58/8 5.0s} Rc8+ {6.7s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::<1024>::new();
-        let (best_move, move_eval) = board.best_move(6, 64, &cache, None).unwrap();
+        let res = board.best_move(6, 64, &cache, None);
+        let best_move = res.best_move();
+        let eval = res.eval().unwrap();
 
         let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
         let evalb = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(evalw != Evaluation::draw());
         assert!(evalb != Evaluation::draw());
-        assert!(move_eval.eval != Evaluation::draw());
+        assert!(eval != Evaluation::draw());
         assert!(best_move.unwrap().to != d4());
     }
 
@@ -806,12 +994,8 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
         assert!(res.is_ok());
 
         let cache = TranspositionTable::<1024>::new();
-        let Some((_, move_eval)) = board.best_move(1, 1, &cache, None) else {
-            assert!(false);
-            return;
-        };
-
-        assert!(move_eval.eval.0 < 0);
+        let eval = board.best_move(1, 1, &cache, None).eval().unwrap();
+        assert!(eval.0 < 0);
     }
     #[test]
     fn eval_bug_bad_trade() {
@@ -852,11 +1036,8 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
         let fen = "6k1/p6p/3p2p1/3P1B2/2Q3n1/N1P5/Pr1B2P1/R3RK1q w - - 1 23";
         let mut board = Board::from_fen(fen).expect("bad fen?");
         let cache = TranspositionTable::<1024>::new();
-        let Some((_, move_eval)) = board.best_move(6, 1, &cache, None) else {
-            assert!(false);
-            return;
-        };
-        let Some(mated_in) = move_eval.eval.mated_in() else {
+        let eval = board.best_move(6, 1, &cache, None).eval().unwrap();
+        let Some(mated_in) = eval.mated_in() else {
             assert!(false);
             return;
         };
@@ -866,20 +1047,17 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
     fn mate_1_disconnect() {
         let fen = "6rk/p1p5/4BNQ1/4P3/4P3/2p2P2/6R1/3R3K w - - 1 39";
         let mut board = Board::from_fen(fen).expect("bad fen?");
-        let Some((_, move_eval)) = board.it_depth_best_move(7, 32) else {
-            assert!(false);
-            return;
-        };
-        assert_eq!(move_eval.eval, Evaluation::m1());
+        let eval = board.it_depth_best_move(7, 32).eval().unwrap();
+        assert_eq!(eval, Evaluation::m1());
     }
     #[test]
     fn eval_bug4() {
         let fen = "r1b1k2r/pp1n3p/6pN/4pp2/3P3Q/8/2q1KPPP/3R1B1R w kq - 0 19";
         let mut board = Board::from_fen(fen).expect("bad fen?");
         let cache = TranspositionTable::<1024>::new();
-        let (_, move_eval) = board.best_move(6, 1, &cache, None).unwrap();
-        println!("move_eval: {}", move_eval.eval);
-        assert!(move_eval.eval.0 < 0);
+        let move_eval = board.best_move(6, 1, &cache, None).eval().unwrap();
+        println!("move_eval: {}", move_eval);
+        assert!(move_eval.0 < 0);
     }
 
     #[test]
@@ -937,13 +1115,13 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
 54. Ra8+ {+3.98/9 5.0s} Nb8 {-4.00/9 5.0s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::<1024>::new();
-        let (_, move_eval) = board.best_move(5, 1, &cache, None).unwrap();
+        let move_eval = board.best_move(5, 1, &cache, None).eval().unwrap();
 
         let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
         let evalb = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(evalw != Evaluation::draw());
         assert!(evalb != Evaluation::draw());
-        assert!(move_eval.eval != Evaluation::draw());
+        assert!(move_eval != Evaluation::draw());
     }
 
     #[test]
@@ -975,8 +1153,8 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
                 &should_stop,
                 ExpectedNodeType::PV,
             )
-            .expect("Failed to resolve value")
-            .eval;
+            .eval()
+            .expect("Failed to resolve value");
         println!("Eval: {}", eval);
         assert!(eval < Evaluation::draw());
     }
@@ -1007,8 +1185,8 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
             .expect("bad move?");
 
         let cache = TranspositionTable::<1024>::new();
-        let (m, _) = board.best_move(4, 32, &cache, None).unwrap();
-        assert!(m.unwrap().to != c5());
+        let m = board.best_move(4, 32, &cache, None).best_move().unwrap();
+        assert!(m.to != c5());
     }
 
     #[test]
