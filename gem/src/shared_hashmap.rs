@@ -28,13 +28,7 @@ pub struct SharedHashMapEntry<T: Encodable> {
 #[derive(Debug)]
 pub struct SharedHashMap<T: Encodable, const N: usize> {
     data: Box<[SharedHashMapEntry<T>; N]>,
-    hits: AtomicUsize,
-    misses: AtomicUsize,
-    conflicts: AtomicUsize,
-
     accepted: AtomicUsize,
-    rejected: AtomicUsize,
-    updates: AtomicUsize,
 }
 
 /// A very simple lockless hashmap that supports get/set. The map also supports updates, but only
@@ -54,28 +48,6 @@ impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
     pub fn hash_usage(&self) -> usize {
         (1000 * self.accepted.load(Ordering::Relaxed)) / N
     }
-    pub fn print_stats(&self) {
-        let hits = self.hits.load(Ordering::Relaxed);
-        let misses = self.misses.load(Ordering::Relaxed);
-        let conflicts = self.conflicts.load(Ordering::Relaxed);
-        let accepted = self.accepted.load(Ordering::Relaxed);
-        let rejected = self.rejected.load(Ordering::Relaxed);
-        let updates = self.updates.load(Ordering::Relaxed);
-        println!("Hits:      {}", hits);
-        println!("Misses:    {}", misses);
-        println!("Conflicts: {}", conflicts);
-        println!(
-            "Hit Rate:  {:.5}",
-            hits as f64 / (hits + misses + conflicts) as f64
-        );
-        println!("Updates:          {}", updates);
-        println!("Accepted:         {}", accepted);
-        println!("Rejected:         {}", rejected);
-        println!(
-            "Acceptance Rate: {:.5}",
-            accepted as f64 / (accepted + rejected) as f64
-        );
-    }
     pub fn new() -> SharedHashMap<T, N> {
         // We use the nightly "new_zeroed" because doing a regular box new causes a stack overflow
         // on non release builds. We also can't just do a `vec![SharedHashMapEntry::new(0,0); N]`
@@ -85,12 +57,7 @@ impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
 
         SharedHashMap::<T, N> {
             data,
-            hits: AtomicUsize::new(0),
-            misses: AtomicUsize::new(0),
-            conflicts: AtomicUsize::new(0),
             accepted: AtomicUsize::new(0),
-            rejected: AtomicUsize::new(0),
-            updates: AtomicUsize::new(0),
         }
     }
 
@@ -98,15 +65,9 @@ impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
         let pos: usize = k as usize % N;
         let entry = self.data[pos].data.load(Ordering::Relaxed);
         let header = (entry >> 64) as u64;
-        if header == 0 {
-            self.misses.fetch_add(1, Ordering::Relaxed);
+        if header == 0 || header != k {
             return None;
         }
-        if header != k {
-            self.conflicts.fetch_add(1, Ordering::Relaxed);
-            return None;
-        }
-        self.hits.fetch_add(1, Ordering::Relaxed);
         Some(T::from_u64(entry as u64))
     }
 
@@ -121,7 +82,7 @@ impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
         // that a move contains a from an to position, and h1 is the only position that's encoded
         // as 0. Since a move can't be both to and from h1, at least one of "to" or "from" must be
         // non zero).
-        assert_ne!(v.to_u64(), 0);
+        debug_assert_ne!(v.to_u64(), 0);
 
         // Modulo is fine for now, our zorbrist keys are hopefully effectively random. Since we
         // bail immediately if the spot is taken rather than trying to find a new one, we're not
@@ -135,7 +96,6 @@ impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
         // the atomic cmpexchg will ensure that only one writer actually gets to write that value.
         let expected = ((k as u128) << 64) | v.to_u64() as u128;
         if let Err(_) = entry.compare_exchange(0, expected, Ordering::Relaxed, Ordering::Relaxed) {
-            self.rejected.fetch_add(1, Ordering::Relaxed);
             false
         } else {
             self.accepted.fetch_add(1, Ordering::Relaxed);
@@ -160,14 +120,8 @@ impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
             Ordering::Relaxed,
             Ordering::Relaxed,
         ) {
-            Ok(v) => {
-                self.updates.fetch_add(1, Ordering::Relaxed);
-                Ok(T::from_u64(v as u64))
-            }
-            Err(v) => {
-                self.rejected.fetch_add(1, Ordering::Relaxed);
-                Err(T::from_u64(v as u64))
-            }
+            Ok(v) => Ok(T::from_u64(v as u64)),
+            Err(v) => Err(T::from_u64(v as u64)),
         }
     }
 }
