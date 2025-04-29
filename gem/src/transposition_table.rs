@@ -102,7 +102,7 @@ pub enum CacheResult {
     // We know it's exact value, or have computed that it's definitely a cut off.
     //
     // In this case, we can return the cached value immediately.
-    Exact(Option<AlgebraicMove>, Evaluation),
+    Cutoff(Option<AlgebraicMove>, Evaluation),
     // We've already computed this position, but it's not to a deep enough depth, or the evaluation
     // is within the alpha beta window.
     //
@@ -137,23 +137,24 @@ impl<const N: usize> TranspositionTable<N> {
             let node_type = entry.node_type();
             let eval = entry.eval();
 
-            if entry.depth() >= target_depth
-                && (node_type == NodeType::Exact || (eval < alpha && eval >= beta))
+            if entry.depth() >= target_depth && node_type == NodeType::Exact {
+                tracing::event!(Level::INFO, name = "Exact Cutoff",);
+                CacheResult::Cutoff(entry.best_move(), eval)
+            } else if entry.depth() >= target_depth && node_type == NodeType::Upper && eval < alpha
             {
-                tracing::event!(
-                    Level::INFO,
-                    name = "Retrieved from cache",
-                    eval = eval.0,
-                    "hash" = hash,
-                    ?node_type
-                );
-                CacheResult::Exact(entry.best_move(), eval)
+                tracing::event!(Level::INFO, name = "Upperbound Cutoff",);
+                CacheResult::Cutoff(entry.best_move(), eval)
+            } else if entry.depth() >= target_depth && node_type == NodeType::Lower && eval > beta {
+                tracing::event!(Level::INFO, name = "Lowerbound Cutoff",);
+                CacheResult::Cutoff(entry.best_move(), eval)
             } else {
                 // If not, if the entry has a best move, start with it and hope that it gives us a nice
                 // alpha to start with that should cause lots of cut offs.
+                tracing::event!(Level::INFO, name = "Cache Hash",);
                 CacheResult::HashMove(entry.best_move())
             }
         } else {
+            tracing::event!(Level::INFO, name = "Cache Miss",);
             CacheResult::Miss
         }
     }
@@ -293,7 +294,7 @@ mod tests {
             // For each result, we should have a cache entry, and it should have a move associated
             // with it.
             match cache_result {
-                CacheResult::Exact(algebraic_move, _) => assert!(algebraic_move.is_some()),
+                CacheResult::Cutoff(algebraic_move, _) => assert!(algebraic_move.is_some()),
                 CacheResult::HashMove(algebraic_move) => assert!(algebraic_move.is_some()),
                 CacheResult::Miss => assert_ne!(cache_result, CacheResult::Miss),
             }

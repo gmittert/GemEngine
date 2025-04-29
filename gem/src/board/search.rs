@@ -384,7 +384,7 @@ impl Board {
 
         let cached_val = cache.get(self.hash, alpha, beta, target_depth);
         let mut hash_move = match cached_val {
-            CacheResult::Exact(best_move, eval) => {
+            CacheResult::Cutoff(best_move, eval) => {
                 return SearchResult::Completed {
                     eval,
                     best_move,
@@ -420,6 +420,7 @@ impl Board {
             && node_type == ExpectedNodeType::PV
             && target_depth - self.half_move > 2
         {
+            trace_span!("iid");
             // Do internal iterative deepening.
             match self.pvs(
                 alpha,
@@ -1205,5 +1206,50 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
                 .expect("Invalid fen?");
         let cache = TranspositionTable::<1024>::new();
         board.best_move(4, 64, &cache, None);
+    }
+    #[test]
+    fn eval_bug5() {
+        let pgn = r###"
+[Event "?"]
+[Site "?"]
+[Date "2025.04.28"]
+[Round "?"]
+[White "gem"]
+[Black "Human"]
+[Result "0-1"]
+[ECO "C20"]
+[GameDuration "00:08:08"]
+[GameEndTime "2025-04-28T23:01:03.980 PDT"]
+[GameStartTime "2025-04-28T22:52:55.032 PDT"]
+[Opening "King's pawn"]
+[PlyCount "77"]
+[Termination "adjudication"]
+[TimeControl "inf"]
+[Variation "Napoleon's Opening"]
+
+1. e4 {+0.01/9 5.0s} e5 {7.5s} 2. Qf3 {+0.16/9 5.0s} Qh4 {7.2s}
+3. Qe3 {+0.20/8 5.0s} Nc6 {6.6s} 4. Nf3 {+0.35/9 5.0s} Qf6 {6.4s}
+5. Bb5 {+0.24/8 5.0s} Nd4 {9.4s} 6. Nxd4 {+0.14/9 5.0s} exd4 {7.2s}
+7. Qd3 {+0.21/8 5.0s} c6 {7.1s} 8. Bc4 {-0.09/8 5.0s} d5 {5.7s}
+9. exd5 {-0.04/9 5.0s} b5 {6.2s} 10. Bb3 {+0.39/9 5.0s} Be7 {7.0s}
+11. dxc6 {+0.70/9 5.0s} Qxc6 {7.0s} 12. O-O {+0.81/8 5.0s} Nf6 {5.6s}
+13. Na3 {+0.36/8 5.0s} O-O {7.5s} 14. Nxb5 {+0.84/9 5.0s} Bb7 {7.9s}
+15. f3 {+0.82/8 5.0s} Qb6 {5.8s} 16. Nxd4 {+1.50/8 5.0s} Rad8 {6.8s}
+17. c3 {+1.11/9 5.0s} Bc5 {7.8s} 18. Re1 {+0.86/8 5.0s} Bxd4+ {6.7s}
+19. cxd4 {+0.83/10 5.0s} Rfe8 {6.8s} 20. Rxe8+ {+1.22/9 5.0s} Rxe8 {5.9s}
+21. Rb1 {+1.24/10 5.0s} Nd5 {9.2s} 22. Bxd5 {+0.99/9 5.0s} Bxd5 {7.6s}
+23. a3 {+0.54/9 5.0s} Qf6 {8.2s} 24. b3 {+0.29/10 5.0s} Re1+ {8.7s}
+25. Kf2 {-0.62/10 5.0s} Rd1 {6.0s} 26. Qc2 {+1.83/9 5.0s} Qh4+ {6.7s}
+27. Ke2 {+0.26/11 5.0s} Qe1+ {8.0s} 28. Kd3 {-2.05/11 5.0s} Bb7 {8.5s}
+29. Qc5 {+1.02/10 5.0s} Qe6 {10s} 30. Qxa7 {+2.04/9 5.0s} Bc8 {8.3s}
+31. Qa4 {+2.18/9 5.0s} Re1 {9.4s} 32. b4 {-1.52/10 5.1s} Qg6+ {6.5s}
+33. Kc3 {-2.62/11 5.0s} Qxb1 {7.6s} 34. Bb2 {-2.91/10 5.0s} Re7 {8.7s}
+35. Qa5 {-2.64/11 5.0s} Re8 {8.4s} *"###;
+        let mut board = Board::from_pgn(pgn).expect("bad pgn?");
+        let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
+        let res = board.best_move(8, 32, &cache, None);
+
+        assert!(res.eval().unwrap().mate_in().is_none());
+        assert!(res.eval().unwrap().mated_in().is_none());
     }
 }

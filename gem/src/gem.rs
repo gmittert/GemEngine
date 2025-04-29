@@ -9,7 +9,7 @@ struct GemOptions {
     num_threads: usize,
 }
 
-const DEFAULT_THREADS: usize = 64;
+const DEFAULT_THREADS: usize = 32;
 
 impl GemOptions {
     fn default() -> GemOptions {
