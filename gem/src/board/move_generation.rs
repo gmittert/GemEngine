@@ -1,5 +1,6 @@
 use crate::board::sliding_attacks;
 use crate::board::*;
+use rand::{distr::Uniform, prelude::*};
 
 #[derive(Debug, Clone, Copy)]
 enum PawnMovesState {
@@ -571,9 +572,13 @@ pub struct PsuedoLegalRandomizedMoves {
         PawnMoves,
         KingMoves,
     ),
+    rng: ThreadRng,
+    dist: Uniform<u8>,
+    remaining: Vec<u8>,
 }
 impl PsuedoLegalRandomizedMoves {
     fn new(board: &Board) -> PsuedoLegalRandomizedMoves {
+        let dist = Uniform::try_from(0..=5).unwrap();
         PsuedoLegalRandomizedMoves {
             iter: (
                 board.knight_moves_it(),
@@ -583,6 +588,9 @@ impl PsuedoLegalRandomizedMoves {
                 board.pawn_moves_it(),
                 board.king_moves_it(),
             ),
+            rng: rand::rng(),
+            dist,
+            remaining: vec![0, 1, 2, 3, 4, 5],
         }
     }
 }
@@ -590,20 +598,33 @@ impl Iterator for PsuedoLegalRandomizedMoves {
     type Item = AlgebraicMove;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let random = rand::random::<u64>() / 10;
-        for i in 0..6 {
-            if let Some(m) = match (random + i) % 6 {
-                0 => self.iter.0.next(),
-                1 => self.iter.1.next(),
-                2 => self.iter.2.next(),
-                3 => self.iter.3.next(),
-                4 => self.iter.4.next(),
-                _ => self.iter.5.next(),
-            } {
-                return Some(m);
-            }
+        // We've got a somewhat cumbersome approach here. The goal is to randomly choose between
+        // the different iterators, removing them from the "remaining" set when they run out.
+        if self.remaining.is_empty() {
+            return None;
         }
-        None
+        let random = self.dist.sample(&mut self.rng);
+        let idx = self.remaining[random as usize];
+        let res = match idx {
+            0 => self.iter.0.next(),
+            1 => self.iter.1.next(),
+            2 => self.iter.2.next(),
+            3 => self.iter.3.next(),
+            4 => self.iter.4.next(),
+            _ => self.iter.5.next(),
+        };
+        if res.is_some() {
+            return res;
+        }
+        // Here, we take whichever iterator index ran out, switch it to the last spot in the
+        // vector, then pop it as a way of removing the n'th index from the vector without shifting
+        // all the elements. Since we're using it as a set, we don't care about order.
+        self.remaining[random as usize] = *self.remaining.last().unwrap();
+        self.remaining.pop().unwrap();
+        if !self.remaining.is_empty() {
+            self.dist = Uniform::try_from(0..self.remaining.len() as u8).unwrap();
+        }
+        self.next()
     }
 }
 
