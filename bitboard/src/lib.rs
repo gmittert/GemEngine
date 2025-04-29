@@ -65,6 +65,17 @@ impl Iterator for BitBoard {
             pos: unsafe { NonZero::new_unchecked(lsb as u64) },
         })
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(32))
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        self.len()
+    }
 }
 
 impl ops::BitOr<Posn> for BitBoard {
