@@ -7,7 +7,7 @@ use bitboard::posn::Posn;
 use tracing::Level;
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy)]
-pub enum NodeType {
+pub enum ScoreType {
     Upper,
     Lower,
     Exact,
@@ -23,7 +23,7 @@ pub struct PackedTTEntry {
     eval: Evaluation,
     depth: u16,
     promo: Option<Piece>,
-    node_type: NodeType,
+    node_type: ScoreType,
     data: Option<NonZero<u16>>,
 }
 
@@ -42,7 +42,7 @@ impl PackedTTEntry {
         eval: Evaluation,
         depth: u16,
         best_move: Option<AlgebraicMove>,
-        node_type: NodeType,
+        node_type: ScoreType,
     ) -> PackedTTEntry {
         let (data, promo) = match best_move {
             Some(AlgebraicMove {
@@ -91,7 +91,7 @@ impl PackedTTEntry {
         })
     }
 
-    pub fn node_type(&self) -> NodeType {
+    pub fn node_type(&self) -> ScoreType {
         self.node_type
     }
 }
@@ -137,14 +137,15 @@ impl<const N: usize> TranspositionTable<N> {
             let node_type = entry.node_type();
             let eval = entry.eval();
 
-            if entry.depth() >= target_depth && node_type == NodeType::Exact {
+            if entry.depth() >= target_depth && node_type == ScoreType::Exact {
                 tracing::event!(Level::INFO, name = "Exact Cutoff",);
                 CacheResult::Cutoff(entry.best_move(), eval)
-            } else if entry.depth() >= target_depth && node_type == NodeType::Upper && eval < alpha
+            } else if entry.depth() >= target_depth && node_type == ScoreType::Upper && eval < alpha
             {
                 tracing::event!(Level::INFO, name = "Upperbound Cutoff",);
                 CacheResult::Cutoff(entry.best_move(), eval)
-            } else if entry.depth() >= target_depth && node_type == NodeType::Lower && eval > beta {
+            } else if entry.depth() >= target_depth && node_type == ScoreType::Lower && eval > beta
+            {
                 tracing::event!(Level::INFO, name = "Lowerbound Cutoff",);
                 CacheResult::Cutoff(entry.best_move(), eval)
             } else {
@@ -165,7 +166,7 @@ impl<const N: usize> TranspositionTable<N> {
         eval: Evaluation,
         best_move: Option<AlgebraicMove>,
         depth: u16,
-        node_type: NodeType,
+        node_type: ScoreType,
     ) {
         let mut expected = self.0.get(hash).unwrap();
         while depth > expected.depth() {
@@ -187,9 +188,9 @@ impl<const N: usize> TranspositionTable<N> {
         eval: Evaluation,
         best_move: Option<AlgebraicMove>,
         target_depth: u16,
-        node_type: NodeType,
+        node_type: ScoreType,
     ) {
-        tracing::event!(Level::INFO, name = "inserting", eval = eval.0, hash = hash, node_type=?NodeType::Upper);
+        tracing::event!(Level::INFO, name = "inserting", eval = eval.0, hash = hash, node_type=?ScoreType::Upper);
         self.0.insert(
             hash,
             PackedTTEntry::new(eval, target_depth, best_move, node_type),
@@ -215,7 +216,7 @@ mod tests {
             to: e4(),
             promotion: None,
         });
-        let node_type = NodeType::Exact;
+        let node_type = ScoreType::Exact;
         let entry = PackedTTEntry::new(eval, depth, m, node_type);
 
         assert_eq!(eval, entry.eval);
@@ -234,7 +235,7 @@ mod tests {
                 to: e2(),
                 promotion: Some(Piece::Queen),
             };
-            let node_type = NodeType::Exact;
+            let node_type = ScoreType::Exact;
             let tt = PackedTTEntry::new(eval, depth, Some(best_move), node_type);
             println!("{:x}", tt.to_u64());
             assert_eq!(tt.eval(), eval);
@@ -250,7 +251,7 @@ mod tests {
                 to: a8(),
                 promotion: None,
             };
-            let node_type = NodeType::Upper;
+            let node_type = ScoreType::Upper;
             let tt = PackedTTEntry::new(eval, depth, Some(best_move), node_type);
             println!("{:x}", tt.to_u64());
             assert_eq!(tt.eval(), eval);
@@ -262,7 +263,7 @@ mod tests {
             let eval = Evaluation(31);
             let depth = 0x456;
             let best_move = None;
-            let node_type = NodeType::Upper;
+            let node_type = ScoreType::Upper;
             let tt = PackedTTEntry::new(eval, depth, best_move, node_type);
             println!("{:x}", tt.to_u64());
             assert_eq!(tt.eval(), eval);

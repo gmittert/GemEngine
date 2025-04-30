@@ -2,7 +2,7 @@ use tracing::{field, trace_span, Level};
 
 use crate::board::evaluation::PIECE_VALUES;
 use crate::board::*;
-use crate::transposition_table::{CacheResult, NodeType, TranspositionTable, DEFAULT_TT_SIZE};
+use crate::transposition_table::{CacheResult, ScoreType, TranspositionTable, DEFAULT_TT_SIZE};
 use std::cmp::{max, min};
 use std::sync::atomic::{AtomicU16, AtomicUsize};
 use std::sync::OnceLock;
@@ -603,10 +603,22 @@ impl Board {
                     self.undo_move(&m);
                     match cached_val {
                         CacheResult::Miss => {
-                            cache.insert(self.hash, beta, best_move, target_depth, NodeType::Upper);
+                            cache.insert(
+                                self.hash,
+                                beta,
+                                best_move,
+                                target_depth,
+                                ScoreType::Lower,
+                            );
                         }
                         _ => {
-                            cache.update(self.hash, beta, best_move, target_depth, NodeType::Upper);
+                            cache.update(
+                                self.hash,
+                                beta,
+                                best_move,
+                                target_depth,
+                                ScoreType::Lower,
+                            );
                         }
                     };
                     if m.capture.is_none() {
@@ -663,9 +675,9 @@ impl Board {
         };
 
         let node_type = if is_pv_node {
-            NodeType::Exact
+            ScoreType::Exact
         } else {
-            NodeType::Lower
+            ScoreType::Upper
         };
         match cached_val {
             CacheResult::Miss => {
@@ -1248,11 +1260,6 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
         let res = board.best_move(8, 32, &cache, None);
-        let am = res.best_move().unwrap();
-        let m = board.from_algeabraic(&am);
-        let eval = res.eval().unwrap();
-        println!("Move: {}", m);
-        println!("eval: {}", eval);
 
         assert!(res.eval().unwrap().mate_in().is_none());
         assert!(res.eval().unwrap().mated_in().is_none());
