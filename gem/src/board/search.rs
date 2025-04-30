@@ -1248,6 +1248,11 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
         let res = board.best_move(8, 32, &cache, None);
+        let am = res.best_move().unwrap();
+        let m = board.from_algeabraic(&am);
+        let eval = res.eval().unwrap();
+        println!("Move: {}", m);
+        println!("eval: {}", eval);
 
         assert!(res.eval().unwrap().mate_in().is_none());
         assert!(res.eval().unwrap().mated_in().is_none());

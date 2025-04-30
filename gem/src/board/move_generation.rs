@@ -1,5 +1,5 @@
-use crate::board::sliding_attacks;
 use crate::board::*;
+use crate::{board::sliding_attacks, piece_attack_tables::KNIGHT_ATTACKS};
 use rand::{distr::Uniform, prelude::*};
 
 #[derive(Debug, Clone, Copy)]
@@ -495,9 +495,6 @@ impl Iterator for KnightMoves {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some(attack) = self.attacks.next() {
-                if self.allies.contains(attack) {
-                    continue;
-                }
                 return Some(AlgebraicMove {
                     from: self.from.unwrap(),
                     to: attack,
@@ -506,19 +503,7 @@ impl Iterator for KnightMoves {
             } else {
                 if let Some(next_knight) = self.knights.next() {
                     self.from = Some(next_knight);
-                    self.attacks = [
-                        next_knight.see(),
-                        next_knight.sse(),
-                        next_knight.ssw(),
-                        next_knight.sww(),
-                        next_knight.nww(),
-                        next_knight.nnw(),
-                        next_knight.nne(),
-                        next_knight.nee(),
-                    ]
-                    .into_iter()
-                    .filter_map(|p| p)
-                    .fold(BitBoard::empty(), |x, y| x | y);
+                    self.attacks = !self.allies & KNIGHT_ATTACKS[next_knight.idx() as usize];
                 } else {
                     // Finished all the knights
                     return None;
@@ -1181,19 +1166,7 @@ impl Board {
         };
 
         knights.into_iter().fold(BitBoard::empty(), |acc, knight| {
-            acc | [
-                knight.see(),
-                knight.sse(),
-                knight.ssw(),
-                knight.sww(),
-                knight.nww(),
-                knight.nnw(),
-                knight.nne(),
-                knight.nee(),
-            ]
-            .into_iter()
-            .filter_map(|p| p)
-            .fold(BitBoard::empty(), |acc, p| acc | p)
+            acc | KNIGHT_ATTACKS[knight.idx() as usize]
         })
     }
 
@@ -1223,24 +1196,15 @@ impl Board {
 
         for knight in knights {
             out.extend(
-                [
-                    knight.see(),
-                    knight.sse(),
-                    knight.ssw(),
-                    knight.sww(),
-                    knight.nww(),
-                    knight.nnw(),
-                    knight.nne(),
-                    knight.nee(),
-                ]
-                .into_iter()
-                .filter_map(|a| a)
-                .filter(|a| !allied_pieces.contains(*a))
-                .map(|p| AlgebraicMove {
-                    from: knight,
-                    to: p,
-                    promotion: None,
-                }),
+                KNIGHT_ATTACKS[knight.idx() as usize]
+                    .into_iter()
+                    .into_iter()
+                    .filter(|a| !allied_pieces.contains(*a))
+                    .map(|p| AlgebraicMove {
+                        from: knight,
+                        to: p,
+                        promotion: None,
+                    }),
             );
         }
     }
@@ -1255,32 +1219,21 @@ impl Board {
             return None;
         }
 
-        for knight in [
-            target_pos.see(),
-            target_pos.sse(),
-            target_pos.ssw(),
-            target_pos.sww(),
-            target_pos.nww(),
-            target_pos.nnw(),
-            target_pos.nne(),
-            target_pos.nee(),
-        ] {
-            if let Some(p) = knight {
-                if knights.contains(p) {
-                    return Some(Move {
-                        from: p,
-                        to: target_pos,
-                        piece: Piece::Knight,
-                        capture: self.query_pos(target_pos, !color),
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: false,
-                        is_castle_king: false,
-                        is_castle_queen: false,
-                        promotion: None,
-                    });
-                }
-            }
+        let capture = self.query_pos(target_pos, !color);
+
+        for knight in knights & KNIGHT_ATTACKS[target_pos.idx() as usize] {
+            return Some(Move {
+                from: knight,
+                to: target_pos,
+                piece: Piece::Knight,
+                capture,
+                is_check: false,
+                is_mate: false,
+                is_en_passant: false,
+                is_castle_king: false,
+                is_castle_queen: false,
+                promotion: None,
+            });
         }
         None
     }
