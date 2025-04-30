@@ -283,9 +283,6 @@ impl Iterator for KingMoves {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some(attack) = self.attacks.next() {
-                if self.allies.contains(attack) {
-                    continue;
-                }
                 return Some(AlgebraicMove {
                     from: self.from.unwrap(),
                     to: attack,
@@ -294,7 +291,7 @@ impl Iterator for KingMoves {
             } else {
                 if let Some(next_king) = self.kings.next() {
                     self.from = Some(next_king);
-                    self.attacks = [
+                    self.attacks = !self.allies & [
                         next_king.no(),
                         next_king.ne(),
                         next_king.nw(),
@@ -357,9 +354,6 @@ impl Iterator for QueenMoves {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some(attack) = self.attacks.next() {
-                if self.allies.contains(attack) {
-                    continue;
-                }
                 return Some(AlgebraicMove {
                     from: self.from.unwrap(),
                     to: attack,
@@ -368,8 +362,9 @@ impl Iterator for QueenMoves {
             } else {
                 if let Some(next_queen) = self.queens.next() {
                     self.from = Some(next_queen);
-                    self.attacks = sliding_attacks::compute_rook_attacks(next_queen, self.pieces)
-                        | sliding_attacks::compute_bishop_attacks(next_queen, self.pieces);
+                    self.attacks = !self.allies
+                        & (sliding_attacks::compute_rook_attacks(next_queen, self.pieces)
+                            | sliding_attacks::compute_bishop_attacks(next_queen, self.pieces));
                 } else {
                     // Finished all the queens
                     return None;
@@ -404,9 +399,6 @@ impl Iterator for RookMoves {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some(attack) = self.attacks.next() {
-                if self.allies.contains(attack) {
-                    continue;
-                }
                 return Some(AlgebraicMove {
                     from: self.from.unwrap(),
                     to: attack,
@@ -415,7 +407,8 @@ impl Iterator for RookMoves {
             } else {
                 if let Some(next_rook) = self.rooks.next() {
                     self.from = Some(next_rook);
-                    self.attacks = sliding_attacks::compute_rook_attacks(next_rook, self.pieces);
+                    self.attacks = !self.allies
+                        & sliding_attacks::compute_rook_attacks(next_rook, self.pieces);
                 } else {
                     // Finished all the rooks
                     return None;
@@ -450,9 +443,6 @@ impl Iterator for BishopMoves {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some(attack) = self.attacks.next() {
-                if self.allies.contains(attack) {
-                    continue;
-                }
                 return Some(AlgebraicMove {
                     from: self.from.unwrap(),
                     to: attack,
@@ -461,8 +451,8 @@ impl Iterator for BishopMoves {
             } else {
                 if let Some(next_bishop) = self.bishops.next() {
                     self.from = Some(next_bishop);
-                    self.attacks =
-                        sliding_attacks::compute_bishop_attacks(next_bishop, self.pieces);
+                    self.attacks = !self.allies
+                        & sliding_attacks::compute_bishop_attacks(next_bishop, self.pieces);
                 } else {
                     // Finished all the bishops
                     return None;
