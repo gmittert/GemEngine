@@ -737,7 +737,12 @@ impl Board {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
         }[Piece::King as usize];
-        self.attacked_by_side(Posn{pos: unsafe{ NonZero::new_unchecked(king_pos.0)}}, !color)
+        self.attacked_by_side(
+            Posn {
+                pos: unsafe { NonZero::new_unchecked(king_pos.0) },
+            },
+            !color,
+        )
     }
 
     pub fn attacked_by_side(&self, pos: Posn, color: Color) -> bool {

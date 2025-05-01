@@ -283,13 +283,7 @@ impl Board {
         }
         let mut nodes = 0;
         let mut seldepth = 0;
-        let opponent_pieces = match self.to_play {
-            Color::Black => self.white_pieces(),
-            Color::White => self.black_pieces(),
-        };
-        let captures = self
-            .pseudo_legal_moves_it()
-            .filter(|x| opponent_pieces.contains(x.to));
+        let captures = self.pseudo_legal_captures_it();
         for capture in captures {
             let m = self.from_algeabraic(&capture);
             // The most material this could swing is capturing a queen
