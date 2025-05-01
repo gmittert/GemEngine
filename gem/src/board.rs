@@ -747,22 +747,11 @@ impl Board {
     }
 
     pub fn attacked_by_side(&self, pos: Posn, color: Color) -> bool {
-        if self.pawn_attacks(color).contains(pos) {
-            return true;
-        }
-        if self.knight_attacks(color).contains(pos) {
-            return true;
-        }
-        if self.bishop_queen_attacks(color).contains(pos) {
-            return true;
-        }
-        if self.rook_queen_attacks(color).contains(pos) {
-            return true;
-        }
-        if self.king_attacks(color).contains(pos) {
-            return true;
-        }
-        return false;
+        self.knight_attacks_pos(pos, color)
+            || self.rook_queen_attacks_pos(pos, color)
+            || self.bishop_queen_attacks_pos(pos, color)
+            || self.pawn_attacks_pos(pos, color)
+            || self.king_attacks_pos(pos, color)
     }
 
     pub fn white_pieces(&self) -> BitBoard {
