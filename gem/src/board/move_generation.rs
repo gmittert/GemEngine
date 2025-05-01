@@ -676,10 +676,7 @@ impl Board {
         for i in queens {
             let mut attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
             attacks |= sliding_attacks::compute_rook_attacks(i, self.pieces());
-            for pos in attacks {
-                if allied_pieces.contains(pos) {
-                    continue;
-                }
+            for pos in attacks & !allied_pieces {
                 out.push(AlgebraicMove {
                     from: i,
                     to: pos,
@@ -689,43 +686,20 @@ impl Board {
         }
     }
 
-    pub fn queen_can_capture(&self, color: Color, target: Posn) -> Option<Move> {
+    pub fn queen_can_capture(&self, color: Color, target: Posn) -> Option<AlgebraicMove> {
         let queens = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
         }[Piece::Queen as usize];
 
-        let allied_pieces = match color {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
-
         for i in queens {
-            let mut attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
-            if i.rank() == target.rank() || i.file() == target.file() {
-                attacks |= sliding_attacks::compute_rook_attacks(i, self.pieces())
-            }
-            if !attacks.contains(target) {
-                continue;
-            }
-            for pos in attacks {
-                if allied_pieces.contains(pos) {
-                    continue;
-                }
-                if target == pos {
-                    return Some(Move {
-                        from: i,
-                        to: pos,
-                        piece: Piece::Queen,
-                        capture: self.query_pos(pos, !color),
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: false,
-                        is_castle_king: false,
-                        is_castle_queen: false,
-                        promotion: None,
-                    });
-                }
+            let attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
+            if attacks.contains(target) {
+                return Some(AlgebraicMove {
+                    from: i,
+                    to: target,
+                    promotion: None,
+                });
             }
         }
         None
@@ -771,10 +745,7 @@ impl Board {
 
         for i in rooks {
             let attacks = sliding_attacks::compute_rook_attacks(i, self.pieces());
-            for pos in attacks {
-                if allied_pieces.contains(pos) {
-                    continue;
-                }
+            for pos in attacks & !allied_pieces {
                 out.push(AlgebraicMove {
                     from: i,
                     to: pos,
@@ -784,40 +755,23 @@ impl Board {
         }
     }
 
-    pub fn rook_can_capture(&self, color: Color, target: Posn) -> Option<Move> {
+    pub fn rook_can_capture(&self, color: Color, target: Posn) -> Option<AlgebraicMove> {
         let rooks = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
         }[Piece::Rook as usize];
-
-        let allied_pieces = match color {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
 
         for i in rooks {
             if i.rank() != target.rank() && i.file() != target.file() {
                 continue;
             }
             let attacks = sliding_attacks::compute_rook_attacks(i, self.pieces());
-            for pos in attacks {
-                if allied_pieces.contains(pos) {
-                    continue;
-                }
-                if pos == target {
-                    return Some(Move {
-                        from: i,
-                        to: pos,
-                        piece: Piece::Rook,
-                        capture: self.query_pos(pos, !color),
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: false,
-                        is_castle_king: false,
-                        is_castle_queen: false,
-                        promotion: None,
-                    });
-                }
+            if attacks.contains(target) {
+                return Some(AlgebraicMove {
+                    from: i,
+                    to: target,
+                    promotion: None,
+                });
             }
         }
         None
@@ -863,10 +817,7 @@ impl Board {
 
         for i in bishops {
             let attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
-            for pos in attacks {
-                if allied_pieces.contains(pos) {
-                    continue;
-                }
+            for pos in attacks & !allied_pieces {
                 out.push(AlgebraicMove {
                     from: i,
                     to: pos,
@@ -876,40 +827,20 @@ impl Board {
         }
     }
 
-    pub fn bishop_can_capture(&self, color: Color, target: Posn) -> Option<Move> {
+    pub fn bishop_can_capture(&self, color: Color, target: Posn) -> Option<AlgebraicMove> {
         let bishops = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
         }[Piece::Bishop as usize];
 
-        let allied_pieces = match color {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
-
         for i in bishops {
             let attacks = sliding_attacks::compute_bishop_attacks(i, self.pieces());
-            if !attacks.contains(target) {
-                continue;
-            }
-            for pos in attacks {
-                if allied_pieces.contains(pos) {
-                    continue;
-                }
-                if pos == target {
-                    return Some(Move {
-                        from: i,
-                        to: pos,
-                        piece: Piece::Bishop,
-                        capture: self.query_pos(pos, !color),
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: false,
-                        is_castle_king: false,
-                        is_castle_queen: false,
-                        promotion: None,
-                    });
-                }
+            if attacks.contains(target) {
+                return Some(AlgebraicMove {
+                    from: i,
+                    to: target,
+                    promotion: None,
+                });
             }
         }
         None
@@ -1085,7 +1016,7 @@ impl Board {
         }
     }
 
-    pub fn king_can_capture(&self, color: Color, target: Posn) -> Option<Move> {
+    pub fn king_can_capture(&self, color: Color, target: Posn) -> Option<AlgebraicMove> {
         let kings = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
@@ -1101,16 +1032,9 @@ impl Board {
 
         let attacks = KING_ATTACKS[from_idx as usize];
         if attacks.contains(target) {
-            Some(Move {
+            Some(AlgebraicMove {
                 from,
                 to: target,
-                piece: Piece::King,
-                capture: self.query_pos(target, !color),
-                is_check: false,
-                is_mate: false,
-                is_en_passant: false,
-                is_castle_king: false,
-                is_castle_queen: false,
                 promotion: None,
             })
         } else {
@@ -1166,7 +1090,7 @@ impl Board {
         }
     }
 
-    pub fn knight_can_capture(&self, color: Color, target_pos: Posn) -> Option<Move> {
+    pub fn knight_can_capture(&self, color: Color, target_pos: Posn) -> Option<AlgebraicMove> {
         let knights = match color {
             Color::White => self.white_pieces[Piece::Knight as usize],
             Color::Black => self.black_pieces[Piece::Knight as usize],
@@ -1176,19 +1100,10 @@ impl Board {
             return None;
         }
 
-        let capture = self.query_pos(target_pos, !color);
-
         for knight in knights & KNIGHT_ATTACKS[target_pos.idx() as usize] {
-            return Some(Move {
+            return Some(AlgebraicMove {
                 from: knight,
                 to: target_pos,
-                piece: Piece::Knight,
-                capture,
-                is_check: false,
-                is_mate: false,
-                is_en_passant: false,
-                is_castle_king: false,
-                is_castle_queen: false,
                 promotion: None,
             });
         }
@@ -1343,7 +1258,7 @@ impl Board {
         }
     }
 
-    pub fn pawn_can_capture(&self, color: Color, target_pos: Posn) -> Option<Move> {
+    pub fn pawn_can_capture(&self, color: Color, target_pos: Posn) -> Option<AlgebraicMove> {
         let pawns = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
@@ -1369,29 +1284,15 @@ impl Board {
                         continue;
                     }
                     if pos.rank() == promo_rank {
-                        return Some(Move {
+                        return Some(AlgebraicMove {
                             from: i,
                             to: pos,
-                            piece: Piece::Pawn,
-                            capture: self.query_pos(pos, !color),
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
                             promotion: Some(Piece::Queen),
                         });
                     } else {
-                        return Some(Move {
+                        return Some(AlgebraicMove {
                             from: i,
                             to: pos,
-                            piece: Piece::Pawn,
-                            capture: self.query_pos(pos, !color),
-                            is_check: false,
-                            is_mate: false,
-                            is_en_passant: false,
-                            is_castle_king: false,
-                            is_castle_queen: false,
                             promotion: None,
                         });
                     }
@@ -1399,6 +1300,15 @@ impl Board {
             }
             // En Passant
             if let Some(ep_target) = self.move_rights.last().and_then(|x| x.ep_target) {
+                let double_push = Posn::from(
+                    if color == Color::White {
+                        Rank::Five
+                    } else {
+                        Rank::Four
+                    },
+                    ep_target,
+                );
+
                 let to = Posn::from(
                     if color == Color::White {
                         Rank::Six
@@ -1407,20 +1317,14 @@ impl Board {
                     },
                     ep_target,
                 );
-                if to == target_pos
+
+                if double_push == target_pos
                     && ((color == Color::White && (i.nw() == Some(to) || i.ne() == Some(to)))
                         || (color == Color::Black && (i.sw() == Some(to) || i.se() == Some(to))))
                 {
-                    return Some(Move {
+                    return Some(AlgebraicMove {
                         from: i,
                         to,
-                        piece: Piece::Pawn,
-                        capture: Some(Piece::Pawn),
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: true,
-                        is_castle_king: false,
-                        is_castle_queen: false,
                         promotion: None,
                     });
                 }

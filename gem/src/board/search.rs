@@ -456,7 +456,6 @@ impl Board {
 
         let recapture = if let Some((p, _)) = self.moves.last() {
             self.get_smallest_attacker(*p, self.to_play)
-                .map(|m| m.algebraic_move())
         } else {
             None
         };

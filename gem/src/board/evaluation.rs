@@ -291,7 +291,7 @@ impl Board {
         blocked_pawns.count_ones() as u8
     }
 
-    pub fn get_smallest_attacker(&self, p: Posn, side: Color) -> Option<Move> {
+    pub fn get_smallest_attacker(&self, p: Posn, side: Color) -> Option<AlgebraicMove> {
         self.pawn_can_capture(side, p)
             .or(self.knight_can_capture(side, p))
             .or(self.bishop_can_capture(side, p))
@@ -305,6 +305,7 @@ impl Board {
         let mut stack = Vec::with_capacity(10);
         let mut side = side;
         while let Some(m) = self.get_smallest_attacker(p, side) {
+            let m = self.from_algeabraic(&m);
             stack.push(PIECE_VALUES[m.capture.unwrap() as usize]);
             self.make_move(&m);
             side = !side;
