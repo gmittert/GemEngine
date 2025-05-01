@@ -14,6 +14,7 @@ use bitboard::moves::{AlgebraicMove, Color, Move, Piece};
 use bitboard::posn::*;
 use bitboard::BitBoard;
 use std::fmt;
+use std::num::NonZero;
 
 #[derive(Debug, PartialEq)]
 // We only use 4 bits:
@@ -736,14 +737,7 @@ impl Board {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
         }[Piece::King as usize];
-
-        let attacked = self.rook_queen_attacks(!color)
-            | self.bishop_queen_attacks(!color)
-            | self.knight_attacks(!color)
-            | self.pawn_attacks(!color)
-            | self.king_attacks(!color);
-
-        king_pos & attacked != BitBoard::empty()
+        self.attacked_by_side(Posn{pos: unsafe{ NonZero::new_unchecked(king_pos.0)}}, !color)
     }
 
     pub fn attacked_by_side(&self, pos: Posn, color: Color) -> bool {
