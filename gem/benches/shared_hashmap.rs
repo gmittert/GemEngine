@@ -5,7 +5,7 @@ use bitboard::{
 use criterion::{black_box, criterion_group, Criterion};
 use gem::{
     board::evaluation::Evaluation,
-    transposition_table::{ScoreType, PackedTTEntry, TranspositionTable},
+    transposition_table::{PackedTTEntry, ScoreType, TranspositionTable},
 };
 
 pub fn create(c: &mut Criterion) {

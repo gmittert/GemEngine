@@ -51,3 +51,55 @@ pub static KNIGHT_ATTACKS: [BitBoard; 64] = {
     }
     arr
 };
+
+pub static KING_ATTACKS: [BitBoard; 64] = {
+    let mut arr = [BitBoard::empty(); 64];
+    let mut i = 0;
+    while i < 64 {
+        let king = Posn::from_idx(i).unwrap();
+        let no = if let Some(p) = king.no() {
+            BitBoard::from(p)
+        } else {
+            BitBoard::empty()
+        };
+        let nw = if let Some(p) = king.nw() {
+            BitBoard::from(p)
+        } else {
+            BitBoard::empty()
+        };
+        let we = if let Some(p) = king.we() {
+            BitBoard::from(p)
+        } else {
+            BitBoard::empty()
+        };
+        let sw = if let Some(p) = king.sw() {
+            BitBoard::from(p)
+        } else {
+            BitBoard::empty()
+        };
+        let so = if let Some(p) = king.so() {
+            BitBoard::from(p)
+        } else {
+            BitBoard::empty()
+        };
+        let se = if let Some(p) = king.se() {
+            BitBoard::from(p)
+        } else {
+            BitBoard::empty()
+        };
+        let ea = if let Some(p) = king.ea() {
+            BitBoard::from(p)
+        } else {
+            BitBoard::empty()
+        };
+        let ne = if let Some(p) = king.ne() {
+            BitBoard::from(p)
+        } else {
+            BitBoard::empty()
+        };
+
+        arr[i] = BitBoard(no.0 | nw.0 | we.0 | sw.0 | so.0 | se.0 | ea.0 | ne.0);
+        i += 1;
+    }
+    arr
+};

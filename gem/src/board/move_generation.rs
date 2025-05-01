@@ -1,4 +1,7 @@
+use std::num::NonZero;
+
 use crate::board::*;
+use crate::piece_attack_tables::KING_ATTACKS;
 use crate::{board::sliding_attacks, piece_attack_tables::KNIGHT_ATTACKS};
 use rand::{distr::Uniform, prelude::*};
 
@@ -291,19 +294,7 @@ impl Iterator for KingMoves {
             } else {
                 if let Some(next_king) = self.kings.next() {
                     self.from = Some(next_king);
-                    self.attacks = !self.allies & [
-                        next_king.no(),
-                        next_king.ne(),
-                        next_king.nw(),
-                        next_king.ea(),
-                        next_king.we(),
-                        next_king.so(),
-                        next_king.se(),
-                        next_king.sw(),
-                    ]
-                    .into_iter()
-                    .filter_map(|p| p)
-                    .fold(BitBoard::empty(), |x, y| x | y);
+                    self.attacks = !self.allies & KING_ATTACKS[next_king.idx() as usize];
                 } else {
                     // Finished all the kings
                     if self.can_castle_king {
@@ -930,21 +921,12 @@ impl Board {
             Color::Black => self.black_pieces,
         }[Piece::King as usize];
 
-        kings.fold(BitBoard::empty(), |acc, p| {
-            acc | [
-                p.no(),
-                p.ne(),
-                p.ea(),
-                p.se(),
-                p.so(),
-                p.sw(),
-                p.we(),
-                p.nw(),
-            ]
-            .into_iter()
-            .filter_map(|p| p)
-            .fold(BitBoard::empty(), |acc, p| acc | p)
-        })
+        if kings.0 == 0 {
+            BitBoard::empty()
+        } else {
+            // There should always be one king.
+            KING_ATTACKS[kings.0.ilog2() as usize]
+        }
     }
 
     pub fn king_moves_it(&self) -> KingMoves {
@@ -1016,7 +998,7 @@ impl Board {
 
     pub fn king_moves(&self, out: &mut Vec<AlgebraicMove>) {
         let color = self.to_play;
-        let mut kings = match color {
+        let kings = match color {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
         }[Piece::King as usize];
@@ -1030,27 +1012,17 @@ impl Board {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
         };
-        let from = kings.next().unwrap();
+        let from_idx = kings.0.ilog2();
+        let from = Posn {
+            pos: unsafe { NonZero::new_unchecked(kings.0) },
+        };
 
-        for m in [
-            from.no(),
-            from.ne(),
-            from.nw(),
-            from.ea(),
-            from.we(),
-            from.so(),
-            from.se(),
-            from.sw(),
-        ] {
-            if let Some(m) = m {
-                if !allied_pieces.contains(m) {
-                    out.push(AlgebraicMove {
-                        from,
-                        to: m,
-                        promotion: None,
-                    });
-                }
-            }
+        for m in KING_ATTACKS[from_idx as usize] & !allied_pieces {
+            out.push(AlgebraicMove {
+                from,
+                to: m,
+                promotion: None,
+            });
         }
 
         // Computing the ability to castle needs the board to compute castling through check
@@ -1118,35 +1090,32 @@ impl Board {
             Color::White => self.white_pieces,
             Color::Black => self.black_pieces,
         }[Piece::King as usize];
-
-        for i in kings {
-            for pos in [
-                i.no(),
-                i.ne(),
-                i.ea(),
-                i.se(),
-                i.so(),
-                i.sw(),
-                i.we(),
-                i.nw(),
-            ] {
-                if Some(target) == pos {
-                    return Some(Move {
-                        from: i,
-                        to: pos.unwrap(),
-                        piece: Piece::King,
-                        capture: self.query_pos(pos.unwrap(), !color),
-                        is_check: false,
-                        is_mate: false,
-                        is_en_passant: false,
-                        is_castle_king: false,
-                        is_castle_queen: false,
-                        promotion: None,
-                    });
-                }
-            }
+        if kings == BitBoard::empty() {
+            return None;
         }
-        None
+
+        let from_idx = kings.0.ilog2();
+        let from = Posn {
+            pos: unsafe { NonZero::new_unchecked(kings.0) },
+        };
+
+        let attacks = KING_ATTACKS[from_idx as usize];
+        if attacks.contains(target) {
+            Some(Move {
+                from,
+                to: target,
+                piece: Piece::King,
+                capture: self.query_pos(target, !color),
+                is_check: false,
+                is_mate: false,
+                is_en_passant: false,
+                is_castle_king: false,
+                is_castle_queen: false,
+                promotion: None,
+            })
+        } else {
+            None
+        }
     }
 
     pub fn knight_attacks(&self, color: Color) -> BitBoard {
@@ -1186,10 +1155,8 @@ impl Board {
 
         for knight in knights {
             out.extend(
-                KNIGHT_ATTACKS[knight.idx() as usize]
+                (KNIGHT_ATTACKS[knight.idx() as usize] & !allied_pieces)
                     .into_iter()
-                    .into_iter()
-                    .filter(|a| !allied_pieces.contains(*a))
                     .map(|p| AlgebraicMove {
                         from: knight,
                         to: p,
