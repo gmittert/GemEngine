@@ -133,9 +133,9 @@ fn find_rook_magic(pos: Posn, rng: &mut StdRng) {
     let mut bitset: [u64; 1 << 9];
     'outer: loop {
         bitset = [0; 1 << 9];
-        let c1: u64 = rng.gen();
-        let c2: u64 = rng.gen();
-        let c3: u64 = rng.gen();
+        let c1: u64 = rng.r#gen();
+        let c2: u64 = rng.r#gen();
+        let c3: u64 = rng.r#gen();
         let candidate: u64 = c1 & c2 & c3;
         let transformed = u64::wrapping_mul(candidate, mask);
         if transformed.leading_ones() < num_bits as u32 {
@@ -168,9 +168,9 @@ fn find_bishop_magic(pos: Posn, rng: &mut StdRng) {
     let mut bitset: [u64; 1 << 6];
     'outer: loop {
         bitset = [0; 1 << 6];
-        let c1: u64 = rng.gen();
-        let c2: u64 = rng.gen();
-        let c3: u64 = rng.gen();
+        let c1: u64 = rng.r#gen();
+        let c2: u64 = rng.r#gen();
+        let c3: u64 = rng.r#gen();
         let candidate: u64 = c1 & c2 & c3;
         let transformed = u64::wrapping_mul(candidate, mask);
         if transformed.leading_ones() < num_bits as u32 {
