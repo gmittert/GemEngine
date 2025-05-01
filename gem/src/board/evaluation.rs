@@ -302,18 +302,22 @@ impl Board {
 
     pub fn static_exchange_evaluation(&mut self, p: Posn, side: Color) -> Evaluation {
         let saved = self.save_state();
-        let mut stack = Vec::with_capacity(10);
+        let mut stack: [Evaluation; 32] = [Evaluation(0); 32];
+        let mut idx: usize = 0;
         let mut side = side;
         while let Some(m) = self.get_smallest_attacker(p, side) {
             let m = self.from_algeabraic(&m);
-            stack.push(PIECE_VALUES[m.capture.unwrap() as usize]);
+            stack[idx] = PIECE_VALUES[m.capture.unwrap() as usize];
+            idx += 1;
             self.make_move(&m);
             side = !side;
         }
 
         let mut value = Evaluation::draw();
-        while let Some(v) = stack.pop() {
-            /* Do not consider captures if they lose material, therefor max zero */
+        while idx != 0 {
+            idx -= 1;
+            let v = stack[idx];
+            /* Do not consider captures if they lose material, therefore max zero */
             value = max(Evaluation::draw(), v - value);
         }
         self.restore_state(saved);
