@@ -1,4 +1,4 @@
-use criterion::{criterion_group, Criterion};
+use criterion::{Criterion, criterion_group};
 use gem::board;
 use gem::perft;
 

@@ -1,5 +1,5 @@
-use bitboard::posn::Posn;
 use bitboard::BitBoard;
+use bitboard::posn::Posn;
 use magics::BBITS;
 use magics::BISHOP_MAGICS;
 use magics::BISHOP_MASK;

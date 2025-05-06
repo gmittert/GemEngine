@@ -10,9 +10,9 @@ use crate::parser::Parser;
 use crate::pgn;
 use crate::pgn::GameTermination;
 use crate::zobrist::ZOBRIST_KEYS;
+use bitboard::BitBoard;
 use bitboard::moves::{AlgebraicMove, Color, Move, Piece};
 use bitboard::posn::*;
-use bitboard::BitBoard;
 use std::fmt;
 use std::num::NonZero;
 
@@ -153,6 +153,24 @@ impl PartialEq for Board {
 }
 
 impl Board {
+    #[inline(always)]
+    pub fn piece(&self, color: Color, piece: Piece) -> BitBoard {
+        match color {
+            Color::Black => self.black_piece(piece),
+            Color::White => self.white_piece(piece),
+        }
+    }
+
+    #[inline(always)]
+    pub fn black_piece(&self, piece: Piece) -> BitBoard {
+        self.black_pieces[piece as usize]
+    }
+
+    #[inline(always)]
+    pub fn white_piece(&self, piece: Piece) -> BitBoard {
+        self.white_pieces[piece as usize]
+    }
+
     pub fn from_pgn(s: &str) -> Option<Board> {
         let (pgn_game, _) = pgn::PgnGameParser::new().parse(s)?;
         if pgn_game.termination != GameTermination::NoResult {
@@ -714,18 +732,14 @@ impl Board {
     pub fn query_pos(&self, p: Posn, color: Color) -> Option<Piece> {
         let pieces: [Piece; 6] = [
             Piece::Pawn,
+            Piece::Rook,
             Piece::Knight,
             Piece::Bishop,
-            Piece::Rook,
             Piece::Queen,
             Piece::King,
         ];
-        let boards = match color {
-            Color::Black => self.black_pieces,
-            Color::White => self.white_pieces,
-        };
         for i in pieces {
-            if boards[i as usize].contains(p) {
+            if self.piece(color, i).contains(p) {
                 return Some(i);
             }
         }
@@ -733,10 +747,7 @@ impl Board {
     }
 
     pub fn in_check(&self, color: Color) -> bool {
-        let king_pos = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::King as usize];
+        let king_pos = self.piece(color, Piece::King);
         self.attacked_by_side(
             Posn {
                 pos: unsafe { NonZero::new_unchecked(king_pos.0) },
@@ -784,35 +795,65 @@ impl fmt::Display for Board {
         let mut chars: [char; 64] = ['.'; 64];
 
         for i in 0..64 as usize {
-            if self.black_pieces[Piece::King as usize].contains(Posn::from_idx(i).unwrap()) {
+            if self
+                .black_piece(Piece::King)
+                .contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♔'
-            } else if self.black_pieces[Piece::Queen as usize].contains(Posn::from_idx(i).unwrap())
+            } else if self
+                .black_piece(Piece::Queen)
+                .contains(Posn::from_idx(i).unwrap())
             {
                 chars[i] = '♕'
-            } else if self.black_pieces[Piece::Knight as usize].contains(Posn::from_idx(i).unwrap())
+            } else if self
+                .black_piece(Piece::Knight)
+                .contains(Posn::from_idx(i).unwrap())
             {
                 chars[i] = '♘'
-            } else if self.black_pieces[Piece::Pawn as usize].contains(Posn::from_idx(i).unwrap()) {
+            } else if self
+                .black_piece(Piece::Pawn)
+                .contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♙'
-            } else if self.black_pieces[Piece::Bishop as usize].contains(Posn::from_idx(i).unwrap())
+            } else if self
+                .black_piece(Piece::Bishop)
+                .contains(Posn::from_idx(i).unwrap())
             {
                 chars[i] = '♗'
-            } else if self.black_pieces[Piece::Rook as usize].contains(Posn::from_idx(i).unwrap()) {
+            } else if self
+                .black_piece(Piece::Rook)
+                .contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♖'
-            } else if self.white_pieces[Piece::King as usize].contains(Posn::from_idx(i).unwrap()) {
+            } else if self
+                .white_piece(Piece::King)
+                .contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♚'
-            } else if self.white_pieces[Piece::Queen as usize].contains(Posn::from_idx(i).unwrap())
+            } else if self
+                .white_piece(Piece::Queen)
+                .contains(Posn::from_idx(i).unwrap())
             {
                 chars[i] = '♛'
-            } else if self.white_pieces[Piece::Knight as usize].contains(Posn::from_idx(i).unwrap())
+            } else if self
+                .white_piece(Piece::Knight)
+                .contains(Posn::from_idx(i).unwrap())
             {
                 chars[i] = '♞'
-            } else if self.white_pieces[Piece::Pawn as usize].contains(Posn::from_idx(i).unwrap()) {
+            } else if self
+                .white_piece(Piece::Pawn)
+                .contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♟'
-            } else if self.white_pieces[Piece::Bishop as usize].contains(Posn::from_idx(i).unwrap())
+            } else if self
+                .white_piece(Piece::Bishop)
+                .contains(Posn::from_idx(i).unwrap())
             {
                 chars[i] = '♝'
-            } else if self.white_pieces[Piece::Rook as usize].contains(Posn::from_idx(i).unwrap()) {
+            } else if self
+                .white_piece(Piece::Rook)
+                .contains(Posn::from_idx(i).unwrap())
+            {
                 chars[i] = '♜'
             }
         }

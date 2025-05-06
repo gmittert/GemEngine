@@ -1,4 +1,4 @@
-use bitboard::{posn::Posn, BitBoard};
+use bitboard::{BitBoard, posn::Posn};
 
 pub static KNIGHT_ATTACKS: [BitBoard; 64] = {
     let mut arr = [BitBoard::empty(); 64];

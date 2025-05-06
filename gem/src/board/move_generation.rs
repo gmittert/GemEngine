@@ -976,10 +976,7 @@ impl Iterator for PsuedoLegalRandomizedMoves {
 
 impl Board {
     pub fn rook_can_capture(&self, color: Color, target: Posn) -> Option<AlgebraicMove> {
-        let pieces = match color {
-            Color::White => self.white_pieces[Piece::Rook as usize],
-            Color::Black => self.black_pieces[Piece::Rook as usize],
-        };
+        let pieces = self.piece(color, Piece::Rook);
 
         let attacked_from = sliding_attacks::compute_rook_attacks(target, self.pieces());
         Some(AlgebraicMove {
@@ -992,14 +989,7 @@ impl Board {
     // Compute the vertical and horizontal ray attacks of the rooks and queens (used with
     // bishop_queen_attacks to blend the queen attacks across two calls).
     pub fn rook_queen_attacks(&self, color: Color) -> BitBoard {
-        let pieces = match color {
-            Color::White => {
-                self.white_pieces[Piece::Queen as usize] | self.white_pieces[Piece::Rook as usize]
-            }
-            Color::Black => {
-                self.black_pieces[Piece::Queen as usize] | self.black_pieces[Piece::Rook as usize]
-            }
-        };
+        let pieces = self.piece(color, Piece::Rook) | self.piece(color, Piece::Queen);
 
         let mut acc = BitBoard::empty();
         for i in pieces {
@@ -1009,24 +999,14 @@ impl Board {
     }
 
     pub fn rook_queen_attacks_pos(&self, pos: Posn, color: Color) -> bool {
-        let pieces = match color {
-            Color::White => {
-                self.white_pieces[Piece::Queen as usize] | self.white_pieces[Piece::Rook as usize]
-            }
-            Color::Black => {
-                self.black_pieces[Piece::Queen as usize] | self.black_pieces[Piece::Rook as usize]
-            }
-        };
+        let pieces = self.piece(color, Piece::Rook) | self.piece(color, Piece::Queen);
 
         let attacked_from = sliding_attacks::compute_rook_attacks(pos, self.pieces());
         pieces & attacked_from != BitBoard::empty()
     }
 
     pub fn bishop_can_capture(&self, color: Color, target: Posn) -> Option<AlgebraicMove> {
-        let pieces = match color {
-            Color::White => self.white_pieces[Piece::Bishop as usize],
-            Color::Black => self.black_pieces[Piece::Bishop as usize],
-        };
+        let pieces = self.piece(color, Piece::Bishop);
 
         let attacked_from = sliding_attacks::compute_bishop_attacks(target, self.pieces());
         Some(AlgebraicMove {
@@ -1037,10 +1017,7 @@ impl Board {
     }
 
     pub fn queen_can_capture(&self, color: Color, target: Posn) -> Option<AlgebraicMove> {
-        let pieces = match color {
-            Color::White => self.white_pieces[Piece::Queen as usize],
-            Color::Black => self.black_pieces[Piece::Queen as usize],
-        };
+        let pieces = self.piece(color, Piece::Queen);
 
         let attacked_from = sliding_attacks::compute_bishop_attacks(target, self.pieces())
             | sliding_attacks::compute_rook_attacks(target, self.pieces());
@@ -1054,14 +1031,7 @@ impl Board {
     // Compute the diagonal ray attacks of the bishops and queens (used with
     // rook_queen_attacks to blend the queen attacks across two calls).
     pub fn bishop_queen_attacks(&self, color: Color) -> BitBoard {
-        let pieces = match color {
-            Color::White => {
-                self.white_pieces[Piece::Queen as usize] | self.white_pieces[Piece::Bishop as usize]
-            }
-            Color::Black => {
-                self.black_pieces[Piece::Queen as usize] | self.black_pieces[Piece::Bishop as usize]
-            }
-        };
+        let pieces = self.piece(color, Piece::Queen) | self.piece(color, Piece::Rook);
 
         let mut acc = BitBoard::empty();
         for i in pieces {
@@ -1071,14 +1041,7 @@ impl Board {
     }
 
     pub fn bishop_queen_attacks_pos(&self, pos: Posn, color: Color) -> bool {
-        let pieces = match color {
-            Color::White => {
-                self.white_pieces[Piece::Queen as usize] | self.white_pieces[Piece::Bishop as usize]
-            }
-            Color::Black => {
-                self.black_pieces[Piece::Queen as usize] | self.black_pieces[Piece::Bishop as usize]
-            }
-        };
+        let pieces = self.piece(color, Piece::Queen) | self.piece(color, Piece::Bishop);
 
         let attacked_from = sliding_attacks::compute_bishop_attacks(pos, self.pieces());
         pieces & attacked_from != BitBoard::empty()
@@ -1086,10 +1049,7 @@ impl Board {
 
     pub fn queen_captures_it(&self) -> QueenCaptures {
         let color = self.to_play;
-        let queens = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Queen as usize];
+        let queens = self.piece(color, Piece::Queen);
 
         let enemy_pieces = match !color {
             Color::White => self.white_pieces(),
@@ -1101,11 +1061,7 @@ impl Board {
 
     pub fn queen_moves_it(&self) -> QueenMoves {
         let color = self.to_play;
-        let queens = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Queen as usize];
-
+        let queens = self.piece(color, Piece::Queen);
         let allied_pieces = match color {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
@@ -1190,10 +1146,7 @@ impl Board {
     }
 
     pub fn bishop_attacks(&self, color: Color) -> BitBoard {
-        let bishops = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Bishop as usize];
+        let bishops = self.piece(color, Piece::Bishop);
 
         let mut acc = BitBoard::empty();
         for i in bishops {
@@ -1254,10 +1207,7 @@ impl Board {
     }
 
     pub fn king_can_capture(&self, color: Color, target: Posn) -> Option<AlgebraicMove> {
-        let kings = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::King as usize];
+        let kings = self.piece(color, Piece::King);
 
         let attacked_from = KING_ATTACKS[target.idx() as usize];
         let attackers = kings & attacked_from;
@@ -1269,20 +1219,14 @@ impl Board {
     }
 
     pub fn king_attacks_pos(&self, pos: Posn, color: Color) -> bool {
-        let kings = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::King as usize];
+        let kings = self.piece(color, Piece::King);
 
         let attacked_from = KING_ATTACKS[pos.idx() as usize];
         kings & attacked_from != BitBoard::empty()
     }
 
     pub fn king_attacks(&self, color: Color) -> BitBoard {
-        let kings = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::King as usize];
+        let kings = self.piece(color, Piece::King);
 
         if kings.0 == 0 {
             BitBoard::empty()
@@ -1294,10 +1238,7 @@ impl Board {
 
     pub fn king_captures_it(&self) -> KingCaptures {
         let color = self.to_play;
-        let kings = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::King as usize];
+        let kings = self.piece(color, Piece::King);
 
         let enemy_pieces = match !color {
             Color::White => self.white_pieces(),
@@ -1313,15 +1254,8 @@ impl Board {
 
     pub fn king_moves_it(&self) -> KingMoves {
         let color = self.to_play;
-        let kings = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::King as usize];
-
-        let rooks = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Rook as usize];
+        let kings = self.piece(color, Piece::King);
+        let rooks = self.piece(color, Piece::Rook);
 
         let allied_pieces = match color {
             Color::White => self.white_pieces(),
@@ -1380,15 +1314,8 @@ impl Board {
 
     pub fn king_moves(&self, out: &mut Vec<AlgebraicMove>) {
         let color = self.to_play;
-        let kings = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::King as usize];
-
-        let rooks = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Rook as usize];
+        let kings = self.piece(color, Piece::King);
+        let rooks = self.piece(color, Piece::Rook);
 
         let allied_pieces = match color {
             Color::White => self.white_pieces(),
@@ -1468,11 +1395,7 @@ impl Board {
     }
 
     pub fn knight_can_capture(&self, color: Color, target_pos: Posn) -> Option<AlgebraicMove> {
-        let knights = match color {
-            Color::White => self.white_pieces[Piece::Knight as usize],
-            Color::Black => self.black_pieces[Piece::Knight as usize],
-        };
-
+        let knights = self.piece(color, Piece::Knight);
         let attacked_from = KNIGHT_ATTACKS[target_pos.idx() as usize];
         let attackers = knights & attacked_from;
         Some(AlgebraicMove {
@@ -1483,21 +1406,13 @@ impl Board {
     }
 
     pub fn knight_attacks_pos(&self, pos: Posn, color: Color) -> bool {
-        let knights = match color {
-            Color::White => self.white_pieces[Piece::Knight as usize],
-            Color::Black => self.black_pieces[Piece::Knight as usize],
-        };
-
+        let knights = self.piece(color, Piece::Knight);
         let attacked_from = KNIGHT_ATTACKS[pos.idx() as usize];
         knights & attacked_from != BitBoard::empty()
     }
 
     pub fn knight_attacks(&self, color: Color) -> BitBoard {
-        let knights = match color {
-            Color::White => self.white_pieces[Piece::Knight as usize],
-            Color::Black => self.black_pieces[Piece::Knight as usize],
-        };
-
+        let knights = self.piece(color, Piece::Knight);
         knights.into_iter().fold(BitBoard::empty(), |acc, knight| {
             acc | KNIGHT_ATTACKS[knight.idx() as usize]
         })
@@ -1533,8 +1448,8 @@ impl Board {
 
     pub fn knight_moves(&self, out: &mut Vec<AlgebraicMove>) {
         let knights = match self.to_play {
-            Color::White => self.white_pieces[Piece::Knight as usize],
-            Color::Black => self.black_pieces[Piece::Knight as usize],
+            Color::White => self.white_piece(Piece::Knight),
+            Color::Black => self.black_piece(Piece::Knight),
         };
         let allied_pieces = match self.to_play {
             Color::White => self.white_pieces(),
@@ -1555,10 +1470,7 @@ impl Board {
     }
 
     pub fn pawn_attacks_pos(&self, pos: Posn, color: Color) -> bool {
-        let pawns = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Pawn as usize];
+        let pawns = self.piece(color, Piece::Pawn);
 
         let attacked_from = match color {
             Color::White => [pos.se(), pos.sw()],
@@ -1571,10 +1483,7 @@ impl Board {
     }
 
     pub fn pawn_attacks(&self, color: Color) -> BitBoard {
-        (match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Pawn as usize])
+        self.piece(color, Piece::Pawn)
             .fold(BitBoard::empty(), |acc, p| {
                 acc | match color {
                     Color::White => [p.ne(), p.nw()],
@@ -1588,10 +1497,7 @@ impl Board {
 
     pub fn pawn_captures_it(&self) -> PawnCaptures {
         let color = self.to_play;
-        let pawns = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Pawn as usize];
+        let pawns = self.piece(color, Piece::Pawn);
 
         let opponent_pieces = match color {
             Color::White => self.black_pieces(),
@@ -1608,10 +1514,7 @@ impl Board {
 
     pub fn pawn_moves_it(&self) -> PawnMoves {
         let color = self.to_play;
-        let pawns = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Pawn as usize];
+        let pawns = self.piece(color, Piece::Pawn);
 
         let opponent_pieces = match color {
             Color::White => self.black_pieces(),
@@ -1739,10 +1642,7 @@ impl Board {
     }
 
     pub fn pawn_can_capture(&self, color: Color, target_pos: Posn) -> Option<AlgebraicMove> {
-        let pawns = match color {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Pawn as usize];
+        let pawns = self.piece(color, Piece::Pawn);
 
         let promo_rank = match color {
             Color::Black => Rank::One,
@@ -1795,7 +1695,7 @@ impl Board {
                         from: e,
                         to,
                         promotion: None,
-                    })
+                    });
                 }
             }
             if let Some(w) = double_push.we() {
@@ -1804,7 +1704,7 @@ impl Board {
                         from: w,
                         to,
                         promotion: None,
-                    })
+                    });
                 }
             }
         }

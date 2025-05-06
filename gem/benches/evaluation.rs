@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use bitboard::moves::Color;
 use bitboard::posn::e5;
-use criterion::{criterion_group, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group};
 use gem::{
     board::{self, Board},
     transposition_table::TranspositionTable,

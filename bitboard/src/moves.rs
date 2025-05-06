@@ -176,7 +176,7 @@ impl fmt::Display for Move {
                         self.to.rank(),
                         promo,
                         is_check
-                    )
+                    );
                 }
                 None => {
                     return write!(
@@ -186,7 +186,7 @@ impl fmt::Display for Move {
                         self.to.rank(),
                         promo,
                         is_check
-                    )
+                    );
                 }
             },
         };

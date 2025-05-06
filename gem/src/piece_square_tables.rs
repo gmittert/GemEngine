@@ -142,7 +142,7 @@ pub const EG_TABLE: [[[i16; 64]; 6]; 2] = {
 
 #[cfg(test)]
 mod tests {
-    use crate::piece_square_tables::{flip, EG_TABLE, MG_TABLE};
+    use crate::piece_square_tables::{EG_TABLE, MG_TABLE, flip};
     use bitboard::moves::{Color, Piece};
     use bitboard::posn::ALL_POSNS;
 

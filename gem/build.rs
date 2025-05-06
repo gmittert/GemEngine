@@ -1,5 +1,5 @@
-use bitboard::posn::{Posn, ALL_POSNS};
 use bitboard::BitBoard;
+use bitboard::posn::{ALL_POSNS, Posn};
 use magics::{BBITS, BISHOP_MAGICS, BISHOP_MASK, RBITS, ROOK_MAGICS, ROOK_MASK};
 use std::arch::asm;
 use std::fs::File;

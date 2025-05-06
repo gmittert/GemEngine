@@ -2,7 +2,7 @@ use bitboard::{
     moves::AlgebraicMove,
     posn::{e2, e4},
 };
-use criterion::{black_box, criterion_group, Criterion};
+use criterion::{Criterion, black_box, criterion_group};
 use gem::{
     board::evaluation::Evaluation,
     transposition_table::{PackedTTEntry, ScoreType, TranspositionTable},

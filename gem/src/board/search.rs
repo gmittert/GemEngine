@@ -1,11 +1,11 @@
-use tracing::{field, trace_span, Level};
+use tracing::{Level, field, trace_span};
 
 use crate::board::evaluation::PIECE_VALUES;
 use crate::board::*;
-use crate::transposition_table::{CacheResult, ScoreType, TranspositionTable, DEFAULT_TT_SIZE};
+use crate::transposition_table::{CacheResult, DEFAULT_TT_SIZE, ScoreType, TranspositionTable};
 use std::cmp::{max, min};
-use std::sync::atomic::{AtomicU16, AtomicUsize};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU16, AtomicUsize};
 use std::sync::{atomic::AtomicBool, atomic::Ordering};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -384,7 +384,7 @@ impl Board {
                     best_move,
                     seldepth,
                     nodes,
-                }
+                };
             }
             CacheResult::HashMove(m) => m,
             CacheResult::Miss => None,
