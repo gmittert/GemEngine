@@ -6,6 +6,8 @@ use std::fmt;
 use std::ops::{Add, AddAssign, Neg, Sub};
 use std::time::Duration;
 
+use super::sliding_attacks::{compute_bishop_attacks, compute_rook_attacks};
+
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
 pub struct Evaluation(pub i16);
 
@@ -291,6 +293,28 @@ impl Board {
         blocked_pawns.count_ones() as u8
     }
 
+    pub fn get_least_valuable_piece(
+        &self,
+        attadef: BitBoard,
+        side: Color,
+    ) -> Option<(Posn, Piece)> {
+        let pieces = [
+            Piece::Pawn,
+            Piece::Rook,
+            Piece::Knight,
+            Piece::Bishop,
+            Piece::Queen,
+            Piece::King,
+        ];
+        for piece in pieces {
+            let subset = attadef & self.piece(side, piece);
+            if !subset.is_empty() {
+                return Some((subset.into_iter().next().unwrap(), piece));
+            }
+        }
+        None
+    }
+
     pub fn get_smallest_attacker(&self, p: Posn, side: Color) -> Option<AlgebraicMove> {
         self.pawn_can_capture(side, p)
             .or(self.knight_can_capture(side, p))
@@ -300,28 +324,80 @@ impl Board {
             .or(self.king_can_capture(side, p))
     }
 
-    pub fn static_exchange_evaluation(&mut self, p: Posn, side: Color) -> Evaluation {
-        let saved = self.save_state();
-        let mut stack: [Evaluation; 32] = [Evaluation(0); 32];
-        let mut idx: usize = 0;
-        let mut side = side;
-        while let Some(m) = self.get_smallest_attacker(p, side) {
-            let m = self.from_algeabraic(&m);
-            stack[idx] = PIECE_VALUES[m.capture.unwrap() as usize];
-            idx += 1;
-            self.make_move(&m);
-            side = !side;
-        }
+    pub fn static_exchange_evaluation(
+        &mut self,
+        to_square: Posn,
+        target: Piece,
+        from_square: Posn,
+        attack_piece: Piece,
+    ) -> Evaluation {
+        let mut gain: [Evaluation; 32] = [Evaluation::draw(); 32];
+        let mut attack_piece = attack_piece;
+        let mut d = 0;
+        let mut to_play = self.to_play;
+        let may_x_ray = self.piece(Color::White, Piece::Pawn)
+            | self.piece(Color::Black, Piece::Pawn)
+            | self.piece(Color::White, Piece::Bishop)
+            | self.piece(Color::Black, Piece::Bishop)
+            | self.piece(Color::White, Piece::Rook)
+            | self.piece(Color::Black, Piece::Rook)
+            | self.piece(Color::White, Piece::Queen)
+            | self.piece(Color::Black, Piece::Queen);
 
-        let mut value = Evaluation::draw();
-        while idx != 0 {
-            idx -= 1;
-            let v = stack[idx];
-            /* Do not consider captures if they lose material, therefore max zero */
-            value = max(Evaluation::draw(), v - value);
+        let mut from_set = BitBoard::from(from_square);
+        let mut occ = self.pieces();
+        let mut attadef = self.king_attacks_pos(to_square, Color::White)
+            | self.king_attacks_pos(to_square, Color::Black)
+            | self.rook_queen_attacks_pos(to_square, Color::White)
+            | self.rook_queen_attacks_pos(to_square, Color::Black)
+            | self.bishop_queen_attacks_pos(to_square, Color::White)
+            | self.bishop_queen_attacks_pos(to_square, Color::Black)
+            | self.knight_attacks_pos(to_square, Color::White)
+            | self.knight_attacks_pos(to_square, Color::Black)
+            | self.pawn_attacks_pos(to_square, Color::White)
+            | self.pawn_attacks_pos(to_square, Color::Black);
+        gain[d] = PIECE_VALUES[target as usize];
+        loop {
+            d += 1; // next depth and side
+            to_play = !to_play;
+            gain[d] = PIECE_VALUES[attack_piece as usize] - gain[d - 1]; // speculative store, if defended
+            attadef ^= from_set; // reset bit in set to traverse
+            occ ^= from_set; // reset bit in temporary occupancy (for x-Rays)
+            if !(from_set & may_x_ray).is_empty() {
+                attadef |= self.consider_xrays(occ, to_square);
+            }
+            if let Some((from, piece)) = self.get_least_valuable_piece(attadef, to_play) {
+                from_set = BitBoard::from(from);
+                attack_piece = piece;
+            } else {
+                break;
+            }
         }
-        self.restore_state(saved);
-        value
+        d -= 1;
+        while d > 0 {
+            gain[d - 1] = -max(-gain[d - 1], gain[d]);
+            d -= 1;
+        }
+        gain[0]
+    }
+
+    pub fn consider_xrays(&self, occ: BitBoard, target: Posn) -> BitBoard {
+        let rook_queen_attacks = compute_rook_attacks(target, occ);
+        let bishop_queen_attacks = compute_bishop_attacks(target, occ);
+
+        let revealed_rook_queens = (self.piece(Color::White, Piece::Queen)
+            | self.piece(Color::Black, Piece::Queen)
+            | self.piece(Color::White, Piece::Rook)
+            | self.piece(Color::Black, Piece::Rook))
+            & rook_queen_attacks
+            & occ;
+        let revealed_bishop_queens = (self.piece(Color::White, Piece::Queen)
+            | self.piece(Color::Black, Piece::Queen)
+            | self.piece(Color::White, Piece::Bishop)
+            | self.piece(Color::Black, Piece::Bishop))
+            & bishop_queen_attacks
+            & occ;
+        revealed_bishop_queens | revealed_rook_queens
     }
 }
 
@@ -414,7 +490,7 @@ mod tests {
             .expect("Invalid fen?");
         assert_eq!(
             Evaluation(100),
-            board.static_exchange_evaluation(e5(), Color::White)
+            board.static_exchange_evaluation(e5(), Piece::Pawn, e1(), Piece::Rook)
         );
     }
 
@@ -422,23 +498,9 @@ mod tests {
     fn see_med() {
         let mut board = Board::from_fen("1k1r3q/1ppn3p/p4b2/4p3/8/P2N2P1/1PP1R1BP/2K1Q3 w - - 0 1")
             .expect("Invalid fen?");
-
-        board.make_move(&Move {
-            from: d3(),
-            to: e5(),
-            piece: Piece::Knight,
-            capture: Some(Piece::Pawn),
-            promotion: None,
-            is_check: false,
-            is_mate: false,
-            is_en_passant: false,
-            is_castle_queen: false,
-            is_castle_king: false,
-        });
         assert_eq!(
             Evaluation(-200),
-            PIECE_VALUES[Piece::Pawn as usize]
-                - board.static_exchange_evaluation(e5(), Color::Black)
+            board.static_exchange_evaluation(e5(), Piece::Pawn, d3(), Piece::Knight)
         );
     }
 

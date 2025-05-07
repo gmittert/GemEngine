@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
-use bitboard::moves::Color;
-use bitboard::posn::e5;
+use bitboard::moves::{Color, Piece};
+use bitboard::posn::{d4, e5};
 use criterion::{BenchmarkId, Criterion, criterion_group};
 use gem::{
     board::{self, Board},
@@ -251,14 +251,14 @@ pub fn static_exchange(c: &mut Criterion) {
         let fen = "r1b1r1k1/pp2q1pp/2nb1p2/2pppQ2/2NP1Bn1/2PB1N2/PP1KRPPP/4R3 w - - 2 15";
         let mut board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            board.static_exchange_evaluation(e5(), Color::White);
+            board.static_exchange_evaluation(e5(), Piece::Pawn, d4(), Piece::Pawn);
         })
     });
     c.bench_function("static_exchange_short", |b| {
         let fen = "rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2";
         let mut board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            board.static_exchange_evaluation(e5(), Color::White);
+            board.static_exchange_evaluation(e5(), Piece::Pawn, d4(), Piece::Pawn);
         })
     });
 }

@@ -285,7 +285,6 @@ impl Board {
         let mut seldepth = 0;
         let captures = self.pseudo_legal_captures_it();
         for capture in captures {
-            let m = self.from_algeabraic(&capture);
             // The most material this could swing is capturing a queen
             let mut big_change = PIECE_VALUES[Piece::Queen as usize];
             // While possibly promoting
@@ -297,12 +296,14 @@ impl Board {
                 continue;
             }
 
+            let m = self.from_algeabraic(&capture);
+            let value = self.static_exchange_evaluation(m.to, m.capture.unwrap(), m.from, m.piece);
+            if value <= Evaluation::draw() {
+                continue;
+            }
             self.make_move(&m);
 
-            let value = PIECE_VALUES[m.capture.unwrap() as usize]
-                - self.static_exchange_evaluation(capture.to, self.to_play);
-
-            if value >= Evaluation::draw() && !self.in_check(!self.to_play) {
+            if !self.in_check(!self.to_play) {
                 let span = match self.to_play {
                     Color::Black => trace_span!("quiesece white", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
                     Color::White => trace_span!("quiesce black", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),

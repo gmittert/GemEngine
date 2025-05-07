@@ -108,6 +108,13 @@ impl ops::BitAnd for BitBoard {
     }
 }
 
+impl ops::BitXor for BitBoard {
+    type Output = Self;
+    fn bitxor(self, rhs: BitBoard) -> Self::Output {
+        BitBoard { 0: self.0 ^ rhs.0 }
+    }
+}
+
 impl ops::BitOrAssign<Posn> for BitBoard {
     fn bitor_assign(&mut self, rhs: Posn) {
         self.0 |= BitBoard::from(rhs).0;
@@ -117,6 +124,12 @@ impl ops::BitOrAssign<Posn> for BitBoard {
 impl ops::BitOrAssign for BitBoard {
     fn bitor_assign(&mut self, rhs: BitBoard) {
         self.0 |= rhs.0;
+    }
+}
+
+impl ops::BitXorAssign for BitBoard {
+    fn bitxor_assign(&mut self, rhs: BitBoard) {
+        self.0 ^= rhs.0;
     }
 }
 
@@ -137,6 +150,20 @@ impl ops::BitOr<BitBoard> for Posn {
     type Output = BitBoard;
     fn bitor(self, rhs: BitBoard) -> Self::Output {
         BitBoard::from(self) | rhs
+    }
+}
+
+impl ops::BitXor for Posn {
+    type Output = BitBoard;
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        BitBoard::from(self) ^ BitBoard::from(rhs)
+    }
+}
+
+impl ops::BitXor<BitBoard> for Posn {
+    type Output = BitBoard;
+    fn bitxor(self, rhs: BitBoard) -> Self::Output {
+        BitBoard::from(self) ^ rhs
     }
 }
 
