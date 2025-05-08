@@ -1,6 +1,6 @@
 pub mod moves;
 pub mod posn;
-use std::{num::NonZero, ops};
+use std::ops;
 
 use crate::posn::*;
 
@@ -49,21 +49,9 @@ impl Iterator for BitBoard {
     type Item = Posn;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.0 == 0 {
-            return None;
-        }
-        if self.0 == 0x8000_0000_0000_0000 {
-            let res = self.0;
-            self.0 = 0;
-            return Some(Posn {
-                pos: unsafe { NonZero::new_unchecked(res) },
-            });
-        }
-        let lsb = (self.0 as i64) & -(self.0 as i64);
-        self.0 &= self.0 - 1;
-        Some(Posn {
-            pos: unsafe { NonZero::new_unchecked(lsb as u64) },
-        })
+        let lsb = (self.0 as i64) & (self.0 as i64).overflowing_neg().0;
+        self.0 &= self.0.overflowing_sub(1).0;
+        unsafe { std::mem::transmute(lsb) }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
