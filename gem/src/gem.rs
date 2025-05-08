@@ -22,7 +22,7 @@ impl GemOptions {
         uci::option(EngineOption {
             name: String::from("NumThreads"),
             ty: EngineOptionType::Spin,
-            default: Some(String::from("64")),
+            default: Some(String::from("32")),
             min: Some(1),
             max: Some(512),
         });
@@ -50,6 +50,9 @@ pub struct Gem {
 
 impl Gem {
     pub fn new() -> Gem {
+        let _ = rayon::ThreadPoolBuilder::new()
+            .num_threads(32)
+            .build_global();
         Gem {
             board: board::starting_board(),
             options: GemOptions::default(),
