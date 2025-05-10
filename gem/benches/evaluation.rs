@@ -177,20 +177,22 @@ pub fn start(c: &mut Criterion) {
 
 pub fn london(c: &mut Criterion) {
     let mut group = c.benchmark_group("london");
-    for num_cpus in [1, 2, 4, 8, 16, 32, 64].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(num_cpus),
-            num_cpus,
-            |b, &num_cpus| {
-                let mut board = board::Board::from_fen(
-                    "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
-                )
-                .expect("Invalid fen?");
-                b.iter(|| {
-                    board.it_depth_best_move(4, num_cpus);
-                })
-            },
-        );
+    for depth in 0..10 {
+        for num_cpus in [1, 2, 4, 8, 16, 32, 64].iter() {
+            group.bench_with_input(
+                BenchmarkId::from_parameter(format!("{}ply/{}cpu", depth, num_cpus)),
+                num_cpus,
+                |b, &num_cpus| {
+                    let mut board = board::Board::from_fen(
+                        "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
+                    )
+                    .expect("Invalid fen?");
+                    b.iter(|| {
+                        board.it_depth_best_move(depth, num_cpus);
+                    })
+                },
+            );
+        }
     }
     group.finish()
 }
@@ -263,7 +265,11 @@ pub fn static_exchange(c: &mut Criterion) {
     });
 }
 
-criterion_group!(evaluation, start, london, eval_fn, static_exchange);
+criterion_group!(
+    name = evaluation;
+    config = Criterion::default();
+    targets = start, london, eval_fn, static_exchange
+);
 criterion_group!(
     name = node_efficiency;
     config = Criterion::default().warm_up_time(Duration::from_nanos(1)).with_measurement(Nodes);
