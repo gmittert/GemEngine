@@ -99,7 +99,7 @@ fn perft_inner(
     };
     let moves = b.generate_pseudo_legal_moves();
     for am in &moves {
-        let m = b.from_algeabraic(am);
+        let m = b.from_algeabraic_unchecked(am);
         let preb = b.black_pieces();
         let prew = b.white_pieces();
         assert!(

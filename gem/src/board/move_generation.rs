@@ -1748,7 +1748,7 @@ mod tests {
             assert_eq!(moves.len(), 14);
             let mut before = board.clone();
             for am in &moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -1783,7 +1783,7 @@ mod tests {
         assert_eq!(moves.len(), 4);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1799,7 +1799,7 @@ mod tests {
         assert_eq!(moves.len(), 7);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1832,7 +1832,7 @@ mod tests {
         assert_eq!(moves.len(), 4);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1848,7 +1848,7 @@ mod tests {
         assert_eq!(moves.len(), 21);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1861,7 +1861,7 @@ mod tests {
         assert_eq!(moves.len(), 27);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1904,7 +1904,7 @@ mod tests {
         assert_eq!(moves.len(), 8);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1924,7 +1924,7 @@ mod tests {
         assert_eq!(moves.len(), 3);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1936,7 +1936,7 @@ mod tests {
         assert_eq!(moves.len(), 8);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1977,7 +1977,7 @@ mod tests {
         assert_eq!(moves.len(), 8);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -1993,7 +1993,7 @@ mod tests {
         assert_eq!(moves.len(), 2);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -2006,7 +2006,7 @@ mod tests {
         assert_eq!(moves.len(), 8);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -2019,7 +2019,7 @@ mod tests {
         assert_eq!(moves.len(), 4);
         let mut before = board.clone();
         for am in &moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -2061,7 +2061,7 @@ mod tests {
         assert_eq!(moves.len(), 8);
         let mut before = board.clone();
         for am in moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -2161,7 +2161,7 @@ mod tests {
         assert_eq!(moves.len(), 1);
         let mut before = board.clone();
         for am in moves.clone() {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -2188,7 +2188,7 @@ mod tests {
         assert_eq!(moves.len(), 1);
         let mut before = board.clone();
         for am in moves.clone() {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -2214,7 +2214,7 @@ mod tests {
         assert_eq!(moves.len(), 2);
         let mut before = board.clone();
         for am in moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -2234,13 +2234,13 @@ mod tests {
         });
         board.pawn_moves(&mut moves);
         assert_eq!(moves.len(), 2);
-        let last_move = board.from_algeabraic(moves.last().unwrap());
+        let last_move = board.from_algeabraic_unchecked(moves.last().unwrap());
         assert_eq!(last_move.is_en_passant, true);
         assert_eq!(last_move.from, d5());
         assert_eq!(last_move.to, e6());
         let mut before = board.clone();
         for am in moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -2261,13 +2261,13 @@ mod tests {
         });
         board.pawn_moves(&mut moves);
         assert_eq!(moves.len(), 2);
-        let last_move = board.from_algeabraic(moves.last().unwrap());
+        let last_move = board.from_algeabraic_unchecked(moves.last().unwrap());
         assert_eq!(last_move.is_en_passant, true);
         assert_eq!(last_move.from, d4());
         assert_eq!(last_move.to, e3());
         let mut before = board.clone();
         for am in moves {
-            let m = board.from_algeabraic(&am);
+            let m = board.from_algeabraic_unchecked(&am);
             before.make_move(&m);
             before.undo_move(&m);
             assert_eq!(before, board);
@@ -2315,14 +2315,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2336,14 +2336,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2360,14 +2360,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_king, true);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2381,14 +2381,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_king, true);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2405,7 +2405,7 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2425,14 +2425,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_queen, true);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2449,14 +2449,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_king, true);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2470,14 +2470,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert_eq!(only_castles.last().unwrap().is_castle_king, true);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2493,7 +2493,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 0);
@@ -2505,7 +2505,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 0);
@@ -2520,7 +2520,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 0);
@@ -2532,7 +2532,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 0);
@@ -2547,7 +2547,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 0);
@@ -2559,7 +2559,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 0);
@@ -2574,7 +2574,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 0);
@@ -2586,7 +2586,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king)
                 .collect();
             assert_eq!(only_castles.len(), 0);
@@ -2602,13 +2602,13 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 0);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2622,14 +2622,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert!(only_castles[0].is_castle_queen);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2643,14 +2643,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert!(only_castles[0].is_castle_king);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2664,14 +2664,14 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
             assert!(only_castles[0].is_castle_king);
             let mut before = board.clone();
             for am in moves {
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 before.make_move(&m);
                 before.undo_move(&m);
                 assert_eq!(before, board);
@@ -2688,13 +2688,13 @@ mod tests {
             let only_castles: Vec<Move> = moves
                 .clone()
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 0);
             for am in moves {
                 let before = board.clone();
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 board.make_move(&m);
                 board.undo_move(&m);
                 assert_eq!(before, board);
@@ -2710,7 +2710,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 0);
@@ -2722,7 +2722,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2735,7 +2735,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2748,7 +2748,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2761,7 +2761,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2774,7 +2774,7 @@ mod tests {
             board.king_moves(&mut moves);
             let only_castles: Vec<Move> = moves
                 .into_iter()
-                .map(|x| board.from_algeabraic(&x))
+                .map(|x| board.from_algeabraic_unchecked(&x))
                 .filter(|x| x.is_castle_king || x.is_castle_queen)
                 .collect();
             assert_eq!(only_castles.len(), 1);
@@ -2792,7 +2792,7 @@ mod tests {
 
             for am in moves {
                 let before = board.clone();
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 board.make_move(&m);
                 board.undo_move(&m);
                 assert_eq!(before, board);
@@ -2806,7 +2806,7 @@ mod tests {
             assert_eq!(moves.len(), 4);
             for am in moves {
                 let before = board.clone();
-                let m = board.from_algeabraic(&am);
+                let m = board.from_algeabraic_unchecked(&am);
                 board.make_move(&m);
                 board.undo_move(&m);
                 assert_eq!(before, board);

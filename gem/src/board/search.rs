@@ -69,7 +69,9 @@ impl Board {
             hash_full: cache.hash_usage(),
         };
         (
-            completed_search.best_move.map(|m| self.from_algeabraic(&m)),
+            completed_search
+                .best_move
+                .map(|m| self.from_algeabraic_unchecked(&m)),
             completed_search.eval,
             info,
         )
@@ -168,7 +170,10 @@ impl Board {
                 continue;
             }
 
-            let m = self.from_algeabraic(&capture);
+            let Some(m) = self.from_algeabraic(&capture) else {
+                debug_assert!(false, "Invalid move pulled from cache: {}", capture);
+                continue;
+            };
             let value = self.static_exchange_evaluation(m.to, m.capture.unwrap(), m.from, m.piece);
             if value <= Evaluation::draw() {
                 continue;
@@ -208,6 +213,41 @@ impl Board {
             self.undo_move(&m);
         }
         alpha
+    }
+
+    pub fn eval_null_move<const N: usize>(
+        &mut self,
+        target_depth: u16,
+        beta: Evaluation,
+        cache: &TranspositionTable<N>,
+        should_stop: &AtomicBool,
+    ) -> Option<Evaluation> {
+        if self.game_phase == 24
+            || target_depth - self.half_move < 2
+            || self.in_check(self.to_play)
+            || beta.mate_in().is_some()
+            || beta.mated_in().is_some()
+        {
+            return None;
+        }
+        self.make_null_move();
+
+        let killer_moves = self.killer_moves;
+        self.killer_moves = [[None;2];16];
+
+        let search = self.pvs(
+            -beta,
+            Evaluation(-(beta.0 - 1)),
+            target_depth - 2,
+            &cache,
+            &should_stop,
+            ExpectedNodeType::PV,
+        )?;
+
+        self.killer_moves = killer_moves;
+        self.undo_null_move();
+        let eval = -search.eval;
+        if eval >= beta { Some(eval) } else { None }
     }
 
     pub fn pvs<const N: usize>(
@@ -268,6 +308,16 @@ impl Board {
             });
         }
 
+        if let Some(eval) = self.eval_null_move(target_depth, beta, cache, should_stop) {
+            return Some(SearchResult {
+                eval,
+                best_move: None,
+            });
+        }
+        if should_stop.load(Ordering::Acquire) {
+            return None;
+        }
+
         if hash_move.is_none()
             && node_type == ExpectedNodeType::PV
             && target_depth - self.half_move > 2
@@ -289,7 +339,7 @@ impl Board {
         let mut alpha = alpha;
         let mut had_legal_move = false;
 
-        let recapture = if let Some((p, _)) = self.moves.last() {
+        let recapture = if let Some((Some(p), _)) = self.moves.last() {
             self.get_smallest_attacker(*p, self.to_play)
         } else {
             None
@@ -326,7 +376,10 @@ impl Board {
         let mut is_first_child = true;
         let mut best_move = None;
         for a in moves {
-            let m = self.from_algeabraic(&a);
+            let Some(m) = self.from_algeabraic(&a) else {
+                debug_assert!(false, "Invalid move pulled from cache: {}", a);
+                continue;
+            };
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
                 if best_move.is_none() {
@@ -492,7 +545,7 @@ mod tests {
         let best_move = b.best_move(4, 1, &cache, None).unwrap().best_move;
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        let best_move = b.from_algeabraic(&best_move);
+        let best_move = b.from_algeabraic_unchecked(&best_move);
         println!("Best Move: {}", best_move);
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, h1());
@@ -507,7 +560,7 @@ mod tests {
         let best_move = b.best_move(4, 1, &cache, None).unwrap().best_move;
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        let best_move = b.from_algeabraic(&best_move);
+        let best_move = b.from_algeabraic_unchecked(&best_move);
         println!("Best Move: {}", best_move);
         assert_eq!(best_move.piece, Piece::Pawn);
         assert_eq!(best_move.from, f7());
@@ -524,7 +577,7 @@ mod tests {
         let eval = res.eval;
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        let best_move = b.from_algeabraic(&best_move);
+        let best_move = b.from_algeabraic_unchecked(&best_move);
         println!("Best Move: {}", best_move);
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, h1());
@@ -591,7 +644,7 @@ mod tests {
         let eval = res.eval;
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        let best_move = b.from_algeabraic(&best_move);
+        let best_move = b.from_algeabraic_unchecked(&best_move);
         println!("Best Move: {}", best_move);
         println!("Eval: {}", eval);
         assert_eq!(best_move.piece, Piece::Rook);
@@ -608,7 +661,7 @@ mod tests {
         let eval = res.eval;
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        let best_move = b.from_algeabraic(&best_move);
+        let best_move = b.from_algeabraic_unchecked(&best_move);
         println!("Eval: {}", eval);
         println!("Best Move: {}", best_move);
         assert_eq!(best_move.piece, Piece::Rook);
@@ -631,7 +684,7 @@ mod tests {
         let eval = res.eval;
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        let best_move = b.from_algeabraic(&best_move);
+        let best_move = b.from_algeabraic_unchecked(&best_move);
         println!("Eval: {}", eval);
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, g6());
@@ -646,7 +699,7 @@ mod tests {
         let eval = res.eval;
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        let best_move = b.from_algeabraic(&best_move);
+        let best_move = b.from_algeabraic_unchecked(&best_move);
         println!("Eval: {}", eval);
         assert_eq!(best_move.piece, Piece::King);
         assert_eq!(best_move.from, b8());
@@ -664,7 +717,7 @@ mod tests {
         let eval = res.eval;
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
-        let best_move = b.from_algeabraic(&best_move);
+        let best_move = b.from_algeabraic_unchecked(&best_move);
         println!("Best Move: {}", best_move);
         println!("Eval: {}", eval);
         assert!(eval.mate_in().is_some());

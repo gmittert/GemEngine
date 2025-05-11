@@ -289,7 +289,7 @@ mod tests {
 
         let moves = board.generate_pseudo_legal_moves();
         for m in moves {
-            let m = board.from_algeabraic(&m);
+            let m = board.from_algeabraic_unchecked(&m);
             board.make_move(&m);
             let cache_result = cache.get(board.hash, Evaluation(-1), Evaluation(1), 1);
             // For each result, we should have a cache entry, and it should have a move associated

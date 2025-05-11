@@ -114,7 +114,7 @@ pub struct Board {
     pub game_phase: u8,
 
     pub last_irreversible: Vec<u16>,
-    pub moves: Vec<(Posn, u64)>,
+    pub moves: Vec<(Option<Posn>, u64)>,
     pub move_rights: Vec<MoveRights>,
     pub killer_moves: [[Option<AlgebraicMove>; 2]; 16],
 
@@ -281,7 +281,7 @@ impl Board {
     }
 
     pub fn make_alg_move(&mut self, m: &AlgebraicMove) -> Result<(), String> {
-        self.make_move(&self.from_algeabraic(m));
+        self.make_move(&self.from_algeabraic_unchecked(m));
         Ok(())
     }
 
@@ -431,7 +431,7 @@ impl Board {
                 }
             }
             if m.to == to && m.promotion == promotion {
-                return Some(self.from_algeabraic(&m));
+                return Some(self.from_algeabraic_unchecked(&m));
             }
         }
         None
@@ -469,7 +469,7 @@ impl Board {
         self.game_phase -= GAME_PHASE_INC[p as usize];
         self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
     }
-    pub fn from_algeabraic(&self, m: &AlgebraicMove) -> Move {
+    pub fn from_algeabraic_unchecked(&self, m: &AlgebraicMove) -> Move {
         let piece = (self.query_pos(m.from, Color::White))
             .or(self.query_pos(m.from, Color::Black))
             .unwrap();
@@ -506,6 +506,42 @@ impl Board {
         }
     }
 
+    pub fn from_algeabraic(&self, m: &AlgebraicMove) -> Option<Move> {
+        let piece = (self.query_pos(m.from, Color::White))
+            .or(self.query_pos(m.from, Color::Black))?;
+        let mut capture = self
+            .query_pos(m.to, Color::White)
+            .or(self.query_pos(m.to, Color::Black));
+        let is_castle_king = piece == Piece::King
+            && ((m.from == e1() && m.to == g1()) || (m.from == e8() && m.to == g8()));
+        let is_castle_queen = piece == Piece::King
+            && ((m.from == e1() && m.to == c1()) || (m.from == e8() && m.to == c8()));
+        let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
+        let is_en_passant = if let Some(file) = ep_target {
+            piece == Piece::Pawn
+                && m.to.file() == file
+                && m.from.file() != file
+                && capture.is_none()
+        } else {
+            false
+        };
+        if is_en_passant {
+            capture = Some(Piece::Pawn)
+        }
+        Some(Move {
+            from: m.from,
+            to: m.to,
+            piece,
+            capture,
+            is_check: false,
+            is_mate: false,
+            is_castle_king,
+            is_castle_queen,
+            promotion: m.promotion,
+            is_en_passant,
+        })
+    }
+
     /// Killer moves may not always apply.
     pub fn check_killer(&self, m: &AlgebraicMove) -> bool {
         // We better have a piece on the from square.
@@ -529,17 +565,37 @@ impl Board {
 
     pub fn make_null_move(&mut self) {
         self.half_move += 1;
+        self.moves.push((None, self.hash));
 
         if self.to_play == Color::Black {
             self.full_move += 1;
         }
+        let move_rights = *self.move_rights.last().unwrap_or(&MoveRights::default());
+
+        let new_move_rights = MoveRights {
+            castling_ability: move_rights.castling_ability,
+            ep_target: None,
+        };
+
+        self.hash ^= move_rights.hash();
+        self.hash ^= new_move_rights.hash();
+        self.move_rights.push(new_move_rights);
+
         self.to_play = !self.to_play;
         self.hash ^= ZOBRIST_KEYS.black_turn;
     }
 
     pub fn undo_null_move(&mut self) {
         self.to_play = !self.to_play;
+        self.moves.pop();
         self.hash ^= ZOBRIST_KEYS.black_turn;
+
+        if let Some(prev_rights) = self.move_rights.pop() {
+            self.hash ^= prev_rights.hash();
+            if let Some(new_rights) = self.move_rights.last() {
+                self.hash ^= new_rights.hash();
+            }
+        }
 
         if self.to_play == Color::Black {
             self.full_move -= 1;
@@ -550,7 +606,7 @@ impl Board {
     pub fn make_move(&mut self, m: &Move) {
         self.half_move += 1;
 
-        self.moves.push((m.to, self.hash));
+        self.moves.push((Some(m.to), self.hash));
         if m.is_castle_king || m.is_castle_queen || m.capture.is_some() || m.piece == Piece::Pawn {
             self.last_irreversible.push(self.half_move);
         }
