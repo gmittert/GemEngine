@@ -235,6 +235,20 @@ impl Board {
             CacheResult::Miss => None,
         };
 
+        // Check for 3 fold repetition
+        if let Some(irr) = self.last_irreversible.last() {
+            if self.half_move - irr >= 8 {
+                for (_, prev_state) in &self.moves[*irr as usize..] {
+                    if *prev_state == self.hash {
+                        return Some(SearchResult {
+                            eval: Evaluation::draw(),
+                            best_move: None,
+                        });
+                    }
+                }
+            }
+        }
+
         // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't
         // want to compute taking a pawn with our queen and just stop computing there, for example.
         if self.half_move >= target_depth {
@@ -323,28 +337,11 @@ impl Board {
                     Color::Black => trace_span!("white", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
                     Color::White => trace_span!("black", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
                 };
-                // Check for 3 fold repetition
-                let mut is_three_fold = false;
-                if let Some(irr) = self.last_irreversible.last() {
-                    if self.half_move - irr >= 8 {
-                        for (_, prev_state) in &self.moves[*irr as usize..] {
-                            if *prev_state == self.hash {
-                                is_three_fold = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                let eval_res = if is_three_fold {
-                    SearchResult {
-                        eval: Evaluation::draw(),
-                        best_move: Some(a),
-                    }
-                } else {
-                    // PV Search: We'd ordered our hash move in front and it's likely to be the PV
-                    // node. Establish an exact score for it, and search a smaller window for
-                    // everything else. If a move might actually be better, research it to find the
-                    // actual score.
+                // PV Search: We'd ordered our hash move in front and it's likely to be the PV
+                // node. Establish an exact score for it, and search a smaller window for
+                // everything else. If a move might actually be better, research it to find the
+                // actual score.
+                let eval_res =
                     if is_first_child || alpha.mate_in().is_some() || alpha.mated_in().is_some() {
                         is_first_child = false;
                         let expected_next_node = match node_type {
@@ -387,8 +384,7 @@ impl Board {
                         }
 
                         score
-                    }
-                };
+                    };
                 let eval = -eval_res.eval.dec_mate();
                 span.record("eval", eval.0);
                 drop(span);
@@ -914,13 +910,13 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
 54. Ra8+ {+3.98/9 5.0s} Nb8 {-4.00/9 5.0s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::<1024>::new();
-        let move_eval = board.best_move(5, 1, &cache, None).unwrap().eval;
+        let move_eval = board.best_move(6, 1, &cache, None).unwrap().eval;
 
         let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
         let evalb = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
-        assert!(evalw != Evaluation::draw());
-        assert!(evalb != Evaluation::draw());
-        assert!(move_eval != Evaluation::draw());
+        assert_ne!(evalw, Evaluation::draw());
+        assert_ne!(evalb, Evaluation::draw());
+        assert_eq!(move_eval, Evaluation::draw());
     }
 
     #[test]
