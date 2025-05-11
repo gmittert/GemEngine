@@ -211,8 +211,8 @@ pub fn london_nodes(c: &mut Criterion<Nodes>) {
                 b.iter_custom(|iters| {
                     let mut nodes = 0;
                     for _i in 0..iters {
-                        let res = board.it_depth_best_move(4, num_cpus);
-                        nodes += res.nodes();
+                        let _ = board.it_depth_best_move(4, num_cpus);
+                        nodes += board.nodes;
                     }
                     nodes
                 })
@@ -237,8 +237,8 @@ pub fn london_node_throughput(c: &mut Criterion<NodeThroughput>) {
                     let mut nodes = 0;
                     let begin = Instant::now();
                     for _i in 0..iters {
-                        let res = board.it_depth_best_move(4, num_cpus);
-                        nodes += res.nodes();
+                        let _ = board.it_depth_best_move(4, num_cpus);
+                        nodes += board.nodes;
                     }
                     (nodes, begin.elapsed())
                 })

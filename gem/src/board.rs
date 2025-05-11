@@ -117,6 +117,10 @@ pub struct Board {
     pub moves: Vec<(Posn, u64)>,
     pub move_rights: Vec<MoveRights>,
     pub killer_moves: [[Option<AlgebraicMove>; 2]; 16],
+
+    // Metadata about the current search
+    pub seldepth: u16,
+    pub nodes: usize,
 }
 
 pub struct BoardState {
@@ -577,6 +581,26 @@ impl Board {
         self.move_rights.truncate(state.move_rights_len);
     }
 
+    pub fn make_null_move(&mut self) {
+        self.half_move += 1;
+
+        if self.to_play == Color::Black {
+            self.full_move += 1;
+        }
+        self.to_play = !self.to_play;
+        self.hash ^= ZOBRIST_KEYS.black_turn;
+    }
+
+    pub fn undo_null_move(&mut self) {
+        self.to_play = !self.to_play;
+        self.hash ^= ZOBRIST_KEYS.black_turn;
+
+        if self.to_play == Color::Black {
+            self.full_move -= 1;
+        }
+        self.half_move -= 1;
+    }
+
     pub fn make_move(&mut self, m: &Move) {
         self.half_move += 1;
 
@@ -788,6 +812,14 @@ impl Board {
         }
         b
     }
+
+    pub fn reset_stats(&mut self) {
+        self.seldepth = 0;
+        self.nodes = 0;
+    }
+    pub fn get_stats(&mut self) -> (u16, usize) {
+        (self.seldepth, self.nodes)
+    }
 }
 
 impl fmt::Display for Board {
@@ -909,6 +941,8 @@ pub fn empty_board(turn: Color) -> Board {
         eg_piece_values: [0, 0],
         game_phase: 0,
         killer_moves: [[None, None]; 16],
+        nodes: 0,
+        seldepth: 0,
     }
 }
 
