@@ -43,6 +43,8 @@ impl CastlingAbility {
                 'Q' => out |= 2,
                 'k' => out |= 4,
                 'q' => out |= 8,
+                'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' => (),
+                'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' => (),
                 _ => return None,
             }
         }
@@ -214,14 +216,30 @@ impl Board {
                     'f' => File::F,
                     'g' => File::G,
                     'h' => File::H,
+                    'A' => File::A,
+                    'B' => File::B,
+                    'C' => File::C,
+                    'D' => File::D,
+                    'E' => File::E,
+                    'F' => File::F,
+                    'G' => File::G,
+                    'H' => File::H,
                     _ => return None,
                 };
                 Some(file)
             },
         };
         out.move_rights.push(move_rights);
-        out.half_move = sections.next()?.parse::<u16>().ok()?;
-        out.full_move = sections.next()?.parse::<u16>().ok()?;
+        out.half_move = if let Some(n) = sections.next() {
+            n.parse::<u16>().ok()?
+        } else {
+            0
+        };
+        out.full_move = if let Some(n) = sections.next() {
+            n.parse::<u16>().ok()?
+        } else {
+            0
+        };
         if sections.next() != None {
             return None;
         }
@@ -507,8 +525,8 @@ impl Board {
     }
 
     pub fn from_algeabraic(&self, m: &AlgebraicMove) -> Option<Move> {
-        let piece = (self.query_pos(m.from, Color::White))
-            .or(self.query_pos(m.from, Color::Black))?;
+        let piece =
+            (self.query_pos(m.from, Color::White)).or(self.query_pos(m.from, Color::Black))?;
         let mut capture = self
             .query_pos(m.to, Color::White)
             .or(self.query_pos(m.to, Color::Black));

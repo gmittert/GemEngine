@@ -7,3 +7,4 @@ perf.data
 perf.data.old
 *.pb
 profile.json.gz
+data
