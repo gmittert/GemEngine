@@ -72,7 +72,7 @@ fn main() -> anyhow::Result<()> {
     while let Ok(_len) = reader.read_line(&mut line) {
         let s: Sample = serde_json::from_str(&line)?;
         line.clear();
-        let Some(_) = Board::from_fen(&s.fen) else {
+        let Some(board) = Board::from_fen(&s.fen) else {
             println!("Failed to parse fen: {}", s.fen);
             continue;
         };
@@ -84,18 +84,23 @@ fn main() -> anyhow::Result<()> {
         for eval in &s.evals {
             max_depth = max_depth.max(eval.depth);
         }
-        for eval in s.evals {
+        for eval in s.evals.iter() {
             if eval.depth == max_depth {
-                if let Some(cp) = eval.pvs[0].cp {
-                    writeln!(writer, "{}, {}", s.fen, cp)?;
+                let cp_eval = if let Some(cp) = eval.pvs[0].cp {
+                    cp
                 } else if let Some(mate) = eval.pvs[0].mate {
-                    let eval = if mate > 0 {
+                    if mate > 0 {
                         std::i16::MAX
                     } else {
                         std::i16::MIN + 1
-                    };
-                    writeln!(writer, "{}, {}", s.fen, eval)?;
-                };
+                    }
+                } else {
+                    panic!("Expected one of either mate or cp");
+                } as u64;
+                let features = gem::nn_features::FeatureSet::from(&board);
+                writer.write(features.as_bytes())?;
+                writer.write(cp_eval.to_ne_bytes().as_slice())?;
+                break;
             }
         }
     }
