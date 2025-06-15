@@ -13,9 +13,9 @@ pub struct Evaluation(pub i16);
 
 pub const PIECE_VALUES: [Evaluation; 6] = [
     Evaluation(100),   // Pawn
-    Evaluation(500),   // Rook
     Evaluation(300),   // Knight
     Evaluation(310),   // Bishop
+    Evaluation(500),   // Rook
     Evaluation(900),   // Queen
     Evaluation(10000), // King
 ];

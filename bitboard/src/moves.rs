@@ -6,9 +6,9 @@ use std::ops::Not;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Piece {
     Pawn = 0,
-    Rook,
     Knight,
     Bishop,
+    Rook,
     Queen,
     King,
 }
