@@ -1,5 +1,5 @@
 [package]
-name = "tools"
+name = "nnue"
 version = "0.1.0"
 edition = "2024"
 
@@ -10,7 +10,17 @@ clap = { version = "4.5.39", features = ["derive"] }
 serde_json = {version = "1.0.140", features = ["std"]}
 anyhow = "1.0.98"
 serde = { version = "1.0", features = ["derive"] }
+bulletformat = { git = "https://github.com/jw1912/bulletformat" }
+bullet_lib = { git = "https://github.com/jw1912/bullet" }
+
+[lib]
+name = "nnue"
+path = "src/lib.rs"
 
 [[bin]]
-name = "generate_training_data"
-path = "src/generate_training_data.rs"
+name = "train"
+path = "src/train.rs"
+
+[[bin]]
+name = "eval"
+path = "src/eval.rs"
