@@ -565,7 +565,6 @@ dependencies = [
  "bullet_lib",
  "bulletformat 1.8.0 (git+https://github.com/jw1912/bulletformat)",
  "clap",
- "gem",
  "serde",
  "serde_json",
 ]
@@ -1033,6 +1032,21 @@ name = "toml_write"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfb942dfe1d8e29a7ee7fcbde5bd2b9a25fb89aa70caea2eba3bee836ff41076"
+
+[[package]]
+name = "tools"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitboard",
+ "bullet_lib",
+ "bulletformat 1.8.0 (git+https://github.com/jw1912/bulletformat)",
+ "clap",
+ "gem",
+ "nnue",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "tracing"

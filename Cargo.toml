@@ -1,6 +1,6 @@
 [workspace]
 members = [ "bitboard", "magics",
-  "gem", "nnue"
+  "gem", "nnue", "tools",
 ]
 resolver = "2"
 
