@@ -2,8 +2,12 @@ pub mod evaluation;
 mod move_generation;
 pub mod search;
 mod sliding_attacks;
+
+#[cfg(not(feature = "nnue"))]
 use crate::piece_square_tables::EG_TABLE;
+#[cfg(not(feature = "nnue"))]
 use crate::piece_square_tables::GAME_PHASE_INC;
+#[cfg(not(feature = "nnue"))]
 use crate::piece_square_tables::MG_TABLE;
 
 use crate::parser::Parser;
@@ -110,9 +114,12 @@ pub struct Board {
     pub full_move: u16,
     pub hash: u64,
 
+    #[cfg(not(feature = "nnue"))]
     pub mg_piece_values: [i16; 2],
+    #[cfg(not(feature = "nnue"))]
     pub eg_piece_values: [i16; 2],
     // A progression of the game (out of 24)
+    #[cfg(not(feature = "nnue"))]
     pub game_phase: u8,
 
     pub last_irreversible: Vec<u16>,
@@ -139,9 +146,18 @@ impl PartialEq for Board {
             && self.full_move == other.full_move
             && self.move_rights == other.move_rights
             && self.hash == other.hash
-            && self.game_phase == other.game_phase
-            && self.mg_piece_values == other.mg_piece_values
-            && self.eg_piece_values == other.eg_piece_values
+            && {
+                #[cfg(feature = "nnue")]
+                {
+                    true
+                }
+                #[cfg(not(feature = "nnue"))]
+                {
+                    self.game_phase == other.game_phase
+                        && self.mg_piece_values == other.mg_piece_values
+                        && self.eg_piece_values == other.eg_piece_values
+                }
+            }
     }
 }
 
@@ -484,11 +500,14 @@ impl Board {
                 self.white_pieces[p as usize] |= pos;
             }
         };
-        let eg_val = EG_TABLE[c as usize][p as usize][pos.idx() as usize];
-        let mg_val = MG_TABLE[c as usize][p as usize][pos.idx() as usize];
-        self.eg_piece_values[c as usize] += eg_val;
-        self.mg_piece_values[c as usize] += mg_val;
-        self.game_phase += GAME_PHASE_INC[p as usize];
+        #[cfg(not(feature = "nnue"))]
+        {
+            let eg_val = EG_TABLE[c as usize][p as usize][pos.idx() as usize];
+            let mg_val = MG_TABLE[c as usize][p as usize][pos.idx() as usize];
+            self.eg_piece_values[c as usize] += eg_val;
+            self.mg_piece_values[c as usize] += mg_val;
+            self.game_phase += GAME_PHASE_INC[p as usize];
+        }
         self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
     }
     pub fn remove_piece(&mut self, c: Color, p: Piece, pos: Posn) {
@@ -515,11 +534,14 @@ impl Board {
                 self.white_pieces[p as usize] &= !BitBoard::from(pos);
             }
         };
-        let eg_val = EG_TABLE[c as usize][p as usize][pos.idx() as usize];
-        let mg_val = MG_TABLE[c as usize][p as usize][pos.idx() as usize];
-        self.eg_piece_values[c as usize] -= eg_val;
-        self.mg_piece_values[c as usize] -= mg_val;
-        self.game_phase -= GAME_PHASE_INC[p as usize];
+        #[cfg(not(feature = "nnue"))]
+        {
+            let eg_val = EG_TABLE[c as usize][p as usize][pos.idx() as usize];
+            let mg_val = MG_TABLE[c as usize][p as usize][pos.idx() as usize];
+            self.eg_piece_values[c as usize] -= eg_val;
+            self.mg_piece_values[c as usize] -= mg_val;
+            self.game_phase -= GAME_PHASE_INC[p as usize];
+        }
         self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
     }
     pub fn from_algeabraic_unchecked(&self, m: &AlgebraicMove) -> Move {
@@ -992,8 +1014,11 @@ pub fn empty_board(turn: Color) -> Board {
             },
         last_irreversible: vec![0],
         moves: vec![],
+        #[cfg(not(feature = "nnue"))]
         mg_piece_values: [0, 0],
+        #[cfg(not(feature = "nnue"))]
         eg_piece_values: [0, 0],
+        #[cfg(not(feature = "nnue"))]
         game_phase: 0,
         killer_moves: [[None, None]; 16],
         nodes: 0,

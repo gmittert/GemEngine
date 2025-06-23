@@ -31,5 +31,8 @@ bitboard = { path = "../bitboard" }
 magics = { path = "../magics" }
 
 [features]
+default = ["nnue"]
+
 # Enable nnue based evaluation
 nnue = []
+
