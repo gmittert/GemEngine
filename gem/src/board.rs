@@ -123,6 +123,11 @@ pub struct Board {
     // Metadata about the current search
     pub seldepth: u16,
     pub nodes: usize,
+
+    #[cfg(feature = "nnue")]
+    pub white_features: nnue::Accumulator,
+    #[cfg(feature = "nnue")]
+    pub black_features: nnue::Accumulator,
 }
 
 impl PartialEq for Board {
@@ -456,6 +461,21 @@ impl Board {
     }
 
     pub fn add_piece(&mut self, c: Color, p: Piece, pos: Posn) {
+        #[cfg(feature = "nnue")]
+        {
+            let pc = 64 * usize::from(p as usize);
+            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+            // Since our nnue is trained using chessboard, we need to flip the board.
+            //
+            // TODO: retrain using our own board representation.
+            let sq = pos.idx() as usize ^ 7;
+            let perspective = usize::from(c == Color::White);
+            self.white_features
+                .add_feature([384, 0][perspective] + pc + sq, &nnue::NNUE);
+            self.black_features
+                .add_feature([0, 384][perspective] + pc + (sq ^ 56), &nnue::NNUE);
+        }
+
         match c {
             Color::Black => {
                 self.black_pieces[p as usize] |= pos;
@@ -472,6 +492,21 @@ impl Board {
         self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
     }
     pub fn remove_piece(&mut self, c: Color, p: Piece, pos: Posn) {
+        #[cfg(feature = "nnue")]
+        {
+            let pc = 64 * usize::from(p as usize);
+            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+            // Since our nnue is trained using chessboard, we need to flip the board.
+            //
+            // TODO: retrain using our own board representation.
+            let sq = pos.idx() as usize ^ 7;
+            let perspective = usize::from(c == Color::White);
+            self.white_features
+                .remove_feature([384, 0][perspective] + pc + sq, &nnue::NNUE);
+            self.black_features
+                .remove_feature([0, 384][perspective] + pc + (sq ^ 56), &nnue::NNUE);
+        }
+
         match c {
             Color::Black => {
                 self.black_pieces[p as usize] &= !BitBoard::from(pos);
@@ -955,7 +990,7 @@ pub fn empty_board(turn: Color) -> Board {
             } else {
                 0
             },
-        last_irreversible: vec![],
+        last_irreversible: vec![0],
         moves: vec![],
         mg_piece_values: [0, 0],
         eg_piece_values: [0, 0],
@@ -963,6 +998,10 @@ pub fn empty_board(turn: Color) -> Board {
         killer_moves: [[None, None]; 16],
         nodes: 0,
         seldepth: 0,
+        #[cfg(feature = "nnue")]
+        white_features: nnue::Accumulator::new(&nnue::NNUE),
+        #[cfg(feature = "nnue")]
+        black_features: nnue::Accumulator::new(&nnue::NNUE),
     }
 }
 

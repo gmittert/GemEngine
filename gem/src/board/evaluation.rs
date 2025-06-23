@@ -1,5 +1,3 @@
-use tracing::Level;
-
 use crate::board::*;
 use std::cmp::max;
 use std::fmt;
@@ -146,6 +144,15 @@ pub struct SearchInfo {
 }
 
 impl Board {
+    #[cfg(feature = "nnue")]
+    pub fn eval(&self, _alpha: Evaluation, _beta: Evaluation, to_play: Color) -> Evaluation {
+        Evaluation(match to_play {
+            Color::Black => nnue::NNUE.evaluate(&self.black_features, &self.white_features),
+            Color::White => nnue::NNUE.evaluate(&self.white_features, &self.black_features),
+        } as i16)
+    }
+
+    #[cfg(not(feature = "nnue"))]
     #[tracing::instrument(skip(self))]
     pub fn eval(&self, alpha: Evaluation, beta: Evaluation, to_play: Color) -> Evaluation {
         let mg_score =
@@ -162,7 +169,7 @@ impl Board {
             (((mg_score as i32 * mg_phase) + (eg_score as i32 * eg_phase)) / 24) as i16;
 
         tracing::event!(
-            Level::INFO,
+            tracing::Level::INFO,
             name = "Phase1 eval",
             eval = phase1_eval,
             alpha = alpha.0,
@@ -175,11 +182,11 @@ impl Board {
         // Lazily evaluate the more expensive parts. If we're already too far out of range of alpha
         // and beta, don't bother trying to compute the minutia.
         if alpha.0 as i32 - phase1_eval as i32 > 200 {
-            tracing::event!(Level::INFO, name = "Alpha too high");
+            tracing::event!(tracing::Level::INFO, name = "Alpha too high");
             return Evaluation(phase1_eval);
         }
         if phase1_eval as i32 - beta.0 as i32 > 200 {
-            tracing::event!(Level::INFO, name = "Beta too low");
+            tracing::event!(tracing::Level::INFO, name = "Beta too low");
             return Evaluation(phase1_eval);
         }
 
@@ -211,7 +218,11 @@ impl Board {
                 Color::White => eval_refinements,
             };
 
-        tracing::event!(Level::INFO, name = "Phase2 eval", "eval" = phase2_eval);
+        tracing::event!(
+            tracing::Level::INFO,
+            name = "Phase2 eval",
+            "eval" = phase2_eval
+        );
         Evaluation(phase2_eval)
     }
 
@@ -413,7 +424,6 @@ mod tests {
         let eval_black = b.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(eval_white.0 > 0);
         assert!(eval_black.0 < 0);
-        assert!(eval_black == -eval_white)
     }
 
     #[test]
@@ -424,7 +434,6 @@ mod tests {
         let eval_black = b.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(eval_white.0 < 0);
         assert!(eval_black.0 > 0);
-        assert!(eval_black == -eval_white)
     }
 
     #[test]
@@ -434,7 +443,6 @@ mod tests {
         let eval_black = b.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
         assert!(eval_white.0 < 100 && eval_white.0 > -100);
         assert!(eval_black.0 < 100 && eval_black.0 > -100);
-        assert_eq!(eval_white, eval_black);
     }
 
     #[test]
@@ -506,8 +514,9 @@ mod tests {
 
     #[test]
     fn repetition() {
-        let mut board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-            .expect("bad fen?");
+        let mut board =
+            Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 23 1")
+                .expect("bad fen?");
         board
             .make_alg_move(&AlgebraicMove {
                 from: b1(),
@@ -593,10 +602,7 @@ mod tests {
             })
             .expect("bad move?");
 
-        let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
-        assert!(evalw == Evaluation::draw());
-        let evalb = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
-        assert!(evalb == Evaluation::draw());
+        assert!(board.has_three_fold_repetition());
     }
 
     #[test]

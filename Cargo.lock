@@ -368,6 +368,7 @@ dependencies = [
  "criterion",
  "lazy_static",
  "magics",
+ "nnue",
  "portable-atomic",
  "rand 0.9.1",
  "rayon",

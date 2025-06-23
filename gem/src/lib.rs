@@ -1,7 +1,6 @@
 #![feature(new_zeroed_alloc)]
 pub mod board;
 pub mod gem;
-pub mod nn_features;
 pub mod parser;
 pub mod perft;
 pub mod pgn;

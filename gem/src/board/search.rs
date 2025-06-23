@@ -215,6 +215,20 @@ impl Board {
         alpha
     }
 
+    pub fn has_three_fold_repetition(&self) -> bool {
+        let Some(irr) = self.last_irreversible.last() else {
+            return false;
+        };
+        if self.half_move - irr >= 8 {
+            for (_, prev_state) in &self.moves[*irr as usize..] {
+                if *prev_state == self.hash {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     pub fn eval_null_move<const N: usize>(
         &mut self,
         target_depth: u16,
@@ -233,7 +247,7 @@ impl Board {
         self.make_null_move();
 
         let killer_moves = self.killer_moves;
-        self.killer_moves = [[None;2];16];
+        self.killer_moves = [[None; 2]; 16];
 
         let search = self.pvs(
             -beta,
@@ -275,18 +289,11 @@ impl Board {
             CacheResult::Miss => None,
         };
 
-        // Check for 3 fold repetition
-        if let Some(irr) = self.last_irreversible.last() {
-            if self.half_move - irr >= 8 {
-                for (_, prev_state) in &self.moves[*irr as usize..] {
-                    if *prev_state == self.hash {
-                        return Some(SearchResult {
-                            eval: Evaluation::draw(),
-                            best_move: None,
-                        });
-                    }
-                }
-            }
+        if self.has_three_fold_repetition() {
+            return Some(SearchResult {
+                eval: Evaluation::draw(),
+                best_move: None,
+            });
         }
 
         // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't

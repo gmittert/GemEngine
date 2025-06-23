@@ -12,6 +12,7 @@ portable-atomic = { version = "1.10.0", default-features = false, features = ["r
 tracing-perfetto = "0.1.4"
 bitboard = { path = "../bitboard" }
 magics = { path = "../magics" }
+nnue = { path = "../nnue" }
 rayon = "1.10.0"
 
 [dev-dependencies]
@@ -28,3 +29,7 @@ path = "src/bin/main.rs"
 [build-dependencies]
 bitboard = { path = "../bitboard" }
 magics = { path = "../magics" }
+
+[features]
+# Enable nnue based evaluation
+nnue = []
