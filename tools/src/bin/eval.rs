@@ -1,44 +1,9 @@
 // A script to check loading and evaluating a few positions from a trained network.
-//
-// A network based off the bullet' simple example
-use bitboard::moves::{Color, Piece};
-use gem::board::Board;
-use nnue::{Accumulator, NNUE};
+use gem::board::{Board, evaluation::Evaluation};
 
-fn fill_accumulator(white: &mut Accumulator, black: &mut Accumulator, board: &Board) {
-    for color in [Color::White, Color::Black] {
-        for piece in [
-            Piece::Pawn,
-            Piece::Knight,
-            Piece::Bishop,
-            Piece::Rook,
-            Piece::Queen,
-            Piece::King,
-        ] {
-            for square in board.piece(color, piece) {
-                let pc = 64 * usize::from(piece as usize);
-
-                // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-                let sq = square.idx() as usize ^ 7;
-
-                let c = usize::from(color == Color::White);
-                white.add_feature([384, 0][c] + pc + sq, &NNUE);
-                black.add_feature([0, 384][c] + pc + (sq ^ 56), &NNUE);
-            }
-        }
-    }
-}
-
-fn eval_fen(fen: &str) -> i32 {
-    let mut white = Accumulator::new(&NNUE);
-    let mut black = Accumulator::new(&NNUE);
-
+fn eval_fen(fen: &str) -> Evaluation {
     let board = Board::from_fen(&fen).unwrap();
-    fill_accumulator(&mut white, &mut black, &board);
-    match board.to_play {
-        Color::Black => NNUE.evaluate(&black, &white),
-        Color::White => NNUE.evaluate(&white, &black),
-    }
+    board.eval(Evaluation::lost(), Evaluation::won(), board.to_play)
 }
 
 fn main() {
