@@ -5,7 +5,7 @@ A UCI compatible chess engine.
 ## Build
 
 ```
-cargo build --release
+cargo build --release --features nnue
 ```
 
 The resulting binary can then be loaded by a UCI compatible interface such as
@@ -22,3 +22,4 @@ Cute Chess.
 - Iterative deeping search
 - Quiescence search
 - Static Exchange Evaluation
+- NNUE based evaluation
