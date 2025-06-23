@@ -127,7 +127,7 @@ impl Posn {
 
     #[inline]
     pub const fn idx(&self) -> u32 {
-        self.pos.ilog2()
+        self.pos.trailing_zeros()
     }
 
     #[inline]

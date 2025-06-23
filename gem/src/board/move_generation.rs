@@ -1232,7 +1232,10 @@ impl Board {
             BitBoard::empty()
         } else {
             // There should always be one king.
-            KING_ATTACKS[kings.0.ilog2() as usize]
+            let from = Posn {
+                pos: unsafe { NonZero::new_unchecked(kings.0) },
+            };
+            KING_ATTACKS[from.idx() as usize]
         }
     }
 
@@ -1321,12 +1324,11 @@ impl Board {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
         };
-        let from_idx = kings.0.ilog2();
         let from = Posn {
             pos: unsafe { NonZero::new_unchecked(kings.0) },
         };
 
-        for m in KING_ATTACKS[from_idx as usize] & !allied_pieces {
+        for m in KING_ATTACKS[from.idx() as usize] & !allied_pieces {
             out.push(AlgebraicMove {
                 from,
                 to: m,
