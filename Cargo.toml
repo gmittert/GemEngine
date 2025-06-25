@@ -1,7 +1,5 @@
 [workspace]
-members = [ "bitboard", "magics",
-  "gem", "nnue", "tools",
-]
+members = [ "crates/*" ]
 resolver = "2"
 
 [profile.rel-with-debug]

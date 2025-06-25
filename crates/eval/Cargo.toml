@@ -1,0 +1,12 @@
+[package]
+name = "eval"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+engine = { path = "../engine", features=["nnue"] }
+nnue = { path = "../nnue" }
+
+[[bin]]
+name = "eval"
+path = "src/bin/eval.rs"

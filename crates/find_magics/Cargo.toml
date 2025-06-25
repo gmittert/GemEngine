@@ -1,6 +1,6 @@
 [package]
-name = "magics"
-version = "0.1.0"
+name = "find_magics"
+version = "0.0.0"
 edition = "2024"
 
 [dependencies]
@@ -11,9 +11,3 @@ rand = "0.8.5"
 name = "find_magics"
 path = "src/find_magics.rs"
 
-[lib]
-name = "magics"
-path = "src/lib.rs"
-
-[build-dependencies]
-bitboard = { path = "../bitboard" }

@@ -1,0 +1,12 @@
+[package]
+name = "train"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+bullet_lib = { git = "https://github.com/jw1912/bullet" }
+nnue = { path = "../nnue" }
+
+[[bin]]
+name = "train"
+path = "src/bin/train.rs"

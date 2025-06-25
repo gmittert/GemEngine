@@ -1,5 +1,5 @@
 // A script to check loading and evaluating a few positions from a trained network.
-use gem::board::{Board, evaluation::Evaluation};
+use engine::board::{Board, evaluation::Evaluation};
 
 fn eval_fen(fen: &str) -> Evaluation {
     let board = Board::from_fen(&fen).unwrap();

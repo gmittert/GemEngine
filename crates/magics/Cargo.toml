@@ -1,0 +1,14 @@
+[package]
+name = "magics"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+bitboard = { path = "../bitboard" }
+
+[lib]
+name = "magics"
+path = "src/lib.rs"
+
+[build-dependencies]
+bitboard = { path = "../bitboard" }

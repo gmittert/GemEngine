@@ -17,7 +17,7 @@ pub const SCALE: i32 = 400;
 
 pub static NNUE: Network = unsafe {
     std::mem::transmute(*include_bytes!(
-        "../../checkpoints/1_simple-50/quantised.bin"
+        "../../../checkpoints/1_simple-50/quantised.bin"
     ))
 };
 

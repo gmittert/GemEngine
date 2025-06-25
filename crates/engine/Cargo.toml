@@ -1,10 +1,9 @@
 [package]
-name = "gem"
-version = "0.1.0"
+name = "engine"
+version = "0.0.0"
 edition = "2024"
 
 [dependencies]
-lazy_static = "1.5.0"
 rand = "0.9.1"
 tracing = { version = "0.1.41", features = ["release_max_level_off"] }
 tracing-subscriber = "0.3.19"
@@ -22,17 +21,11 @@ criterion = { version = "0.5.1", features = ["html_reports"] }
 name = "gem_bench"
 harness = false
 
-[[bin]]
-name = "gem"
-path = "src/bin/main.rs"
-
 [build-dependencies]
 bitboard = { path = "../bitboard" }
 magics = { path = "../magics" }
 
 [features]
-default = ["nnue"]
-
 # Enable nnue based evaluation
 nnue = []
 
