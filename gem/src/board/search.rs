@@ -60,11 +60,12 @@ impl Board {
         }
 
         let (seldepth, nodes) = self.get_stats();
+        let elapsed_ms = start.elapsed().as_millis().min(1);
         let info = SearchInfo {
             depth,
             seldepth: max(seldepth, self.half_move) - self.half_move,
             nodes,
-            nodes_per_sec: self.nodes / start.elapsed().as_secs() as usize,
+            nodes_per_sec: 1000 * self.nodes / elapsed_ms as usize,
             time,
             hash_full: cache.hash_usage(),
         };

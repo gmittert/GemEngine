@@ -9,28 +9,28 @@ pub mod reader;
 #[derive(Default, PartialEq)]
 pub struct GoOptions {
     // Restrict search to only these moves
-    search_moves: Option<Vec<AlgebraicMove>>,
-    ponder: bool,
+    pub search_moves: Option<Vec<AlgebraicMove>>,
+    pub ponder: bool,
     // White's remaining ms on the clock
-    wtime: Option<usize>,
+    pub wtime: Option<usize>,
     // Black's remaining ms on the clock
-    btime: Option<usize>,
+    pub btime: Option<usize>,
     // White's increment per move in ms
-    winc: Option<usize>,
+    pub winc: Option<usize>,
     // Black's increment per move in ms
-    binc: Option<usize>,
+    pub binc: Option<usize>,
     // there are x moves to the next time control,
-    moves_to_go: Option<usize>,
+    pub moves_to_go: Option<usize>,
     // Only search `depth` plies deep
-    depth: Option<usize>,
+    pub depth: Option<usize>,
     // Check only `nodes` deep
-    nodes: Option<usize>,
+    pub nodes: Option<usize>,
     // Search for a mate in `mate` moves
-    mate: Option<usize>,
+    pub mate: Option<usize>,
     // Search for exactly x mseconds
-    move_time: Option<usize>,
+    pub move_time: Option<usize>,
     // Search until recieving "stop" command
-    infinite: bool,
+    pub infinite: bool,
 }
 
 pub struct Score {

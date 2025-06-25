@@ -107,7 +107,7 @@ pub fn read_uci_line(line: &str, dispatch: &mut dyn UciEngine) -> Result<(), Str
                         let ms: usize = time
                             .parse()
                             .map_err(|e| format!("Invalid btime value: {}", e))?;
-                        options.wtime = Some(ms);
+                        options.btime = Some(ms);
                     }
                     "winc" => {
                         let time = words
@@ -125,7 +125,7 @@ pub fn read_uci_line(line: &str, dispatch: &mut dyn UciEngine) -> Result<(), Str
                         let ms: usize = time
                             .parse()
                             .map_err(|e| format!("Invalid binc value: {}", e))?;
-                        options.btime = Some(ms);
+                        options.binc = Some(ms);
                     }
                     "movestogo" => {
                         let moves = words

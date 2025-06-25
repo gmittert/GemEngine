@@ -7,4 +7,3 @@ resolver = "2"
 [profile.rel-with-debug]
 inherits = "release"
 debug = true
-

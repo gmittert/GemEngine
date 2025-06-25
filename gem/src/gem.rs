@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use bitboard::moves::Color;
+
 use crate::{
     board::{self, Board},
     uci::{self, *},
@@ -120,10 +122,29 @@ impl UciEngine for Gem {
         Ok(())
     }
 
-    fn go(&mut self, _options: crate::uci::GoOptions) -> Result<(), String> {
+    fn go(&mut self, options: crate::uci::GoOptions) -> Result<(), String> {
+        // Hueristic to how long we should search for:
+        // We do something pretty simple: remaining time/20 + increment/2.
+
+        let search_ms = if let Some(move_time) = options.move_time {
+            move_time as u64
+        } else if let Some(btime) = options.btime
+            && self.board.to_play == Color::Black
+        {
+            let inc_ms = options.binc.unwrap_or(0);
+            (btime / 20 + inc_ms / 2) as u64
+        } else if let Some(wtime) = options.wtime
+            && self.board.to_play == Color::White
+        {
+            let inc_ms = options.winc.unwrap_or(0);
+            (wtime / 20 + inc_ms / 2) as u64
+        } else {
+            5000
+        };
+
         let (m, eval, info) = self
             .board
-            .search_best_move_for(Duration::from_secs(5), self.options.num_threads);
+            .search_best_move_for(Duration::from_millis(search_ms), self.options.num_threads);
         let Some(best_move) = m else {
             return Err(format!("Failed to find best move on board: {}", self.board));
         };
