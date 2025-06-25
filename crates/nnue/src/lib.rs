@@ -1,11 +1,10 @@
 use bullet_lib::{
     ExecutionContext,
     core::optimiser,
-    default::Trainer,
     game::inputs::Chess768,
     nn::optimiser::AdamW,
     trainer::save::SavedFormat,
-    value::{NoOutputBuckets, ValueTrainerBuilder},
+    value::{NoOutputBuckets, ValueTrainer, ValueTrainerBuilder},
 };
 // Hyper parameters
 pub const SUPERBATCHES: usize = 160;
@@ -106,8 +105,8 @@ impl Network {
     }
 }
 
-pub fn get_trainer() -> Trainer<optimiser::adam::AdamW<ExecutionContext>, Chess768, NoOutputBuckets>
-{
+pub fn get_trainer()
+-> ValueTrainer<optimiser::adam::AdamW<ExecutionContext>, Chess768, NoOutputBuckets> {
     ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)

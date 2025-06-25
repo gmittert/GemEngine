@@ -8,7 +8,7 @@ fn eval_fen(fen: &str) -> Evaluation {
 
 fn main() {
     let mut trainer = nnue::get_trainer();
-    trainer.load_weights_from_file("checkpoints/1_simple-50/optimiser_state/weights.bin");
+    trainer.optimiser.load_weights_from_file("checkpoints/1_simple-50/optimiser_state/weights.bin").expect("Failed to load weights for trainer");
 
     let starting_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     println!("starting Eval: {}", 400.0 * trainer.eval(starting_fen));

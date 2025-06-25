@@ -1,2 +1,2 @@
 [target.'cfg(all(target_arch = "x86_64"))']
-rustflags = ["-C", "target-cpu=native", "-F", "unused-crate-dependencies"]
+rustflags = ["-C", "target-cpu=native"]
