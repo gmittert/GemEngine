@@ -4,7 +4,7 @@ version = "0.0.0"
 edition = "2024"
 
 [dependencies]
-engine = { path = "../engine" }
+engine = { path = "../engine", features = []}
 
 [[bin]]
 name = "gem"
