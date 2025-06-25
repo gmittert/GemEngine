@@ -37,7 +37,7 @@ impl GemOptions {
                     self.num_threads = threads;
                     Ok(String::from("NumThreads"))
                 } else {
-                    Err(format!("Bad argument for NumThreads"))
+                    Err("Bad argument for NumThreads".to_string())
                 }
             }
             _ => Err(format!("No such Option: {name}")),
@@ -48,6 +48,12 @@ impl GemOptions {
 pub struct Gem {
     board: Board,
     options: GemOptions,
+}
+
+impl Default for Gem {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Gem {
@@ -94,8 +100,8 @@ impl UciEngine for Gem {
     fn set_option(&mut self, name: &str, value: Option<&str>) -> Result<(), String> {
         self.options
             .set_option(name, value)
-            .and_then(|name| match name.as_str() {
-                "NumThreads" => Ok(()),
+            .map(|name| match name.as_str() {
+                "NumThreads" => (),
                 _ => panic!("Bad option set"),
             })
     }
@@ -115,7 +121,7 @@ impl UciEngine for Gem {
         fen: &str,
         moves: Vec<bitboard::moves::AlgebraicMove>,
     ) -> Result<(), String> {
-        self.board = Board::from_fen(fen).ok_or(format!("Failed to parse fen: {}", fen))?;
+        self.board = Board::from_fen(fen).ok_or(format!("Failed to parse fen: {fen}"))?;
         for m in &moves {
             self.board.make_alg_move(m)?;
         }
@@ -176,7 +182,7 @@ impl UciEngine for Gem {
     }
 
     fn quit(&mut self) -> Result<(), String> {
-        Err(format!("Quitting!"))
+        Err("Quitting!".to_string())
     }
 }
 

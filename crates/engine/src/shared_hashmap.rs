@@ -44,6 +44,12 @@ pub struct SharedHashMap<T: Encodable, const N: usize> {
 /// spot is already taken the insert will fail.
 unsafe impl<T: Encodable, const N: usize> Send for SharedHashMap<T, N> {}
 unsafe impl<T: Encodable, const N: usize> Sync for SharedHashMap<T, N> {}
+impl<T: Encodable, const N: usize> Default for SharedHashMap<T, N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
     pub fn hash_usage(&self) -> usize {
         (1000 * self.accepted.load(Ordering::Relaxed)) / N
@@ -95,7 +101,10 @@ impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
         // The trick we'll rely on is that we're only allowed to replace an unintialized value, and
         // the atomic cmpexchg will ensure that only one writer actually gets to write that value.
         let expected = ((k as u128) << 64) | v.to_u64() as u128;
-        if let Err(_) = entry.compare_exchange(0, expected, Ordering::Relaxed, Ordering::Relaxed) {
+        if entry
+            .compare_exchange(0, expected, Ordering::Relaxed, Ordering::Relaxed)
+            .is_err()
+        {
             false
         } else {
             self.accepted.fetch_add(1, Ordering::Relaxed);

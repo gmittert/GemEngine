@@ -19,7 +19,7 @@ pub const PIECE_VALUES: [Evaluation; 6] = [
 ];
 
 // An evaluation is simply an i64 with a few caveats:
-// - We limit the range to (std::i64::MIN, std::i64::MAX] to not run into negation errors
+// - We limit the range to (i64::MIN, i64::MAX] to not run into negation errors
 // - We treat i64::MAX as having won the game, i64::MAX - 1 as mate in 1, i64::MAX -2 as mate in
 //   2 and so on.
 // - We treat i64::MIN as having lost the game, i64::MIN + 1 as the opponent having mate in 1,
@@ -27,31 +27,31 @@ pub const PIECE_VALUES: [Evaluation; 6] = [
 // - Everything else is an evalutation in centipawns
 impl Evaluation {
     pub fn won() -> Evaluation {
-        Evaluation(std::i16::MAX)
+        Evaluation(i16::MAX)
     }
     pub fn draw() -> Evaluation {
         Evaluation(0)
     }
     pub fn lost() -> Evaluation {
-        Evaluation(std::i16::MIN + 1)
+        Evaluation(i16::MIN + 1)
     }
     pub fn m1() -> Evaluation {
-        Evaluation(std::i16::MAX - 1)
+        Evaluation(i16::MAX - 1)
     }
     pub fn m2() -> Evaluation {
-        Evaluation(std::i16::MAX - 2)
+        Evaluation(i16::MAX - 2)
     }
     pub fn m3() -> Evaluation {
-        Evaluation(std::i16::MAX - 3)
+        Evaluation(i16::MAX - 3)
     }
     pub fn m4() -> Evaluation {
-        Evaluation(std::i16::MAX - 4)
+        Evaluation(i16::MAX - 4)
     }
     pub fn m5() -> Evaluation {
-        Evaluation(std::i16::MAX - 5)
+        Evaluation(i16::MAX - 5)
     }
     pub fn m6() -> Evaluation {
-        Evaluation(std::i16::MAX - 6)
+        Evaluation(i16::MAX - 6)
     }
     pub fn mate_in(&self) -> Option<usize> {
         if self.0 >= Self::won().0 - 100 {
@@ -210,7 +210,7 @@ impl Board {
         let blocked_pawns =
             self.blocked_pawns(Color::White) as i16 - self.blocked_pawns(Color::Black) as i16;
         let eval_refinements =
-            attacks_diff as i16 - 10 * doubled_pawns - 15 * isolated_pawns - 10 * blocked_pawns;
+            attacks_diff - 10 * doubled_pawns - 15 * isolated_pawns - 10 * blocked_pawns;
 
         let phase2_eval = phase1_eval
             + match to_play {

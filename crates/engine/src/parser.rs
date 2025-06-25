@@ -51,6 +51,12 @@ macro_rules! parser {
         #[derive(Clone)]
         pub struct $name {}
 
+        impl Default for $name {
+            fn default() -> Self {
+                Self::new()
+            }
+        }
+
         impl $name {
             pub fn new() -> $name {
                 $name {}

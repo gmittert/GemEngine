@@ -191,8 +191,8 @@ pub trait UciEngine {
 
 // Identify the engine to the GUI
 pub fn id(name: &str, author: &str) {
-    println!("id name {}", name);
-    println!("id author {}", author);
+    println!("id name {name}");
+    println!("id author {author}");
 }
 
 // Let the GUI know that we have identified ourself and are in UCI mode
@@ -239,9 +239,9 @@ pub fn registration(status: RegistrationStatus) {
 fn eval_to_score(eval: Evaluation) -> String {
     // UCI needs M in moves, our evaluation stores mate in plies.
     if let Some(m) = eval.mate_in() {
-        format!("mate {}", (m + 1) / 2)
+        format!("mate {}", m.div_ceil(2))
     } else if let Some(m) = eval.mated_in() {
-        format!("mate -{}", (m + 1) / 2)
+        format!("mate -{}", m.div_ceil(2))
     } else {
         let Evaluation(cp) = eval;
         format!("cp {}", cp as i64)
@@ -281,25 +281,25 @@ pub fn info(info_block: Info) {
         print!(" currmove {}{}", currmove.from, currmove.to)
     }
     if let Some(currmovenum) = info_block.curr_move_number {
-        print!(" currmovenumber {}", currmovenum)
+        print!(" currmovenumber {currmovenum}")
     }
     if let Some(hashfull) = info_block.hash_full {
-        print!(" hashfull {}", hashfull)
+        print!(" hashfull {hashfull}")
     }
     if let Some(nps) = info_block.nodes_per_sec {
-        print!(" nps {}", nps)
+        print!(" nps {nps}")
     }
     if let Some(tbhits) = info_block.table_base_hits {
-        print!(" tbhits {}", tbhits)
+        print!(" tbhits {tbhits}")
     }
     if let Some(sbhits) = info_block.shredder_ending_hits {
-        print!(" sbhits {}", sbhits)
+        print!(" sbhits {sbhits}")
     }
     if let Some(cpuload) = info_block.cpuload {
-        print!(" cpuload {}", cpuload)
+        print!(" cpuload {cpuload}")
     }
     if let Some(string) = info_block.string {
-        print!(" string {}", string)
+        print!(" string {string}")
     }
     if let Some(refutation) = info_block.refutation {
         print!(" refutation");
@@ -308,12 +308,12 @@ pub fn info(info_block: Info) {
         }
     }
     if let Some((cpu, currline)) = info_block.curr_line {
-        print!(" refutation {}", cpu);
+        print!(" refutation {cpu}");
         for m in currline {
             print!(" {m}");
         }
     }
-    println!("");
+    println!();
 }
 
 // This command tells the GUI which parameters can be changed in the engine.
@@ -334,7 +334,7 @@ pub fn option(opt: EngineOption) {
             print!(" var {var}");
         }
     }
-    println!("");
+    println!();
 }
 
 #[cfg(test)]

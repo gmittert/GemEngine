@@ -63,8 +63,8 @@ pub fn perft(b: &mut board::Board, depth: u8) -> PerftResult {
         };
     }
     let mut cache: HashMap<u64, PerftResult> = HashMap::new();
-    let res = perft_inner(b, depth, &mut cache).clone();
-    res
+
+    perft_inner(b, depth, &mut cache).clone()
 }
 
 fn perft_inner(
@@ -104,18 +104,14 @@ fn perft_inner(
         let prew = b.white_pieces();
         assert!(
             preb & prew == bitboard::BitBoard::empty(),
-            "Before making move: {m}, black ({:?}) overlapped with white ({:?})",
-            preb,
-            prew,
+            "Before making move: {m}, black ({preb:?}) overlapped with white ({prew:?})",
         );
         b.make_move(&m);
         let mb = b.black_pieces();
         let mw = b.white_pieces();
         assert!(
             mb & mw == bitboard::BitBoard::empty(),
-            "After making move: {m}, black ({:?}) overlapped with white ({:?})",
-            mb,
-            mw
+            "After making move: {m}, black ({mb:?}) overlapped with white ({mw:?})"
         );
         if !b.in_check(!b.to_play) {
             if depth > 1 {
@@ -148,9 +144,7 @@ fn perft_inner(
         let postw = b.white_pieces();
         assert!(
             postb & postw == bitboard::BitBoard::empty(),
-            "After undoing move: {m}, black ({:?}) overlapped with white ({:?})",
-            postb,
-            postw,
+            "After undoing move: {m}, black ({postb:?}) overlapped with white ({postw:?})",
         );
         if preb != postb {
             println!("Undo_move failed for move: {m}");
@@ -164,7 +158,7 @@ fn perft_inner(
         assert_eq!(v, &result);
     }
     cache.insert(hash, result.clone());
-    return result;
+    result
 }
 #[cfg(test)]
 mod tests {

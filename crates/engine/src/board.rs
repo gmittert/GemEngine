@@ -261,7 +261,7 @@ impl Board {
         } else {
             0
         };
-        if sections.next() != None {
+        if sections.next().is_some() {
             return None;
         }
 
@@ -413,7 +413,7 @@ impl Board {
         let mut disamb_file = None;
         let mut disamb_rank = None;
 
-        while let Some(curr) = stream.next() {
+        for curr in stream {
             match curr {
                 'K' => piece = Piece::King,
                 'Q' => piece = Piece::Queen,
@@ -459,15 +459,15 @@ impl Board {
             Piece::King => self.king_moves(&mut moves),
         }
         for m in moves {
-            if let Some(needed_file) = disamb_file {
-                if m.from.file() != needed_file {
-                    continue;
-                }
+            if let Some(needed_file) = disamb_file
+                && m.from.file() != needed_file
+            {
+                continue;
             }
-            if let Some(needed_rank) = disamb_rank {
-                if m.from.rank() != needed_rank {
-                    continue;
-                }
+            if let Some(needed_rank) = disamb_rank
+                && m.from.rank() != needed_rank
+            {
+                continue;
             }
             if m.to == to && m.promotion == promotion {
                 return Some(self.from_algeabraic_unchecked(&m));
@@ -479,7 +479,7 @@ impl Board {
     pub fn add_piece(&mut self, c: Color, p: Piece, pos: Posn) {
         #[cfg(feature = "nnue")]
         {
-            let pc = 64 * usize::from(p as usize);
+            let pc = 64 * p as usize;
             // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
             // Since our nnue is trained using chessboard, we need to flip the board.
             //
@@ -513,7 +513,7 @@ impl Board {
     pub fn remove_piece(&mut self, c: Color, p: Piece, pos: Posn) {
         #[cfg(feature = "nnue")]
         {
-            let pc = 64 * usize::from(p as usize);
+            let pc = 64 * p as usize;
             // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
             // Since our nnue is trained using chessboard, we need to flip the board.
             //
@@ -624,7 +624,7 @@ impl Board {
             return false;
         };
         match piece {
-            Piece::Pawn => return self.pawn_moves_it().any(|x| x == *m),
+            Piece::Pawn => self.pawn_moves_it().any(|x| x == *m),
             Piece::Rook => self.rook_moves_it().any(|x| x == *m),
             Piece::Knight => self.knight_moves_it().any(|x| x == *m),
             Piece::Bishop => self.bishop_moves_it().any(|x| x == *m),
@@ -702,17 +702,15 @@ impl Board {
             self.move_piece(self.to_play, Piece::Rook, from, to)
         }
 
-        let ep_target =
-            if m.piece == Piece::Pawn && m.from.rank() == Rank::Two && m.to.rank() == Rank::Four {
-                Some(m.from.file())
-            } else if m.piece == Piece::Pawn
-                && m.from.rank() == Rank::Seven
-                && m.to.rank() == Rank::Five
-            {
-                Some(m.from.file())
-            } else {
-                None
-            };
+        let ep_target = if (m.piece == Piece::Pawn
+            && m.from.rank() == Rank::Two
+            && m.to.rank() == Rank::Four)
+            || (m.piece == Piece::Pawn && m.from.rank() == Rank::Seven && m.to.rank() == Rank::Five)
+        {
+            Some(m.from.file())
+        } else {
+            None
+        };
         let move_rights = *self.move_rights.last().unwrap_or(&MoveRights::default());
         let CastlingAbility(mut inner) = move_rights.castling_ability;
         if m.piece == Piece::King {
@@ -839,12 +837,9 @@ impl Board {
             Piece::Queen,
             Piece::King,
         ];
-        for i in pieces {
-            if self.piece(color, i).contains(p) {
-                return Some(i);
-            }
-        }
-        None
+        pieces
+            .into_iter()
+            .find(|&i| self.piece(color, i).contains(p))
     }
 
     pub fn in_check(&self, color: Color) -> bool {
@@ -903,74 +898,74 @@ impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut chars: [char; 64] = ['.'; 64];
 
-        for i in 0..64 as usize {
+        for (i, c) in chars.iter_mut().enumerate() {
             if self
                 .black_piece(Piece::King)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♔'
+                *c = '♔'
             } else if self
                 .black_piece(Piece::Queen)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♕'
+                *c = '♕'
             } else if self
                 .black_piece(Piece::Knight)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♘'
+                *c = '♘'
             } else if self
                 .black_piece(Piece::Pawn)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♙'
+                *c = '♙'
             } else if self
                 .black_piece(Piece::Bishop)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♗'
+                *c = '♗'
             } else if self
                 .black_piece(Piece::Rook)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♖'
+                *c = '♖'
             } else if self
                 .white_piece(Piece::King)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♚'
+                *c = '♚'
             } else if self
                 .white_piece(Piece::Queen)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♛'
+                *c = '♛'
             } else if self
                 .white_piece(Piece::Knight)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♞'
+                *c = '♞'
             } else if self
                 .white_piece(Piece::Pawn)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♟'
+                *c = '♟'
             } else if self
                 .white_piece(Piece::Bishop)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♝'
+                *c = '♝'
             } else if self
                 .white_piece(Piece::Rook)
                 .contains(Posn::from_idx(i).unwrap())
             {
-                chars[i] = '♜'
+                *c = '♜'
             }
         }
         for rank in 0..8 {
             for file in 0..8 {
                 write!(f, "{}", chars[(7 - file) + (8 * (7 - rank))])?;
             }
-            write!(f, "\n")?;
+            writeln!(f)?;
         }
         Ok(())
     }

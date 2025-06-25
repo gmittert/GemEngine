@@ -153,9 +153,9 @@ fn find_rook_magic(pos: Posn, rng: &mut StdRng) {
             bitset[idx] |= offset;
         }
 
-        println!("Found Magic for rook pos {}", pos);
-        println!("Mask: {:#x}", mask);
-        println!("Magic: {:#x}", candidate);
+        println!("Found Magic for rook pos {pos}");
+        println!("Mask: {mask:#x}");
+        println!("Magic: {candidate:#x}");
 
         break;
     }
@@ -188,9 +188,9 @@ fn find_bishop_magic(pos: Posn, rng: &mut StdRng) {
             bitset[idx] |= offset;
         }
 
-        println!("Found Magic for bishop pos {}", pos);
-        println!("Mask: {:#x}", mask);
-        println!("Magic: {:#x}", candidate);
+        println!("Found Magic for bishop pos {pos}");
+        println!("Mask: {mask:#x}");
+        println!("Magic: {candidate:#x}");
 
         break;
     }

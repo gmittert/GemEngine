@@ -122,7 +122,7 @@ impl Posn {
     }
 
     pub const fn from_idx(i: usize) -> Option<Posn> {
-        unsafe { std::mem::transmute((1 as u64) << i) }
+        unsafe { std::mem::transmute(1_u64 << i) }
     }
 
     #[inline]

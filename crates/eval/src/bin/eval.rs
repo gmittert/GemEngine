@@ -2,13 +2,16 @@
 use engine::board::{Board, evaluation::Evaluation};
 
 fn eval_fen(fen: &str) -> Evaluation {
-    let board = Board::from_fen(&fen).unwrap();
+    let board = Board::from_fen(fen).unwrap();
     board.eval(Evaluation::lost(), Evaluation::won(), board.to_play)
 }
 
 fn main() {
     let mut trainer = nnue::get_trainer();
-    trainer.optimiser.load_weights_from_file("checkpoints/1_simple-50/optimiser_state/weights.bin").expect("Failed to load weights for trainer");
+    trainer
+        .optimiser
+        .load_weights_from_file("checkpoints/1_simple-50/optimiser_state/weights.bin")
+        .expect("Failed to load weights for trainer");
 
     let starting_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     println!("starting Eval: {}", 400.0 * trainer.eval(starting_fen));

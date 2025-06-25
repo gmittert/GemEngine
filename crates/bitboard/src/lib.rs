@@ -9,11 +9,11 @@ pub struct BitBoard(pub u64);
 
 impl BitBoard {
     pub const fn empty() -> BitBoard {
-        BitBoard { 0: 0 }
+        BitBoard(0)
     }
 
     pub const fn from(p: Posn) -> BitBoard {
-        BitBoard { 0: p.pos.get() }
+        BitBoard(p.pos.get())
     }
 
     pub const fn contains(&self, p: Posn) -> bool {
@@ -39,7 +39,7 @@ impl std::fmt::Display for BitBoard {
                     write!(f, ".")?;
                 }
             }
-            write!(f, "\n")?;
+            writeln!(f)?;
         }
         Ok(())
     }
@@ -69,37 +69,35 @@ impl Iterator for BitBoard {
 impl ops::BitOr<Posn> for BitBoard {
     type Output = Self;
     fn bitor(self, rhs: Posn) -> Self::Output {
-        BitBoard {
-            0: self.0 | BitBoard::from(rhs).0,
-        }
+        BitBoard(self.0 | BitBoard::from(rhs).0)
     }
 }
 
 impl ops::Not for BitBoard {
     type Output = Self;
     fn not(self) -> Self::Output {
-        BitBoard { 0: !self.0 }
+        BitBoard(!self.0)
     }
 }
 
 impl ops::BitOr for BitBoard {
     type Output = Self;
     fn bitor(self, rhs: BitBoard) -> Self::Output {
-        BitBoard { 0: self.0 | rhs.0 }
+        BitBoard(self.0 | rhs.0)
     }
 }
 
 impl ops::BitAnd for BitBoard {
     type Output = Self;
     fn bitand(self, rhs: BitBoard) -> Self::Output {
-        BitBoard { 0: self.0 & rhs.0 }
+        BitBoard(self.0 & rhs.0)
     }
 }
 
 impl ops::BitXor for BitBoard {
     type Output = Self;
     fn bitxor(self, rhs: BitBoard) -> Self::Output {
-        BitBoard { 0: self.0 ^ rhs.0 }
+        BitBoard(self.0 ^ rhs.0)
     }
 }
 

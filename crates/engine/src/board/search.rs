@@ -116,10 +116,10 @@ impl Board {
                     );
                     let _ = &total_nodes.fetch_add(new_b.nodes, Ordering::AcqRel);
                     let _ = &total_seldepth.fetch_max(new_b.seldepth, Ordering::AcqRel);
-                    if let Some(res) = res {
-                        if result.set(Some((res.eval, res.best_move))).is_ok() {
-                            let _ = &should_stop.store(true, Ordering::Relaxed);
-                        }
+                    if let Some(res) = res
+                        && result.set(Some((res.eval, res.best_move))).is_ok()
+                    {
+                        let _ = &should_stop.store(true, Ordering::Relaxed);
                     }
                 });
             }
@@ -172,7 +172,7 @@ impl Board {
             }
 
             let Some(m) = self.from_algeabraic(&capture) else {
-                debug_assert!(false, "Invalid move pulled from cache: {}", capture);
+                debug_assert!(false, "Invalid move pulled from cache: {capture}");
                 continue;
             };
             let value = self.static_exchange_evaluation(m.to, m.capture.unwrap(), m.from, m.piece);
@@ -257,8 +257,8 @@ impl Board {
             -beta,
             Evaluation(-(beta.0 - 1)),
             target_depth - 2,
-            &cache,
-            &should_stop,
+            cache,
+            should_stop,
             ExpectedNodeType::PV,
         )?;
 
@@ -363,15 +363,15 @@ impl Board {
                 let killer_idx = target_depth - self.half_move;
                 let killer_moves = self.killer_moves[killer_idx as usize];
                 let mut killers = vec![];
-                if let Some(m0) = killer_moves[0] {
-                    if self.check_killer(&m0) {
-                        killers.push(m0)
-                    }
+                if let Some(m0) = killer_moves[0]
+                    && self.check_killer(&m0)
+                {
+                    killers.push(m0)
                 }
-                if let Some(m1) = killer_moves[1] {
-                    if self.check_killer(&m1) {
-                        killers.push(m1)
-                    }
+                if let Some(m1) = killer_moves[1]
+                    && self.check_killer(&m1)
+                {
+                    killers.push(m1)
                 }
                 killers
             }
@@ -380,7 +380,7 @@ impl Board {
 
         let moves = hash_move
             .into_iter()
-            .chain(recapture.into_iter())
+            .chain(recapture)
             .chain(killer_moves)
             .chain(self.pseudo_legal_randomized_moves_it());
         let mut is_pv_node = false;
@@ -388,7 +388,7 @@ impl Board {
         let mut best_move = None;
         for a in moves {
             let Some(m) = self.from_algeabraic(&a) else {
-                debug_assert!(false, "Invalid move pulled from cache: {}", a);
+                debug_assert!(false, "Invalid move pulled from cache: {a}");
                 continue;
             };
             self.make_move(&m);

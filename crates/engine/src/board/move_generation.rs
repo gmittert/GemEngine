@@ -466,29 +466,27 @@ impl Iterator for KingMoves {
                     to: attack,
                     promotion: None,
                 });
+            } else if let Some(next_king) = self.kings.next() {
+                self.from = Some(next_king);
+                self.attacks = !self.allies & KING_ATTACKS[next_king.idx() as usize];
             } else {
-                if let Some(next_king) = self.kings.next() {
-                    self.from = Some(next_king);
-                    self.attacks = !self.allies & KING_ATTACKS[next_king.idx() as usize];
+                // Finished all the kings
+                if self.can_castle_king {
+                    self.can_castle_king = false;
+                    return Some(AlgebraicMove {
+                        from: self.from.unwrap(),
+                        to: self.from.unwrap().ea().and_then(|x| x.ea()).unwrap(),
+                        promotion: None,
+                    });
+                } else if self.can_castle_queen {
+                    self.can_castle_queen = false;
+                    return Some(AlgebraicMove {
+                        from: self.from.unwrap(),
+                        to: self.from.unwrap().we().and_then(|x| x.we()).unwrap(),
+                        promotion: None,
+                    });
                 } else {
-                    // Finished all the kings
-                    if self.can_castle_king {
-                        self.can_castle_king = false;
-                        return Some(AlgebraicMove {
-                            from: self.from.unwrap(),
-                            to: self.from.unwrap().ea().and_then(|x| x.ea()).unwrap(),
-                            promotion: None,
-                        });
-                    } else if self.can_castle_queen {
-                        self.can_castle_queen = false;
-                        return Some(AlgebraicMove {
-                            from: self.from.unwrap(),
-                            to: self.from.unwrap().we().and_then(|x| x.we()).unwrap(),
-                            promotion: None,
-                        });
-                    } else {
-                        return None;
-                    }
+                    return None;
                 }
             }
         }
@@ -512,17 +510,15 @@ impl Iterator for KingCaptures {
     type Item = AlgebraicMove;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(attack) = self.attacks.next() {
-                return Some(AlgebraicMove {
-                    from: self.from,
-                    to: attack,
-                    promotion: None,
-                });
-            }
-            // Finished all the attacks
-            return None;
+        if let Some(attack) = self.attacks.next() {
+            return Some(AlgebraicMove {
+                from: self.from,
+                to: attack,
+                promotion: None,
+            });
         }
+        // Finished all the attacks
+        None
     }
 }
 
@@ -556,16 +552,14 @@ impl Iterator for QueenMoves {
                     to: attack,
                     promotion: None,
                 });
+            } else if let Some(next_queen) = self.queens.next() {
+                self.from = Some(next_queen);
+                self.attacks = !self.allies
+                    & (sliding_attacks::compute_rook_attacks(next_queen, self.pieces)
+                        | sliding_attacks::compute_bishop_attacks(next_queen, self.pieces));
             } else {
-                if let Some(next_queen) = self.queens.next() {
-                    self.from = Some(next_queen);
-                    self.attacks = !self.allies
-                        & (sliding_attacks::compute_rook_attacks(next_queen, self.pieces)
-                            | sliding_attacks::compute_bishop_attacks(next_queen, self.pieces));
-                } else {
-                    // Finished all the queens
-                    return None;
-                }
+                // Finished all the queens
+                return None;
             }
         }
     }
@@ -601,16 +595,14 @@ impl Iterator for QueenCaptures {
                     to: attack,
                     promotion: None,
                 });
+            } else if let Some(next_queen) = self.queens.next() {
+                self.from = Some(next_queen);
+                self.attacks = self.enemies
+                    & (sliding_attacks::compute_rook_attacks(next_queen, self.pieces)
+                        | sliding_attacks::compute_bishop_attacks(next_queen, self.pieces));
             } else {
-                if let Some(next_queen) = self.queens.next() {
-                    self.from = Some(next_queen);
-                    self.attacks = self.enemies
-                        & (sliding_attacks::compute_rook_attacks(next_queen, self.pieces)
-                            | sliding_attacks::compute_bishop_attacks(next_queen, self.pieces));
-                } else {
-                    // Finished all the queens
-                    return None;
-                }
+                // Finished all the queens
+                return None;
             }
         }
     }
@@ -646,15 +638,13 @@ impl Iterator for RookMoves {
                     to: attack,
                     promotion: None,
                 });
+            } else if let Some(next_rook) = self.rooks.next() {
+                self.from = Some(next_rook);
+                self.attacks =
+                    !self.allies & sliding_attacks::compute_rook_attacks(next_rook, self.pieces);
             } else {
-                if let Some(next_rook) = self.rooks.next() {
-                    self.from = Some(next_rook);
-                    self.attacks = !self.allies
-                        & sliding_attacks::compute_rook_attacks(next_rook, self.pieces);
-                } else {
-                    // Finished all the rooks
-                    return None;
-                }
+                // Finished all the rooks
+                return None;
             }
         }
     }
@@ -690,15 +680,13 @@ impl Iterator for RookCaptures {
                     to: attack,
                     promotion: None,
                 });
+            } else if let Some(next_rook) = self.rooks.next() {
+                self.from = Some(next_rook);
+                self.attacks =
+                    self.enemies & sliding_attacks::compute_rook_attacks(next_rook, self.pieces);
             } else {
-                if let Some(next_rook) = self.rooks.next() {
-                    self.from = Some(next_rook);
-                    self.attacks = self.enemies
-                        & sliding_attacks::compute_rook_attacks(next_rook, self.pieces);
-                } else {
-                    // Finished all the rooks
-                    return None;
-                }
+                // Finished all the rooks
+                return None;
             }
         }
     }
@@ -734,15 +722,13 @@ impl Iterator for BishopMoves {
                     to: attack,
                     promotion: None,
                 });
+            } else if let Some(next_bishop) = self.bishops.next() {
+                self.from = Some(next_bishop);
+                self.attacks = !self.allies
+                    & sliding_attacks::compute_bishop_attacks(next_bishop, self.pieces);
             } else {
-                if let Some(next_bishop) = self.bishops.next() {
-                    self.from = Some(next_bishop);
-                    self.attacks = !self.allies
-                        & sliding_attacks::compute_bishop_attacks(next_bishop, self.pieces);
-                } else {
-                    // Finished all the bishops
-                    return None;
-                }
+                // Finished all the bishops
+                return None;
             }
         }
     }
@@ -778,15 +764,13 @@ impl Iterator for BishopCaptures {
                     to: attack,
                     promotion: None,
                 });
+            } else if let Some(next_bishop) = self.bishops.next() {
+                self.from = Some(next_bishop);
+                self.attacks = self.enemies
+                    & sliding_attacks::compute_bishop_attacks(next_bishop, self.pieces);
             } else {
-                if let Some(next_bishop) = self.bishops.next() {
-                    self.from = Some(next_bishop);
-                    self.attacks = self.enemies
-                        & sliding_attacks::compute_bishop_attacks(next_bishop, self.pieces);
-                } else {
-                    // Finished all the bishops
-                    return None;
-                }
+                // Finished all the bishops
+                return None;
             }
         }
     }
@@ -820,14 +804,12 @@ impl Iterator for KnightMoves {
                     to: attack,
                     promotion: None,
                 });
+            } else if let Some(next_knight) = self.knights.next() {
+                self.from = Some(next_knight);
+                self.attacks = !self.allies & KNIGHT_ATTACKS[next_knight.idx() as usize];
             } else {
-                if let Some(next_knight) = self.knights.next() {
-                    self.from = Some(next_knight);
-                    self.attacks = !self.allies & KNIGHT_ATTACKS[next_knight.idx() as usize];
-                } else {
-                    // Finished all the knights
-                    return None;
-                }
+                // Finished all the knights
+                return None;
             }
         }
     }
@@ -861,20 +843,19 @@ impl Iterator for KnightCaptures {
                     to: attack,
                     promotion: None,
                 });
+            } else if let Some(next_knight) = self.knights.next() {
+                self.from = Some(next_knight);
+                self.attacks = self.enemies & KNIGHT_ATTACKS[next_knight.idx() as usize];
             } else {
-                if let Some(next_knight) = self.knights.next() {
-                    self.from = Some(next_knight);
-                    self.attacks = self.enemies & KNIGHT_ATTACKS[next_knight.idx() as usize];
-                } else {
-                    // Finished all the knights
-                    return None;
-                }
+                // Finished all the knights
+                return None;
             }
         }
     }
 }
 
 pub struct PsuedoLegalCaptures {
+    #[allow(clippy::type_complexity)]
     iter: std::iter::Chain<
         std::iter::Chain<
             std::iter::Chain<
@@ -1271,7 +1252,7 @@ impl Board {
         let can_castle_king = if self
             .move_rights
             .last()
-            .and_then(|x| Some(x.castling_ability.can_castle_king(self.to_play)))
+            .map(|x| x.castling_ability.can_castle_king(self.to_play))
             .unwrap_or(false)
         {
             !self.attacked_by_side(from.ea().unwrap(), !self.to_play)
@@ -1288,7 +1269,7 @@ impl Board {
         let can_castle_queen = if self
             .move_rights
             .last()
-            .and_then(|x| Some(x.castling_ability.can_castle_queen(self.to_play)))
+            .map(|x| x.castling_ability.can_castle_queen(self.to_play))
             .unwrap_or(false)
         {
             !self.attacked_by_side(from.we().unwrap(), !self.to_play)
@@ -1340,7 +1321,7 @@ impl Board {
         let can_castle_king = if self
             .move_rights
             .last()
-            .and_then(|x| Some(x.castling_ability.can_castle_king(self.to_play)))
+            .map(|x| x.castling_ability.can_castle_king(self.to_play))
             .unwrap_or(false)
         {
             !self.attacked_by_side(from.ea().unwrap(), !self.to_play)
@@ -1364,7 +1345,7 @@ impl Board {
         let can_castle_queen = if self
             .move_rights
             .last()
-            .and_then(|x| Some(x.castling_ability.can_castle_queen(self.to_play)))
+            .map(|x| x.castling_ability.can_castle_queen(self.to_play))
             .unwrap_or(false)
         {
             !self.attacked_by_side(from.we().unwrap(), !self.to_play)
@@ -1479,7 +1460,7 @@ impl Board {
             Color::Black => [pos.ne(), pos.nw()],
         }
         .into_iter()
-        .filter_map(|p| p)
+        .flatten()
         .fold(BitBoard::empty(), |acc, p| acc | p);
         pawns & attacked_from
     }
@@ -1492,7 +1473,7 @@ impl Board {
                     Color::Black => [p.se(), p.sw()],
                 }
                 .into_iter()
-                .filter_map(|p| p)
+                .flatten()
                 .fold(BitBoard::empty(), |acc, p| acc | p)
             })
     }
@@ -1552,44 +1533,44 @@ impl Board {
                 Color::Black => pawn.so(),
             };
             // Push 1
-            if let Some(push_pos) = mpush_pos {
-                if !self.pieces().contains(push_pos) {
-                    if push_pos.rank() == promo_rank {
-                        for piece in [Piece::Queen, Piece::Knight, Piece::Rook, Piece::Bishop] {
-                            out.push(AlgebraicMove {
-                                from: pawn,
-                                to: push_pos,
-                                promotion: Some(piece),
-                            });
-                        }
-                    } else {
+            if let Some(push_pos) = mpush_pos
+                && !self.pieces().contains(push_pos)
+            {
+                if push_pos.rank() == promo_rank {
+                    for piece in [Piece::Queen, Piece::Knight, Piece::Rook, Piece::Bishop] {
                         out.push(AlgebraicMove {
                             from: pawn,
                             to: push_pos,
-                            promotion: None,
+                            promotion: Some(piece),
                         });
                     }
+                } else {
+                    out.push(AlgebraicMove {
+                        from: pawn,
+                        to: push_pos,
+                        promotion: None,
+                    });
+                }
 
-                    // Double Push (only if we could push 1)
-                    let can_double_push = match self.to_play {
-                        Color::White => pawn.rank() == Rank::Two,
-                        Color::Black => pawn.rank() == Rank::Seven,
+                // Double Push (only if we could push 1)
+                let can_double_push = match self.to_play {
+                    Color::White => pawn.rank() == Rank::Two,
+                    Color::Black => pawn.rank() == Rank::Seven,
+                };
+                if can_double_push {
+                    let mdouble_push_pos = match self.to_play {
+                        Color::White => pawn.no().and_then(|x| x.no()),
+                        Color::Black => pawn.so().and_then(|x| x.so()),
                     };
-                    if can_double_push {
-                        let mdouble_push_pos = match self.to_play {
-                            Color::White => pawn.no().and_then(|x| x.no()),
-                            Color::Black => pawn.so().and_then(|x| x.so()),
-                        };
 
-                        if let Some(double_push_pos) = mdouble_push_pos {
-                            if !self.pieces().contains(double_push_pos) {
-                                out.push(AlgebraicMove {
-                                    from: pawn,
-                                    to: double_push_pos,
-                                    promotion: None,
-                                });
-                            }
-                        }
+                    if let Some(double_push_pos) = mdouble_push_pos
+                        && !self.pieces().contains(double_push_pos)
+                    {
+                        out.push(AlgebraicMove {
+                            from: pawn,
+                            to: double_push_pos,
+                            promotion: None,
+                        });
                     }
                 }
             }
@@ -1598,23 +1579,23 @@ impl Board {
                 mpush_pos.and_then(|x| x.we()),
                 mpush_pos.and_then(|x| x.ea()),
             ] {
-                if let Some(take_pos) = take {
-                    if opponent_pieces.contains(take_pos) {
-                        if take_pos.rank() == promo_rank {
-                            for piece in [Piece::Queen, Piece::Knight, Piece::Rook, Piece::Bishop] {
-                                out.push(AlgebraicMove {
-                                    from: pawn,
-                                    to: take_pos,
-                                    promotion: Some(piece),
-                                });
-                            }
-                        } else {
+                if let Some(take_pos) = take
+                    && opponent_pieces.contains(take_pos)
+                {
+                    if take_pos.rank() == promo_rank {
+                        for piece in [Piece::Queen, Piece::Knight, Piece::Rook, Piece::Bishop] {
                             out.push(AlgebraicMove {
                                 from: pawn,
                                 to: take_pos,
-                                promotion: None,
+                                promotion: Some(piece),
                             });
                         }
+                    } else {
+                        out.push(AlgebraicMove {
+                            from: pawn,
+                            to: take_pos,
+                            promotion: None,
+                        });
                     }
                 }
             }
@@ -1661,7 +1642,7 @@ impl Board {
             Color::Black => [target_pos.ne(), target_pos.nw()],
         }
         .into_iter()
-        .filter_map(|p| p)
+        .flatten()
         .fold(BitBoard::empty(), |acc, p| acc | p);
         if let Some(from) = (pawns & attacked_from).into_iter().next() {
             return Some(AlgebraicMove {
@@ -1691,23 +1672,23 @@ impl Board {
                 ep_target,
             );
 
-            if let Some(e) = double_push.ea() {
-                if pawns.contains(e) {
-                    return Some(AlgebraicMove {
-                        from: e,
-                        to,
-                        promotion: None,
-                    });
-                }
+            if let Some(e) = double_push.ea()
+                && pawns.contains(e)
+            {
+                return Some(AlgebraicMove {
+                    from: e,
+                    to,
+                    promotion: None,
+                });
             }
-            if let Some(w) = double_push.we() {
-                if pawns.contains(w) {
-                    return Some(AlgebraicMove {
-                        from: w,
-                        to,
-                        promotion: None,
-                    });
-                }
+            if let Some(w) = double_push.we()
+                && pawns.contains(w)
+            {
+                return Some(AlgebraicMove {
+                    from: w,
+                    to,
+                    promotion: None,
+                });
             }
         }
         None
@@ -1729,8 +1710,7 @@ impl Board {
     }
 
     pub fn generate_pseudo_legal_moves(&mut self) -> Vec<AlgebraicMove> {
-        let mut moves = vec![];
-        moves.reserve(32);
+        let mut moves = Vec::with_capacity(32);
         self.fill_pseudo_legal_moves(&mut moves);
         moves
     }

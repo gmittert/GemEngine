@@ -3,7 +3,7 @@ use std::num::NonZero;
 use crate::shared_hashmap::Encodable;
 use crate::{board::evaluation::Evaluation, shared_hashmap::SharedHashMap};
 use bitboard::moves::{AlgebraicMove, Piece};
-use bitboard::posn::Posn;
+use bitboard::posn::{File, Posn, Rank};
 use tracing::Level;
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy)]
@@ -76,12 +76,12 @@ impl PackedTTEntry {
     }
     pub fn best_move(&self) -> Option<AlgebraicMove> {
         let data = self.data?.get();
-        let from_file = unsafe { std::mem::transmute(((data >> 0) & 0xf) as u8) };
-        let from_rank = unsafe { std::mem::transmute(((data >> 4) & 0xf) as u8) };
+        let from_file = unsafe { std::mem::transmute::<u8, File>((data & 0xf) as u8) };
+        let from_rank = unsafe { std::mem::transmute::<u8, Rank>(((data >> 4) & 0xf) as u8) };
         let from = Posn::from(from_rank, from_file);
 
-        let to_file = unsafe { std::mem::transmute(((data >> 8) & 0xf) as u8) };
-        let to_rank = unsafe { std::mem::transmute(((data >> 12) & 0xf) as u8) };
+        let to_file = unsafe { std::mem::transmute::<u8, File>(((data >> 8) & 0xf) as u8) };
+        let to_rank = unsafe { std::mem::transmute::<u8, Rank>(((data >> 12) & 0xf) as u8) };
         let to = Posn::from(to_rank, to_file);
 
         Some(AlgebraicMove {
@@ -116,6 +116,12 @@ pub enum CacheResult {
 // 256MB with 16 bytes per entry
 pub const DEFAULT_TT_SIZE: usize = 256 * 1024 * 1024 / 16;
 pub struct TranspositionTable<const N: usize>(SharedHashMap<PackedTTEntry, N>);
+impl<const N: usize> Default for TranspositionTable<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> TranspositionTable<N> {
     pub fn new() -> TranspositionTable<N> {
         TranspositionTable::<N>(SharedHashMap::new())

@@ -68,7 +68,7 @@ impl fmt::Display for AlgebraicMove {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} {}", self.from, self.to)?;
         if let Some(piece) = self.promotion {
-            write!(f, "{}", piece)?;
+            write!(f, "{piece}")?;
         }
         Ok(())
     }
@@ -81,7 +81,7 @@ impl AlgebraicMove {
         let from_rank = Rank::from(chars.next()?)?;
         let to_file = File::from(chars.next()?)?;
         let to_rank = Rank::from(chars.next()?)?;
-        let promo = chars.next().and_then(|c| Piece::from(c));
+        let promo = chars.next().and_then(Piece::from);
         Some(AlgebraicMove {
             from: Posn::from(from_rank, from_file),
             to: Posn::from(to_rank, to_file),
@@ -150,7 +150,7 @@ impl fmt::Display for Move {
         let promo = if let Some(piece) = self.promotion {
             format!("={piece:?}")
         } else {
-            format!("")
+            String::new()
         };
 
         let icon = match self.piece {
@@ -160,9 +160,9 @@ impl fmt::Display for Move {
             Piece::Queen => "♛",
             Piece::King => {
                 if self.is_castle_king {
-                    return write!(f, "O-O{}", is_check);
+                    return write!(f, "O-O{is_check}");
                 } else if self.is_castle_queen {
-                    return write!(f, "O-O-O{}", is_check);
+                    return write!(f, "O-O-O{is_check}");
                 }
                 "♚"
             }
