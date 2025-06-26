@@ -172,7 +172,7 @@ impl UciEngine for Gem {
             hash_full: Some(info.hash_full),
             ..Default::default()
         };
-        uci::info(info);
+        uci::info(self.board.half_move, info);
         uci::best_move(best_move, None);
         Ok(())
     }

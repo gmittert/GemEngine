@@ -236,11 +236,11 @@ pub fn registration(status: RegistrationStatus) {
     }
 }
 
-fn eval_to_score(eval: Evaluation) -> String {
+fn eval_to_score(current_plies: u16, eval: Evaluation) -> String {
     // UCI needs M in moves, our evaluation stores mate in plies.
-    if let Some(m) = eval.mate_in() {
+    if let Some(m) = eval.mate_in(current_plies) {
         format!("mate {}", m.div_ceil(2))
-    } else if let Some(m) = eval.mated_in() {
+    } else if let Some(m) = eval.mated_in(current_plies) {
         format!("mate -{}", m.div_ceil(2))
     } else {
         let Evaluation(cp) = eval;
@@ -249,7 +249,7 @@ fn eval_to_score(eval: Evaluation) -> String {
 }
 
 // The engine wishes to send information to the GUI.
-pub fn info(info_block: Info) {
+pub fn info(current_plies: u16, info_block: Info) {
     print!("info");
     if let Some(depth) = info_block.depth {
         print!(" depth {depth}");
@@ -269,7 +269,7 @@ pub fn info(info_block: Info) {
     if let Some(score) = info_block.score {
         print!(" score");
         let eval = score.eval;
-        print!(" {}", eval_to_score(eval));
+        print!(" {}", eval_to_score(current_plies, eval));
         if score.is_upper_bound {
             print!(" upperbound")
         }
@@ -343,28 +343,28 @@ mod tests {
 
     #[test]
     fn eval_to_score_cp() {
-        assert_eq!("cp 0", eval_to_score(Evaluation::draw()));
-        assert_eq!("cp 3", eval_to_score(Evaluation(3)));
-        assert_eq!("cp -3", eval_to_score(-Evaluation(3)));
-        assert_eq!("cp 123", eval_to_score(Evaluation(123)));
-        assert_eq!("cp -123", eval_to_score(-Evaluation(123)));
+        assert_eq!("cp 0", eval_to_score(0, Evaluation::draw()));
+        assert_eq!("cp 3", eval_to_score(0, Evaluation(3)));
+        assert_eq!("cp -3", eval_to_score(0, -Evaluation(3)));
+        assert_eq!("cp 123", eval_to_score(0, Evaluation(123)));
+        assert_eq!("cp -123", eval_to_score(0, -Evaluation(123)));
     }
     #[test]
     fn eval_to_score_mate() {
-        assert_eq!("mate 1", eval_to_score(Evaluation::m1()));
-        assert_eq!("mate 1", eval_to_score(Evaluation::m2()));
-        assert_eq!("mate 2", eval_to_score(Evaluation::m3()));
-        assert_eq!("mate 2", eval_to_score(Evaluation::m4()));
-        assert_eq!("mate 3", eval_to_score(Evaluation::m5()));
-        assert_eq!("mate 3", eval_to_score(Evaluation::m6()));
+        assert_eq!("mate 1", eval_to_score(10, Evaluation::m1(10)));
+        assert_eq!("mate 1", eval_to_score(10, Evaluation::m2(10)));
+        assert_eq!("mate 2", eval_to_score(10, Evaluation::m3(10)));
+        assert_eq!("mate 2", eval_to_score(10, Evaluation::m4(10)));
+        assert_eq!("mate 3", eval_to_score(10, Evaluation::m5(10)));
+        assert_eq!("mate 3", eval_to_score(10, Evaluation::m6(10)));
     }
     #[test]
     fn eval_to_score_mated() {
-        assert_eq!("mate -1", eval_to_score(-Evaluation::m1()));
-        assert_eq!("mate -1", eval_to_score(-Evaluation::m2()));
-        assert_eq!("mate -2", eval_to_score(-Evaluation::m3()));
-        assert_eq!("mate -2", eval_to_score(-Evaluation::m4()));
-        assert_eq!("mate -3", eval_to_score(-Evaluation::m5()));
-        assert_eq!("mate -3", eval_to_score(-Evaluation::m6()));
+        assert_eq!("mate -1", eval_to_score(11, -Evaluation::m1(11)));
+        assert_eq!("mate -1", eval_to_score(11, -Evaluation::m2(11)));
+        assert_eq!("mate -2", eval_to_score(11, -Evaluation::m3(11)));
+        assert_eq!("mate -2", eval_to_score(11, -Evaluation::m4(11)));
+        assert_eq!("mate -3", eval_to_score(11, -Evaluation::m5(11)));
+        assert_eq!("mate -3", eval_to_score(11, -Evaluation::m6(11)));
     }
 }

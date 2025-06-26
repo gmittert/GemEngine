@@ -19,70 +19,53 @@ pub const PIECE_VALUES: [Evaluation; 6] = [
 ];
 
 // An evaluation is simply an i64 with a few caveats:
-// - We limit the range to (i64::MIN, i64::MAX] to not run into negation errors
-// - We treat i64::MAX as having won the game, i64::MAX - 1 as mate in 1, i64::MAX -2 as mate in
-//   2 and so on.
-// - We treat i64::MIN as having lost the game, i64::MIN + 1 as the opponent having mate in 1,
-//   i64::MAX -2 as the opponent having mate in 2 and so on.
-// - Everything else is an evalutation in centipawns
+// - We limit the range to (i16::MIN, i16::MAX] to not run into negation errors
+// - Evaluation maxes out at +/-20000 centipawns.
+// - Beyond that, we use that to express that we found mate at <ply>
 impl Evaluation {
-    pub fn won() -> Evaluation {
-        Evaluation(i16::MAX)
+    pub fn won(current_ply: u16) -> Evaluation {
+        Evaluation(i16::MAX - current_ply as i16)
     }
     pub fn draw() -> Evaluation {
         Evaluation(0)
     }
-    pub fn lost() -> Evaluation {
-        Evaluation(i16::MIN + 1)
+    pub fn lost(current_ply: u16) -> Evaluation {
+        Evaluation(i16::MIN + 1 + current_ply as i16)
     }
-    pub fn m1() -> Evaluation {
-        Evaluation(i16::MAX - 1)
+    pub fn m1(current_ply: u16) -> Evaluation {
+        Evaluation(i16::MAX - 1 - current_ply as i16)
     }
-    pub fn m2() -> Evaluation {
-        Evaluation(i16::MAX - 2)
+    pub fn m2(current_ply: u16) -> Evaluation {
+        Evaluation(i16::MAX - 2 - current_ply as i16)
     }
-    pub fn m3() -> Evaluation {
-        Evaluation(i16::MAX - 3)
+    pub fn m3(current_ply: u16) -> Evaluation {
+        Evaluation(i16::MAX - 3 - current_ply as i16)
     }
-    pub fn m4() -> Evaluation {
-        Evaluation(i16::MAX - 4)
+    pub fn m4(current_ply: u16) -> Evaluation {
+        Evaluation(i16::MAX - 4 - current_ply as i16)
     }
-    pub fn m5() -> Evaluation {
-        Evaluation(i16::MAX - 5)
+    pub fn m5(current_ply: u16) -> Evaluation {
+        Evaluation(i16::MAX - 5 - current_ply as i16)
     }
-    pub fn m6() -> Evaluation {
-        Evaluation(i16::MAX - 6)
+    pub fn m6(current_ply: u16) -> Evaluation {
+        Evaluation(i16::MAX - 6 - current_ply as i16)
     }
-    pub fn mate_in(&self) -> Option<usize> {
-        if self.0 >= Self::won().0 - 100 {
-            Some((Self::won().0 - self.0) as usize)
+    pub fn mate(&self) -> bool {
+        self.0 > 20000 || self.0 < -20000
+    }
+
+    pub fn mate_in(&self, current_ply: u16) -> Option<usize> {
+        if self.0 > 20000 {
+            Some((Self::won(current_ply).0 - self.0) as usize)
         } else {
             None
         }
     }
-    pub fn mated_in(&self) -> Option<usize> {
-        if self.0 <= Self::lost().0 + 100 {
-            Some((self.0 - Self::lost().0) as usize)
+    pub fn mated_in(&self, current_ply: u16) -> Option<usize> {
+        if self.0 < -20000 {
+            Some((self.0 - Self::lost(current_ply).0) as usize)
         } else {
             None
-        }
-    }
-    pub fn dec_mate(&self) -> Evaluation {
-        if self.0 >= Self::won().0 - 100 {
-            Evaluation(self.0 - 1)
-        } else if self.0 <= Self::lost().0 + 100 {
-            Evaluation(self.0 + 1)
-        } else {
-            *self
-        }
-    }
-    pub fn inc_mate(&self) -> Evaluation {
-        if (self.0 >= Self::won().0 - 100) && *self != Self::won() {
-            Evaluation(self.0 + 1)
-        } else if self.0 <= Self::lost().0 + 100 && *self != Self::lost() {
-            Evaluation(self.0 - 1)
-        } else {
-            *self
         }
     }
 }
@@ -119,14 +102,10 @@ impl Neg for Evaluation {
 
 impl fmt::Display for Evaluation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if *self == Evaluation::won() {
-            write!(f, "Won")?;
-        } else if self.0 >= (Evaluation::m1().0 - 100) {
-            write!(f, "M{}", Evaluation::m1().0 - self.0 + 1)?;
-        } else if *self == Evaluation::lost() {
-            write!(f, "Lost")?;
-        } else if self.0 <= (-Evaluation::m1().0 + 100) {
-            write!(f, "-M{}", self.0 + Evaluation::m1().0 + 1)?;
+        if self.0 > 20000 {
+            write!(f, "M: {} plies", i16::MAX - self.0)?;
+        } else if self.0 < 20000 {
+            write!(f, "-M: {} plies", self.0 - (i16::MIN + 1))?;
         } else {
             write!(f, "{}", self.0 as f64 / 100.0)?;
         }
@@ -420,8 +399,16 @@ mod tests {
     fn white_better() {
         let b = Board::from_fen("rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1")
             .expect("failed to parse fen");
-        let eval_white = b.eval(Evaluation::lost(), Evaluation::won(), Color::White);
-        let eval_black = b.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
+        let eval_white = b.eval(
+            Evaluation::lost(b.half_move),
+            Evaluation::won(b.half_move),
+            Color::White,
+        );
+        let eval_black = b.eval(
+            Evaluation::lost(b.half_move),
+            Evaluation::won(b.half_move),
+            Color::Black,
+        );
         assert!(eval_white.0 > 0);
         assert!(eval_black.0 < 0);
     }
@@ -430,8 +417,16 @@ mod tests {
     fn black_better() {
         let b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w - - 0 1")
             .expect("failed to parse fen");
-        let eval_white = b.eval(Evaluation::lost(), Evaluation::won(), Color::White);
-        let eval_black = b.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
+        let eval_white = b.eval(
+            Evaluation::lost(b.half_move),
+            Evaluation::won(b.half_move),
+            Color::White,
+        );
+        let eval_black = b.eval(
+            Evaluation::lost(b.half_move),
+            Evaluation::won(b.half_move),
+            Color::Black,
+        );
         assert!(eval_white.0 < 0);
         assert!(eval_black.0 > 0);
     }
@@ -439,8 +434,16 @@ mod tests {
     #[test]
     fn eval_starting_board() {
         let b = starting_board();
-        let eval_white = b.eval(Evaluation::lost(), Evaluation::won(), Color::White);
-        let eval_black = b.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
+        let eval_white = b.eval(
+            Evaluation::lost(b.half_move),
+            Evaluation::won(b.half_move),
+            Color::White,
+        );
+        let eval_black = b.eval(
+            Evaluation::lost(b.half_move),
+            Evaluation::won(b.half_move),
+            Color::Black,
+        );
         assert!(eval_white.0 < 100 && eval_white.0 > -100);
         assert!(eval_black.0 < 100 && eval_black.0 > -100);
     }
@@ -448,7 +451,11 @@ mod tests {
     #[test]
     fn eval_starting_board_e4() {
         let mut b = starting_board();
-        let eval_white_before = b.eval(Evaluation::lost(), Evaluation::won(), Color::White);
+        let eval_white_before = b.eval(
+            Evaluation::lost(b.half_move),
+            Evaluation::won(b.half_move),
+            Color::White,
+        );
         b.make_move(&Move {
             from: e2(),
             to: e4(),
@@ -461,7 +468,11 @@ mod tests {
             is_castle_queen: false,
             is_castle_king: false,
         });
-        let eval_white_after = b.eval(Evaluation::lost(), Evaluation::won(), Color::White);
+        let eval_white_after = b.eval(
+            Evaluation::lost(b.half_move),
+            Evaluation::won(b.half_move),
+            Color::White,
+        );
         dbg!(eval_white_before);
         dbg!(eval_white_after);
         assert!(eval_white_before < eval_white_after);
@@ -469,27 +480,23 @@ mod tests {
 
     #[test]
     fn eval_flipped() {
-        assert_eq!(Evaluation::won(), -Evaluation::lost());
-        assert_eq!(Evaluation::lost(), -Evaluation::won());
-        assert_eq!(Evaluation::won().dec_mate(), Evaluation::m1());
-        assert_eq!(Evaluation::lost().dec_mate(), -Evaluation::m1());
-        assert_eq!(-Evaluation::won().dec_mate(), -Evaluation::m1());
-        assert_eq!(-Evaluation::lost().dec_mate(), Evaluation::m1());
+        assert_eq!(Evaluation::won(0), -Evaluation::lost(0));
+        assert_eq!(Evaluation::lost(0), -Evaluation::won(0));
     }
     #[test]
     fn eval_formatted() {
-        assert_eq!("M1", format!("{}", Evaluation::m1()));
-        assert_eq!("-M1", format!("{}", -Evaluation::m1()));
-        assert_eq!("M2", format!("{}", Evaluation::m2()));
-        assert_eq!("-M2", format!("{}", -Evaluation::m2()));
+        assert_eq!("M: 33 plies", format!("{}", Evaluation::m1(32)));
+        assert_eq!("-M: 33 plies", format!("{}", -Evaluation::m1(32)));
+        assert_eq!("M: 34 plies", format!("{}", Evaluation::m2(32)));
+        assert_eq!("-M: 34 plies", format!("{}", -Evaluation::m2(32)));
     }
 
     #[test]
     fn mated_in_formatting() {
-        assert_eq!(Some(1), Evaluation::m1().mate_in());
-        assert_eq!(Some(1), (-Evaluation::m1()).mated_in());
-        assert_eq!(Some(2), Evaluation::m2().mate_in());
-        assert_eq!(Some(2), (-Evaluation::m2()).mated_in());
+        assert_eq!(Some(1), Evaluation::m1(31).mate_in(31));
+        assert_eq!(Some(1), (-Evaluation::m1(31)).mated_in(31));
+        assert_eq!(Some(2), Evaluation::m2(31).mate_in(31));
+        assert_eq!(Some(2), (-Evaluation::m2(31)).mated_in(31));
     }
 
     #[test]
@@ -659,19 +666,5 @@ mod tests {
         let b = Board::from_fen("8/p1p5/P1N5/8/8/7P/7P/8 w - - 0 1").expect("failed to parse fen");
         assert_eq!(2, b.blocked_pawns(Color::White));
         assert_eq!(2, b.blocked_pawns(Color::Black));
-    }
-
-    #[test]
-    fn eval_prec() {
-        let e = Evaluation::m1();
-        let f = e.dec_mate();
-        let g = -f;
-        let h = -e.dec_mate();
-        let i = -(e.dec_mate());
-        let j = (-e).dec_mate();
-        assert_eq!(-Evaluation::m2(), g);
-        assert_eq!(-Evaluation::m2(), h);
-        assert_eq!(-Evaluation::m2(), i);
-        assert_eq!(-Evaluation::m2(), j);
     }
 }

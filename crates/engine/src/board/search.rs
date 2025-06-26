@@ -107,8 +107,8 @@ impl Board {
                 s.spawn(|_| {
                     let mut new_b = self.clone();
                     let res = new_b.pvs(
-                        Evaluation::lost(),
-                        Evaluation::won(),
+                        Evaluation::lost(self.half_move),
+                        Evaluation::won(self.half_move),
                         target_depth,
                         cache,
                         &should_stop,
@@ -183,10 +183,10 @@ impl Board {
 
             if !self.in_check(!self.to_play) {
                 let span = match self.to_play {
-                    Color::Black => trace_span!("quiesece white", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
-                    Color::White => trace_span!("quiesce black", inspecting = %m, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
+                    Color::Black => trace_span!("quiesece white", inspecting = %m, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
+                    Color::White => trace_span!("quiesce black", inspecting = %m, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
                 };
-                let eval = -self.quiesce(-beta, -alpha.inc_mate()).dec_mate();
+                let eval = -self.quiesce(-beta, -alpha);
 
                 span.record("eval", eval.0);
                 drop(span);
@@ -241,11 +241,7 @@ impl Board {
         if self.game_phase == 24 {
             return None;
         }
-        if target_depth - self.half_move < 2
-            || self.in_check(self.to_play)
-            || beta.mate_in().is_some()
-            || beta.mated_in().is_some()
-        {
+        if target_depth - self.half_move < 2 || self.in_check(self.to_play) || beta.mate() {
             return None;
         }
         self.make_null_move();
@@ -266,6 +262,14 @@ impl Board {
         self.undo_null_move();
         let eval = -search.eval;
         if eval >= beta { Some(eval) } else { None }
+    }
+
+    fn search_extensions(&self, target_depth: u16) -> u16 {
+        let mut additions = 0;
+        if self.in_check(self.to_play) {
+            additions += 1;
+        }
+        target_depth + additions
     }
 
     pub fn pvs<const N: usize>(
@@ -398,58 +402,57 @@ impl Board {
                 }
                 had_legal_move = true;
                 let span = match self.to_play {
-                    Color::Black => trace_span!("white", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
-                    Color::White => trace_span!("black", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.inc_mate().0, eval = field::Empty).entered(),
+                    Color::Black => trace_span!("white", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
+                    Color::White => trace_span!("black", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
                 };
                 // PV Search: We'd ordered our hash move in front and it's likely to be the PV
                 // node. Establish an exact score for it, and search a smaller window for
                 // everything else. If a move might actually be better, research it to find the
                 // actual score.
-                let eval_res =
-                    if is_first_child || alpha.mate_in().is_some() || alpha.mated_in().is_some() {
-                        is_first_child = false;
-                        let expected_next_node = match node_type {
-                            ExpectedNodeType::PV => ExpectedNodeType::PV,
-                            ExpectedNodeType::Cut => ExpectedNodeType::All,
-                            ExpectedNodeType::All => ExpectedNodeType::Cut,
-                        };
-                        self.pvs(
-                            -beta,
-                            -alpha.inc_mate(),
-                            target_depth,
-                            cache,
-                            should_stop,
-                            expected_next_node,
-                        )?
-                    } else {
-                        let expected_next_node = match node_type {
-                            ExpectedNodeType::PV => ExpectedNodeType::Cut,
-                            ExpectedNodeType::Cut => ExpectedNodeType::All,
-                            ExpectedNodeType::All => ExpectedNodeType::Cut,
-                        };
-                        let mut score = self.pvs(
-                            Evaluation(-alpha.inc_mate().0 - 1),
-                            -alpha.inc_mate(),
-                            target_depth,
-                            cache,
-                            should_stop,
-                            expected_next_node,
-                        )?;
-
-                        if alpha < -score.eval && -score.eval < beta {
-                            score = self.pvs(
-                                -beta,
-                                -alpha.inc_mate(),
-                                target_depth,
-                                cache,
-                                should_stop,
-                                ExpectedNodeType::PV,
-                            )?;
-                        }
-
-                        score
+                let eval_res = if is_first_child || alpha.mate() {
+                    is_first_child = false;
+                    let expected_next_node = match node_type {
+                        ExpectedNodeType::PV => ExpectedNodeType::PV,
+                        ExpectedNodeType::Cut => ExpectedNodeType::All,
+                        ExpectedNodeType::All => ExpectedNodeType::Cut,
                     };
-                let eval = -eval_res.eval.dec_mate();
+                    self.pvs(
+                        -beta,
+                        -alpha,
+                        target_depth,
+                        cache,
+                        should_stop,
+                        expected_next_node,
+                    )?
+                } else {
+                    let expected_next_node = match node_type {
+                        ExpectedNodeType::PV => ExpectedNodeType::Cut,
+                        ExpectedNodeType::Cut => ExpectedNodeType::All,
+                        ExpectedNodeType::All => ExpectedNodeType::Cut,
+                    };
+                    let mut score = self.pvs(
+                        Evaluation(-alpha.0 - 1),
+                        -alpha,
+                        self.search_extensions(target_depth),
+                        cache,
+                        should_stop,
+                        expected_next_node,
+                    )?;
+
+                    if alpha < -score.eval && -score.eval < beta {
+                        score = self.pvs(
+                            -beta,
+                            -alpha,
+                            self.search_extensions(target_depth),
+                            cache,
+                            should_stop,
+                            ExpectedNodeType::PV,
+                        )?;
+                    }
+
+                    score
+                };
+                let eval = -eval_res.eval;
                 span.record("eval", eval.0);
                 drop(span);
 
@@ -520,7 +523,7 @@ impl Board {
         } else {
             // We have no legal moves. If we are in check, it's checkmate. If not, it's stalemate
             if self.in_check(self.to_play) {
-                Evaluation::lost()
+                Evaluation::lost(self.half_move)
             } else {
                 Evaluation::draw()
             }
@@ -594,7 +597,7 @@ mod tests {
         assert_eq!(best_move.from, h1());
         assert_eq!(best_move.to, h8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval, Evaluation::m1());
+        assert_eq!(eval, Evaluation::m1(b.half_move));
     }
 
     #[test]
@@ -606,7 +609,7 @@ mod tests {
         let best_move = res.best_move;
         let eval = res.eval;
         assert!(best_move.is_none());
-        assert_eq!(eval, -Evaluation::won());
+        assert_eq!(eval, -Evaluation::won(b.half_move));
     }
 
     #[test]
@@ -618,7 +621,7 @@ mod tests {
         let best_move = res.best_move;
         let eval = res.eval;
         assert!(best_move.is_none());
-        assert_eq!(eval, Evaluation::lost());
+        assert_eq!(eval, Evaluation::lost(b.half_move));
     }
 
     #[test]
@@ -662,7 +665,7 @@ mod tests {
         assert_eq!(best_move.from, h1());
         assert_eq!(best_move.to, h8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval, Evaluation::m3());
+        assert_eq!(eval, Evaluation::m3(b.half_move));
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
@@ -679,13 +682,13 @@ mod tests {
         assert_eq!(best_move.from, g6());
         assert_eq!(best_move.to, g8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval, Evaluation::m1());
+        assert_eq!(eval, Evaluation::m1(b.half_move));
 
         let mut b = Board::from_fen("k5RN/7R/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
         let cache = TranspositionTable::<1024>::new();
         let eval = b.best_move(4, 1, &cache, None).unwrap().eval;
         println!("Eval: {}", eval);
-        assert_eq!(eval, Evaluation::lost());
+        assert_eq!(eval, Evaluation::lost(b.half_move));
 
         let mut b =
             Board::from_fen("k6N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
@@ -700,7 +703,7 @@ mod tests {
         assert_eq!(best_move.piece, Piece::Rook);
         assert_eq!(best_move.from, g6());
         assert_eq!(best_move.to, g8());
-        assert_eq!(eval, Evaluation::m1());
+        assert_eq!(eval, Evaluation::m1(b.half_move));
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
@@ -715,7 +718,7 @@ mod tests {
         assert_eq!(best_move.piece, Piece::King);
         assert_eq!(best_move.from, b8());
         assert_eq!(best_move.capture, None);
-        assert_eq!(eval, -Evaluation::m2());
+        assert_eq!(eval, -Evaluation::m2(b.half_move));
     }
 
     #[test]
@@ -731,7 +734,7 @@ mod tests {
         let best_move = b.from_algeabraic_unchecked(&best_move);
         println!("Best Move: {}", best_move);
         println!("Eval: {}", eval);
-        assert!(eval.mate_in().is_some());
+        assert!(eval.mate_in(b.half_move).is_some());
     }
 
     #[test]
@@ -789,8 +792,16 @@ mod tests {
         let best_move = res.best_move;
         let eval = res.eval;
 
-        let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
-        let evalb = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
+        let evalw = board.eval(
+            Evaluation::lost(board.half_move),
+            Evaluation::won(board.half_move),
+            Color::White,
+        );
+        let evalb = board.eval(
+            Evaluation::lost(board.half_move),
+            Evaluation::won(board.half_move),
+            Color::Black,
+        );
         assert!(evalw != Evaluation::draw());
         assert!(evalb != Evaluation::draw());
         assert!(eval != Evaluation::draw());
@@ -887,7 +898,11 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
 19. Rxe3 {-0.71/7 5.0s} *
 "###;
         let board = Board::from_pgn(pgn).expect("bad pgn?");
-        let eval = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
+        let eval = board.eval(
+            Evaluation::lost(board.half_move),
+            Evaluation::won(board.half_move),
+            Color::Black,
+        );
         assert!(eval.0 < 0);
     }
     #[test]
@@ -896,7 +911,7 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
         let mut board = Board::from_fen(fen).expect("bad fen?");
         let cache = TranspositionTable::<1024>::new();
         let eval = board.best_move(6, 1, &cache, None).unwrap().eval;
-        let Some(mated_in) = eval.mated_in() else {
+        let Some(mated_in) = eval.mated_in(board.half_move) else {
             assert!(false);
             return;
         };
@@ -907,7 +922,7 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
         let fen = "6rk/p1p5/4BNQ1/4P3/4P3/2p2P2/6R1/3R3K w - - 1 39";
         let mut board = Board::from_fen(fen).expect("bad fen?");
         let eval = board.it_depth_best_move(7, 32).eval;
-        assert_eq!(eval, Evaluation::m1());
+        assert_eq!(eval, Evaluation::m1(board.half_move));
     }
     #[test]
     fn eval_bug4() {
@@ -976,8 +991,16 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let cache = TranspositionTable::<1024>::new();
         let move_eval = board.best_move(6, 1, &cache, None).unwrap().eval;
 
-        let evalw = board.eval(Evaluation::lost(), Evaluation::won(), Color::White);
-        let evalb = board.eval(Evaluation::lost(), Evaluation::won(), Color::Black);
+        let evalw = board.eval(
+            Evaluation::lost(board.half_move),
+            Evaluation::won(board.half_move),
+            Color::White,
+        );
+        let evalb = board.eval(
+            Evaluation::lost(board.half_move),
+            Evaluation::won(board.half_move),
+            Color::Black,
+        );
         assert_ne!(evalw, Evaluation::draw());
         assert_ne!(evalb, Evaluation::draw());
         assert_eq!(move_eval, Evaluation::draw());
@@ -1000,13 +1023,13 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
             is_castle_queen: false,
             is_castle_king: false,
         });
-        let best_score = Evaluation::lost();
+        let best_score = Evaluation::lost(board.half_move);
         let cache = TranspositionTable::<1024>::new();
         let should_stop = AtomicBool::new(false);
         let eval = -board
             .pvs(
-                Evaluation::lost(),
-                -best_score.inc_mate(),
+                Evaluation::lost(board.half_move),
+                -best_score,
                 4,
                 &cache,
                 &should_stop,
@@ -1112,7 +1135,6 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
         let res = board.best_move(8, 32, &cache, None).unwrap();
 
-        assert!(res.eval.mate_in().is_none());
-        assert!(res.eval.mated_in().is_none());
+        assert!(!res.eval.mate());
     }
 }

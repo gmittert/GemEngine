@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn check_packed_tt_entry() {
         {
-            let eval = Evaluation::m1();
+            let eval = Evaluation::m1(32);
             let depth = 0x123;
             let best_move = AlgebraicMove {
                 from: b6(),
@@ -250,7 +250,7 @@ mod tests {
             assert_eq!(tt.node_type(), node_type);
         }
         {
-            let eval = -Evaluation::m1();
+            let eval = -Evaluation::m1(32);
             let depth = 0x456;
             let best_move = AlgebraicMove {
                 from: h1(),
@@ -285,8 +285,8 @@ mod tests {
         let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
         let should_stop = AtomicBool::new(false);
         board.pvs(
-            Evaluation::lost(),
-            Evaluation::won(),
+            Evaluation::lost(board.half_move),
+            Evaluation::won(board.half_move),
             2,
             &cache,
             &should_stop,
