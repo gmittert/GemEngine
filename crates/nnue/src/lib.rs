@@ -46,6 +46,23 @@ impl Accumulator {
         }
     }
 
+    /// Add a feature to an accumulator.
+    pub fn add_remove_feature(
+        &mut self,
+        add_feature_idx: usize,
+        remove_feature_idx: usize,
+        net: &Network,
+    ) {
+        for ((acc, add), remove) in self
+            .vals
+            .iter_mut()
+            .zip(&net.feature_weights[add_feature_idx].vals)
+            .zip(&net.feature_weights[remove_feature_idx].vals)
+        {
+            *acc += *add - *remove
+        }
+    }
+
     /// Remove a feature from an accumulator.
     pub fn remove_feature(&mut self, feature_idx: usize, net: &Network) {
         for (i, d) in self

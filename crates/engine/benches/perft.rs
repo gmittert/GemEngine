@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group};
-use gem::board;
-use gem::perft;
+use engine::board;
+use engine::perft;
 
 pub fn shallow_perft(c: &mut Criterion) {
     c.bench_function("perft3", |b| {

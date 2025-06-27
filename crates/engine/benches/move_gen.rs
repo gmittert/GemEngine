@@ -1,5 +1,5 @@
 use criterion::{Criterion, black_box, criterion_group};
-use gem::board::Board;
+use engine::board::Board;
 
 pub fn knights(c: &mut Criterion) {
     c.bench_function("knights", |b| {

@@ -1,6 +1,7 @@
 mod evaluation;
 mod move_gen;
 mod perft;
+mod search;
 mod shared_hashmap;
 
 criterion::criterion_main!(
@@ -11,4 +12,5 @@ criterion::criterion_main!(
     evaluation::node_throughput,
     shared_hashmap::shared_hashmap,
     move_gen::iterative_compare,
+    search::search_benches,
 );

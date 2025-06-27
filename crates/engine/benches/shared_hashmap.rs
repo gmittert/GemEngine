@@ -3,7 +3,7 @@ use bitboard::{
     posn::{e2, e4},
 };
 use criterion::{Criterion, black_box, criterion_group};
-use gem::{
+use engine::{
     board::evaluation::Evaluation,
     transposition_table::{PackedTTEntry, ScoreType, TranspositionTable},
 };

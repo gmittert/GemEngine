@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use bitboard::moves::{Color, Piece};
 use bitboard::posn::{d4, e5};
 use criterion::{BenchmarkId, Criterion, criterion_group};
-use gem::{
+use engine::{
     board::{self, Board},
     transposition_table::TranspositionTable,
 };
@@ -149,8 +149,8 @@ pub fn eval_fn(c: &mut Criterion) {
         let board = board::starting_board();
         b.iter(|| {
             board.eval(
-                board::evaluation::Evaluation::lost(),
-                board::evaluation::Evaluation::won(),
+                board::evaluation::Evaluation::lost(0),
+                board::evaluation::Evaluation::won(0),
                 Color::White,
             );
         })

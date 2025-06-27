@@ -634,8 +634,50 @@ impl Board {
     }
 
     pub fn move_piece(&mut self, c: Color, p: Piece, from: Posn, to: Posn) {
-        self.remove_piece(c, p, from);
-        self.add_piece(c, p, to);
+        #[cfg(feature = "nnue")]
+        {
+            let pc = 64 * p as usize;
+            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+            // Since our nnue is trained using chessboard, we need to flip the board.
+            //
+            // TODO: retrain using our own board representation.
+            let from_sq = from.idx() as usize ^ 7;
+            let to_sq = to.idx() as usize ^ 7;
+            let perspective = usize::from(c == Color::White);
+
+            self.white_features.add_remove_feature(
+                [384, 0][perspective] + pc + to_sq,
+                [384, 0][perspective] + pc + from_sq,
+                &nnue::NNUE,
+            );
+            self.black_features.add_remove_feature(
+                [0, 384][perspective] + pc + (to_sq ^ 56),
+                [0, 384][perspective] + pc + (from_sq ^ 56),
+                &nnue::NNUE,
+            );
+        }
+
+        match c {
+            Color::Black => {
+                self.black_pieces[p as usize] &= !BitBoard::from(from);
+                self.black_pieces[p as usize] |= to;
+            }
+            Color::White => {
+                self.white_pieces[p as usize] &= !BitBoard::from(from);
+                self.white_pieces[p as usize] |= to;
+            }
+        };
+        #[cfg(not(feature = "nnue"))]
+        {
+            let from_eg_val = EG_TABLE[c as usize][p as usize][from.idx() as usize];
+            let from_mg_val = MG_TABLE[c as usize][p as usize][from.idx() as usize];
+
+            let to_eg_val = EG_TABLE[c as usize][p as usize][to.idx() as usize];
+            let to_mg_val = MG_TABLE[c as usize][p as usize][to.idx() as usize];
+            self.eg_piece_values[c as usize] += to_eg_val - from_eg_val;
+            self.mg_piece_values[c as usize] += to_mg_val - from_mg_val;
+        }
+        self.hash ^= ZOBRIST_KEYS.get_key(c, p, from) ^ ZOBRIST_KEYS.get_key(c, p, to);
     }
 
     pub fn make_null_move(&mut self) {
