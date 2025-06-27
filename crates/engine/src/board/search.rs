@@ -48,9 +48,6 @@ impl Board {
         let mut depth = 2;
         loop {
             let now = Instant::now();
-            if now >= end_time {
-                break;
-            }
             if let Some(evalp) = self.best_move(depth, num_threads, &cache, Some(end_time - now)) {
                 completed_search = evalp;
             } else {
@@ -101,11 +98,12 @@ impl Board {
         let should_stop = AtomicBool::new(false);
         let result: OnceLock<Option<(Evaluation, Option<AlgebraicMove>)>> = OnceLock::new();
         let total_seldepth = AtomicU16::new(0);
-        let total_nodes = AtomicUsize::new(0);
+        let total_nodes = AtomicUsize::new(self.nodes);
         rayon::scope(|s| {
             for _ in 0..num_threads {
                 s.spawn(|_| {
                     let mut new_b = self.clone();
+                    new_b.nodes = 0;
                     let res = new_b.pvs(
                         Evaluation::lost(self.half_move),
                         Evaluation::won(self.half_move),
@@ -1136,5 +1134,48 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let res = board.best_move(8, 32, &cache, None).unwrap();
 
         assert!(!res.eval.mate());
+    }
+    #[test]
+    fn eval_bug6() {
+        let pgn = r###"
+[Event "?"]
+[Site "?"]
+[Date "2025.06.25"]
+[Round "10"]
+[White "gem"]
+[Black "gem_prev"]
+[Result "0-1"]
+[ECO "E12"]
+[GameDuration "00:00:19"]
+[GameEndTime "2025-06-25T22:45:56.804 PDT"]
+[GameStartTime "2025-06-25T22:45:37.093 PDT"]
+[Opening "Queen's Indian"]
+[PlyCount "70"]
+[Termination "abandoned"]
+[TimeControl "5+0.2"]
+[Variation "4.Nc3"]
+
+1. d4 {book} Nf6 {book} 2. c4 {book} e6 {book}
+3. Nf3 {book} b6 {book} 4. Nc3 {+1.17/7 0.46s} Bb7 {-0.75/6 0.41s}
+5. g3 {+1.81/6 0.41s} Bb4 {-0.89/6 0.42s} 6. Bd2 {+1.41/6 0.41s} Nc6 {-0.23/6 0.37s}
+7. a3 {+0.23/5 0.38s} Bxc3 {-0.71/6 0.41s} 8. Bxc3 {+1.59/6 0.41s} Ne4 {-0.09/6 0.36s}
+9. Qc2 {+0.09/5 0.36s} Nxc3 {-2.38/5 0.36s} 10. Qxc3 {+1.60/6 0.33s} Qf6 {+1.58/6 0.41s}
+11. Rc1 {+2.04/6 0.36s} Nxd4 {+10.41/6 0.32s} 12. Bg2 {-6.24/6 0.34s} c5 {+5.85/5 0.35s}
+13. h4 {-7.72/5 0.35s} O-O {+12.52/6 0.36s} 14. Rh3 {-7.92/5 0.29s} Bc6 {+8.27/5 0.32s}
+15. Kf1 {-5.60/6 0.31s} Rad8 {+10.88/6 0.31s} 16. Rd1 {-5.19/6 0.33s} Bxf3 {+3.93/5 0.31s}
+17. Bxf3 {-4.65/6 0.28s} Qe5 {+9.64/6 0.28s} 18. b4 {-8.07/5 0.27s} Nxf3 {+4.47/5 0.32s}
+19. Qxf3 {-5.28/6 0.34s} d5 {+5.36/7 0.28s} 20. cxd5 {-5.91/6 0.27s} Rxd5 {+6.50/7 0.29s}
+21. Rxd5 {-6.74/6 0.27s} Qxd5 {+7.14/6 0.26s} 22. Qxd5 {-5.45/6 0.27s} exd5 {+8.31/8 0.28s}
+23. bxc5 {-7.02/8 0.26s} bxc5 {+9.24/8 0.25s} 24. g4 {-7.84/8 0.31s} Rb8 {+7.84/7 0.29s}
+25. Rd3 {-7.91/7 0.39s} d4 {+7.91/6 0.28s} 26. Rd1 {-6.27/6 0.24s} Rb3 {+8.06/6 0.29s}
+27. e3 {-7.03/6 0.23s} d3 {+7.99/7 0.26s} 28. Rc1 {-9.65/7 0.24s} Rxa3 {+9.65/6 0.25s}
+29. Rxc5 {-7.44/7 0.22s} h6 {+4.45/7 0.26s} 30. Ke1 {-5.26/7 0.25s} Ra2 {+4.86/7 0.23s}
+31. Rd5 {-4.07/7 0.22s} Ra1+ {+4.96/8 0.24s} 32. Kd2 {-4.07/7 0.23s} Ra2+ {+4.96/6 0.23s}
+33. Ke1 {-3.85/7 0.29s} Re2+ {+5.15/6 0.23s} 34. Kf1 {-1.56/7 0.21s} Rd2 {+1.56/6 0.21s}
+35. Ke1 {-1.20/7 0.21s} Re2+ {0.00/7 0.21s} *"###;
+        let mut board = Board::from_pgn(pgn).expect("bad pgn?");
+        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(300), 16);
+
+        assert!(!eval.mate());
     }
 }
