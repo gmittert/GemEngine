@@ -3,11 +3,10 @@ use tracing::{Level, field, trace_span};
 use crate::board::evaluation::PIECE_VALUES;
 use crate::board::*;
 use crate::transposition_table::{CacheResult, DEFAULT_TT_SIZE, ScoreType, TranspositionTable};
-use std::cmp::{max, min};
-use std::sync::OnceLock;
+use std::cmp::max;
 use std::sync::atomic::{AtomicU16, AtomicUsize};
+use std::sync::{Condvar, Mutex};
 use std::sync::{atomic::AtomicBool, atomic::Ordering};
-use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 use super::evaluation::Evaluation;
@@ -97,12 +96,14 @@ impl Board {
         cache: &TranspositionTable<N>,
         time: Option<Duration>,
     ) -> Option<SearchResult> {
+        let end_time = time.map(|t| Instant::now() + t);
         let target_depth = self.half_move + depth;
         let should_stop = AtomicBool::new(false);
-        let result: OnceLock<Option<(Evaluation, Option<AlgebraicMove>)>> = OnceLock::new();
+        let result: Mutex<Option<(Evaluation, Option<AlgebraicMove>)>> = Mutex::new(None);
+        let cv = Condvar::new();
         let total_seldepth = AtomicU16::new(0);
         let total_nodes = AtomicUsize::new(self.nodes);
-        rayon::scope(|s| {
+        let res = rayon::scope(|s| {
             for _ in 0..num_threads {
                 s.spawn(|_| {
                     let mut new_b = self.clone();
@@ -117,36 +118,41 @@ impl Board {
                     );
                     let _ = &total_nodes.fetch_add(new_b.nodes, Ordering::AcqRel);
                     let _ = &total_seldepth.fetch_max(new_b.seldepth, Ordering::AcqRel);
-                    if let Some(res) = res
-                        && result.set(Some((res.eval, res.best_move))).is_ok()
-                    {
-                        let _ = &should_stop.store(true, Ordering::Relaxed);
+                    if let Some(res) = res {
+                        let mut eval = result.lock().unwrap();
+                        if eval.is_none() {
+                            *eval = Some((res.eval, res.best_move));
+                            cv.notify_one();
+                            should_stop.store(true, Ordering::Relaxed);
+                        }
                     }
                 });
             }
-            // If we have a maximum time to wait for, instead of waiting on the result directly, we
-            // watch a timer to wait for the timeout. We check every 100ms if any search has
-            // completed yet so we don't want too long.
-            if let Some(t) = time {
-                let end_time = Instant::now() + t;
-                while !should_stop.load(Ordering::Relaxed) {
+            let mut res = result.lock().unwrap();
+            // Loop for spurious wake ups
+            loop {
+                if let Some((eval, best_move)) = *res {
+                    return Some(SearchResult { eval, best_move });
+                } else if let Some(end) = end_time {
                     let now = Instant::now();
-                    if now >= end_time {
-                        if result.set(None).is_ok() {
-                            let _ = &should_stop.store(true, Ordering::Relaxed);
-                        };
-                        break;
+                    if now > end {
+                        should_stop.store(true, Ordering::Relaxed);
+                        return None;
                     }
-                    let remaining = end_time - now;
-                    sleep(min(remaining, Duration::from_millis(100)));
+                    let (guard, timed_out) = cv.wait_timeout(res, end - now).unwrap();
+                    if timed_out.timed_out() {
+                        should_stop.store(true, Ordering::Relaxed);
+                        return None;
+                    }
+                    res = guard;
+                } else {
+                    res = cv.wait(res).unwrap();
                 }
             }
         });
-
-        let (eval, best_move) = (*result.wait())?;
         self.seldepth = total_seldepth.load(Ordering::Acquire);
         self.nodes = total_nodes.load(Ordering::Acquire);
-        Some(SearchResult { eval, best_move })
+        res
     }
 
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
@@ -1233,6 +1239,39 @@ Bd2+ {-4.30/4 0.21s} 51. Kg3 {0.00/5 0.21s}
 Be1+ {0.00/5 0.21s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let (_, eval, _) = board.search_best_move_for(Duration::from_millis(100), 16);
+
+        assert!(!eval.mate());
+    }
+
+    #[test]
+    fn eval_bug8() {
+        let pgn = r###"
+[Event "?"]
+[Site "?"]
+[Date "2025.06.28"]
+[Round "1"]
+[White "gem_prev"]
+[Black "gem"]
+[Result "1-0"]
+[ECO "B54"]
+[GameDuration "00:00:08"]
+[GameEndTime "2025-06-28T12:25:55.929 PDT"]
+[GameStartTime "2025-06-28T12:25:47.608 PDT"]
+[Opening "Sicilian"]
+[PlyCount "25"]
+[Termination "abandoned"]
+[TimeControl "5+0.2"]
+
+1. e4 {book} c5 {book} 2. Nf3 {book} d6 {book} 3. d4 {book} cxd4 {book}
+4. Nxd4 {+2.93/6 0.38s} a6 {-0.78/8 1.2s} 5. Nc3 {+1.90/5 0.36s}
+g6 {-1.16/8 0.52s} 6. Bc4 {+0.71/5 0.35s} Nf6 {-1.08/8 0.81s}
+7. O-O {+0.80/5 0.35s} Bg7 {-2.09/7 0.31s} 8. Nd5 {+1.22/5 0.34s}
+Nc6 {-1.50/7 0.49s} 9. Nxc6 {+1.50/5 0.33s} bxc6 {-1.35/7 0.40s}
+10. Nxf6+ {+1.35/5 0.32s} Bxf6 {+0.11/8 0.31s} 11. Rb1 {+0.10/5 0.32s}
+Qa5 {-1.58/7 0.29s} 12. b4 {-0.11/5 0.31s} Qe5 {-2.36/7 0.40s}
+13. Bb2 {+0.03/5 0.31s} *"###;
+        let mut board = Board::from_pgn(pgn).expect("bad pgn?");
+        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(400), 16);
 
         assert!(!eval.mate());
     }
