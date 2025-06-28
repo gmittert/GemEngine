@@ -1,4 +1,7 @@
-use bitboard::{moves::{Color, Piece}, posn::{e2, e4}};
+use bitboard::{
+    moves::{Color, Piece},
+    posn::{e2, e4},
+};
 use criterion::{Criterion, criterion_group};
 use engine::board;
 

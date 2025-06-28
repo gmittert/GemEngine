@@ -104,7 +104,7 @@ impl fmt::Display for Evaluation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.0 > 20000 {
             write!(f, "M: {} plies", i16::MAX - self.0)?;
-        } else if self.0 < 20000 {
+        } else if self.0 < -20000 {
             write!(f, "-M: {} plies", self.0 - (i16::MIN + 1))?;
         } else {
             write!(f, "{}", self.0 as f64 / 100.0)?;
