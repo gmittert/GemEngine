@@ -23,15 +23,15 @@ pub static NNUE: Network = unsafe {
 
 /// Accumulator code cribbed from the bullet examples in
 /// https://github.com/jw1912/bullet/blob/main/examples/simple.rs
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C, align(64))]
 pub struct Accumulator {
     vals: [i16; HIDDEN_SIZE],
 }
 
 impl Accumulator {
-    /// Initialised with bias so we can just efficiently
-    /// operate on it afterwards.
+    /// We initialize with just the baises. We don't have any pieces yet, we'll add their feature
+    /// vectors as we add to the accumulator.
     pub fn new(net: &Network) -> Self {
         net.feature_biases
     }
@@ -63,7 +63,25 @@ impl Accumulator {
         }
     }
 
-    /// Simultaneously add and remove two features to an accumulator.
+    /// Simultaneously add two and remove one features to an accumulator.
+    pub fn add2_remove1_feature(
+        &mut self,
+        add_feature1_idx: usize,
+        add_feature2_idx: usize,
+        remove_feature_idx: usize,
+        net: &Network,
+    ) {
+        for (acc, add1, add2, remove) in izip!(
+            self.vals.iter_mut(),
+            &net.feature_weights[add_feature1_idx].vals,
+            &net.feature_weights[add_feature2_idx].vals,
+            &net.feature_weights[remove_feature_idx].vals,
+        ) {
+            *acc += *add1 + *add2 - *remove
+        }
+    }
+
+    /// Simultaneously add one and remove two features to an accumulator.
     pub fn add1_remove2_feature(
         &mut self,
         add_feature_idx: usize,

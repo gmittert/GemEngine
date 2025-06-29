@@ -149,7 +149,8 @@ impl PartialEq for Board {
             && {
                 #[cfg(feature = "nnue")]
                 {
-                    true
+                    self.white_features == other.white_features
+                        && self.black_features == other.black_features
                 }
                 #[cfg(not(feature = "nnue"))]
                 {
@@ -510,6 +511,7 @@ impl Board {
         }
         self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
     }
+
     pub fn remove_piece(&mut self, c: Color, p: Piece, pos: Posn) {
         #[cfg(feature = "nnue")]
         {
@@ -633,92 +635,245 @@ impl Board {
         }
     }
 
-    pub fn castle(&mut self, c: Color, from: Posn, to: Posn) {
-        let (rook_from, rook_to) = if to.file() == File::G {
-            match c {
-                Color::Black => (h8(), f8()),
-                Color::White => (h1(), f1()),
-            }
-        } else {
-            match c {
-                Color::Black => (a8(), d8()),
-                Color::White => (a1(), d1()),
-            }
-        };
+    pub fn move_two_pieces(
+        &mut self,
+        c: Color,
+        from1: Posn,
+        to1: Posn,
+        piece1: Piece,
+        from2: Posn,
+        to2: Posn,
+        piece2: Piece,
+    ) {
         #[cfg(feature = "nnue")]
         {
-            let pc = 64 * Piece::King as usize;
-            let rook_pc = 64 * Piece::Rook as usize;
+            let pc1 = 64 * piece1 as usize;
+            let pc2 = 64 * piece2 as usize;
+            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+            // Since our nnue is trained using chessboard, we need to flip the board.
+            //
+            // TODO: retrain using our own board representation.
+            let from_sq1 = from1.idx() as usize ^ 7;
+            let to_sq1 = to1.idx() as usize ^ 7;
+            let from_sq2 = from1.idx() as usize ^ 7;
+            let to_sq2 = to1.idx() as usize ^ 7;
+            let perspective = usize::from(c == Color::White);
+
+            self.white_features.add2_remove2_feature(
+                [384, 0][perspective] + pc1 + to_sq1,
+                [384, 0][perspective] + pc2 + to_sq2,
+                [384, 0][perspective] + pc1 + from_sq1,
+                [384, 0][perspective] + pc2 + from_sq2,
+                &nnue::NNUE,
+            );
+            self.black_features.add2_remove2_feature(
+                [0, 384][perspective] + pc1 + (to_sq1 ^ 56),
+                [0, 384][perspective] + pc2 + (to_sq2 ^ 56),
+                [0, 384][perspective] + pc1 + (from_sq1 ^ 56),
+                [0, 384][perspective] + pc2 + (from_sq2 ^ 56),
+                &nnue::NNUE,
+            );
+        }
+        match c {
+            Color::Black => {
+                self.black_pieces[piece1 as usize] &= !BitBoard::from(from1);
+                self.black_pieces[piece1 as usize] |= to1;
+                self.black_pieces[piece2 as usize] &= !BitBoard::from(from2);
+                self.black_pieces[piece2 as usize] |= to2;
+            }
+            Color::White => {
+                self.white_pieces[piece1 as usize] &= !BitBoard::from(from1);
+                self.white_pieces[piece1 as usize] |= to1;
+                self.white_pieces[piece2 as usize] &= !BitBoard::from(from2);
+                self.white_pieces[piece2 as usize] |= to2;
+            }
+        };
+        #[cfg(not(feature = "nnue"))]
+        {
+            let from_eg_val = EG_TABLE[c as usize][piece1 as usize][from1.idx() as usize];
+            let from_mg_val = MG_TABLE[c as usize][piece1 as usize][from1.idx() as usize];
+
+            let to_eg_val = EG_TABLE[c as usize][piece1 as usize][to1.idx() as usize];
+            let to_mg_val = MG_TABLE[c as usize][piece1 as usize][to1.idx() as usize];
+
+            let rook_from_eg_val = EG_TABLE[c as usize][piece2 as usize][from2.idx() as usize];
+            let rook_from_mg_val = MG_TABLE[c as usize][piece2 as usize][from2.idx() as usize];
+
+            let rook_to_eg_val = EG_TABLE[c as usize][piece2 as usize][to2.idx() as usize];
+            let rook_to_mg_val = MG_TABLE[c as usize][piece2 as usize][to2.idx() as usize];
+            self.eg_piece_values[c as usize] += to_eg_val - from_eg_val;
+            self.mg_piece_values[c as usize] += to_mg_val - from_mg_val;
+            self.eg_piece_values[c as usize] += rook_to_eg_val - rook_from_eg_val;
+            self.mg_piece_values[c as usize] += rook_to_mg_val - rook_from_mg_val;
+        }
+        self.hash ^= ZOBRIST_KEYS.get_key(c, piece1, from1)
+            ^ ZOBRIST_KEYS.get_key(c, piece1, to1)
+            ^ ZOBRIST_KEYS.get_key(c, piece2, from2)
+            ^ ZOBRIST_KEYS.get_key(c, piece2, to2);
+    }
+
+    pub fn capture_piece(
+        &mut self,
+        c: Color,
+        from_piece: Piece,
+        from: Posn,
+        to_piece: Piece,
+        to: Posn,
+        capture_piece: Piece,
+        capture_pos: Posn,
+    ) {
+        #[cfg(feature = "nnue")]
+        {
+            let from_pc = 64 * from_piece as usize;
+            let to_pc = 64 * to_piece as usize;
+            let capture_pc = 64 * capture_piece as usize;
             // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
             // Since our nnue is trained using chessboard, we need to flip the board.
             //
             // TODO: retrain using our own board representation.
             let from_sq = from.idx() as usize ^ 7;
             let to_sq = to.idx() as usize ^ 7;
-            let rook_from_sq = rook_from.idx() as usize ^ 7;
-            let rook_to_sq = rook_to.idx() as usize ^ 7;
+            let capture_sq = capture_pos.idx() as usize ^ 7;
             let perspective = usize::from(c == Color::White);
 
-            self.white_features.add2_remove2_feature(
-                [384, 0][perspective] + pc + to_sq,
-                [384, 0][perspective] + rook_pc + rook_to_sq,
-                [384, 0][perspective] + pc + from_sq,
-                [384, 0][perspective] + rook_pc + rook_from_sq,
+            self.white_features.add1_remove2_feature(
+                [384, 0][perspective] + to_pc + to_sq,
+                [0, 384][perspective] + capture_pc + capture_sq,
+                [384, 0][perspective] + from_pc + from_sq,
                 &nnue::NNUE,
             );
-            self.black_features.add2_remove2_feature(
-                [0, 384][perspective] + pc + (to_sq ^ 56),
-                [0, 384][perspective] + rook_pc + (rook_to_sq ^ 56),
-                [0, 384][perspective] + pc + (from_sq ^ 56),
-                [0, 384][perspective] + rook_pc + (rook_from_sq ^ 56),
+            self.black_features.add1_remove2_feature(
+                [0, 384][perspective] + to_pc + (to_sq ^ 56),
+                [384, 0][perspective] + capture_pc + (capture_sq ^ 56),
+                [0, 384][perspective] + from_pc + (from_sq ^ 56),
                 &nnue::NNUE,
             );
         }
 
         match c {
             Color::Black => {
-                self.black_pieces[Piece::King as usize] &= !BitBoard::from(from);
-                self.black_pieces[Piece::King as usize] |= to;
-                self.black_pieces[Piece::Rook as usize] &= !BitBoard::from(rook_from);
-                self.black_pieces[Piece::Rook as usize] |= rook_to;
+                self.black_pieces[from_piece as usize] &= !BitBoard::from(from);
+                self.white_pieces[capture_piece as usize] &= !BitBoard::from(capture_pos);
+                self.black_pieces[to_piece as usize] |= to;
             }
             Color::White => {
-                self.white_pieces[Piece::King as usize] &= !BitBoard::from(from);
-                self.white_pieces[Piece::King as usize] |= to;
-                self.white_pieces[Piece::Rook as usize] &= !BitBoard::from(rook_from);
-                self.white_pieces[Piece::Rook as usize] |= rook_to;
+                self.white_pieces[from_piece as usize] &= !BitBoard::from(from);
+                self.black_pieces[capture_piece as usize] &= !BitBoard::from(capture_pos);
+                self.white_pieces[to_piece as usize] |= to;
             }
         };
         #[cfg(not(feature = "nnue"))]
         {
-            let from_eg_val = EG_TABLE[c as usize][Piece::King as usize][from.idx() as usize];
-            let from_mg_val = MG_TABLE[c as usize][Piece::King as usize][from.idx() as usize];
+            let from_eg_val = EG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
+            let from_mg_val = MG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
 
-            let to_eg_val = EG_TABLE[c as usize][Piece::King as usize][to.idx() as usize];
-            let to_mg_val = MG_TABLE[c as usize][Piece::King as usize][to.idx() as usize];
+            let to_eg_val = EG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
+            let to_mg_val = MG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
 
-            let rook_from_eg_val =
-                EG_TABLE[c as usize][Piece::Rook as usize][rook_from.idx() as usize];
-            let rook_from_mg_val =
-                MG_TABLE[c as usize][Piece::Rook as usize][rook_from.idx() as usize];
-
-            let rook_to_eg_val = EG_TABLE[c as usize][Piece::Rook as usize][rook_to.idx() as usize];
-            let rook_to_mg_val = MG_TABLE[c as usize][Piece::Rook as usize][rook_to.idx() as usize];
+            let capture_eg_val =
+                EG_TABLE[!c as usize][capture_piece as usize][capture_pos.idx() as usize];
+            let capture_mg_val =
+                MG_TABLE[!c as usize][capture_piece as usize][capture_pos.idx() as usize];
             self.eg_piece_values[c as usize] += to_eg_val - from_eg_val;
             self.mg_piece_values[c as usize] += to_mg_val - from_mg_val;
-            self.eg_piece_values[c as usize] += rook_to_eg_val - rook_from_eg_val;
-            self.mg_piece_values[c as usize] += rook_to_mg_val - rook_from_mg_val;
+            self.eg_piece_values[!c as usize] -= capture_eg_val;
+            self.mg_piece_values[!c as usize] -= capture_mg_val;
+            self.game_phase -= GAME_PHASE_INC[capture_piece as usize];
+            self.game_phase += GAME_PHASE_INC[to_piece as usize];
+            self.game_phase -= GAME_PHASE_INC[from_piece as usize];
         }
-        self.hash ^= ZOBRIST_KEYS.get_key(c, Piece::King, from)
-            ^ ZOBRIST_KEYS.get_key(c, Piece::King, to)
-            ^ ZOBRIST_KEYS.get_key(c, Piece::Rook, rook_from)
-            ^ ZOBRIST_KEYS.get_key(c, Piece::Rook, rook_to);
+        self.hash ^= ZOBRIST_KEYS.get_key(c, from_piece, from)
+            ^ ZOBRIST_KEYS.get_key(c, to_piece, to)
+            ^ ZOBRIST_KEYS.get_key(!c, capture_piece, capture_pos);
     }
 
-    pub fn move_piece(&mut self, c: Color, p: Piece, from: Posn, to: Posn) {
+    pub fn uncapture_piece(
+        &mut self,
+        c: Color,
+        from_piece: Piece,
+        from: Posn,
+        to_piece: Piece,
+        to: Posn,
+        capture_piece: Piece,
+        capture_pos: Posn,
+    ) {
         #[cfg(feature = "nnue")]
         {
-            let pc = 64 * p as usize;
+            let from_pc = 64 * from_piece as usize;
+            let to_pc = 64 * to_piece as usize;
+            let capture_pc = 64 * capture_piece as usize;
+            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+            // Since our nnue is trained using chessboard, we need to flip the board.
+            //
+            // TODO: retrain using our own board representation.
+            let from_sq = from.idx() as usize ^ 7;
+            let to_sq = to.idx() as usize ^ 7;
+            let capture_sq = capture_pos.idx() as usize ^ 7;
+            let perspective = usize::from(c == Color::White);
+
+            self.white_features.add2_remove1_feature(
+                [0, 384][perspective] + capture_pc + capture_sq,
+                [384, 0][perspective] + from_pc + from_sq,
+                [384, 0][perspective] + to_pc + to_sq,
+                &nnue::NNUE,
+            );
+            self.black_features.add2_remove1_feature(
+                [384, 0][perspective] + capture_pc + (capture_sq ^ 56),
+                [0, 384][perspective] + from_pc + (from_sq ^ 56),
+                [0, 384][perspective] + to_pc + (to_sq ^ 56),
+                &nnue::NNUE,
+            );
+        }
+
+        match c {
+            Color::Black => {
+                self.black_pieces[from_piece as usize] |= from;
+                self.white_pieces[capture_piece as usize] |= capture_pos;
+                self.black_pieces[to_piece as usize] &= !BitBoard::from(to);
+            }
+            Color::White => {
+                self.white_pieces[from_piece as usize] |= from;
+                self.black_pieces[capture_piece as usize] |= capture_pos;
+                self.white_pieces[to_piece as usize] &= !BitBoard::from(to);
+            }
+        };
+        #[cfg(not(feature = "nnue"))]
+        {
+            let from_eg_val = EG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
+            let from_mg_val = MG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
+
+            let to_eg_val = EG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
+            let to_mg_val = MG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
+
+            let capture_eg_val =
+                EG_TABLE[!c as usize][capture_piece as usize][capture_pos.idx() as usize];
+            let capture_mg_val =
+                MG_TABLE[!c as usize][capture_piece as usize][capture_pos.idx() as usize];
+            self.eg_piece_values[c as usize] += from_eg_val - to_eg_val;
+            self.mg_piece_values[c as usize] += from_mg_val - to_mg_val;
+            self.eg_piece_values[!c as usize] += capture_eg_val;
+            self.mg_piece_values[!c as usize] += capture_mg_val;
+            self.game_phase += GAME_PHASE_INC[capture_piece as usize];
+            self.game_phase += GAME_PHASE_INC[from_piece as usize];
+            self.game_phase -= GAME_PHASE_INC[to_piece as usize];
+        }
+        self.hash ^= ZOBRIST_KEYS.get_key(c, from_piece, from)
+            ^ ZOBRIST_KEYS.get_key(c, to_piece, to)
+            ^ ZOBRIST_KEYS.get_key(!c, capture_piece, capture_pos);
+    }
+
+    pub fn move_piece(
+        &mut self,
+        c: Color,
+        from_piece: Piece,
+        from: Posn,
+        to_piece: Piece,
+        to: Posn,
+    ) {
+        #[cfg(feature = "nnue")]
+        {
+            let from_pc = 64 * from_piece as usize;
+            let to_pc = 64 * to_piece as usize;
             // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
             // Since our nnue is trained using chessboard, we need to flip the board.
             //
@@ -728,38 +883,41 @@ impl Board {
             let perspective = usize::from(c == Color::White);
 
             self.white_features.add_remove_feature(
-                [384, 0][perspective] + pc + to_sq,
-                [384, 0][perspective] + pc + from_sq,
+                [384, 0][perspective] + to_pc + to_sq,
+                [384, 0][perspective] + from_pc + from_sq,
                 &nnue::NNUE,
             );
             self.black_features.add_remove_feature(
-                [0, 384][perspective] + pc + (to_sq ^ 56),
-                [0, 384][perspective] + pc + (from_sq ^ 56),
+                [0, 384][perspective] + to_pc + (to_sq ^ 56),
+                [0, 384][perspective] + from_pc + (from_sq ^ 56),
                 &nnue::NNUE,
             );
         }
 
         match c {
             Color::Black => {
-                self.black_pieces[p as usize] &= !BitBoard::from(from);
-                self.black_pieces[p as usize] |= to;
+                self.black_pieces[from_piece as usize] &= !BitBoard::from(from);
+                self.black_pieces[to_piece as usize] |= to;
             }
             Color::White => {
-                self.white_pieces[p as usize] &= !BitBoard::from(from);
-                self.white_pieces[p as usize] |= to;
+                self.white_pieces[from_piece as usize] &= !BitBoard::from(from);
+                self.white_pieces[to_piece as usize] |= to;
             }
         };
         #[cfg(not(feature = "nnue"))]
         {
-            let from_eg_val = EG_TABLE[c as usize][p as usize][from.idx() as usize];
-            let from_mg_val = MG_TABLE[c as usize][p as usize][from.idx() as usize];
+            let from_eg_val = EG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
+            let from_mg_val = MG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
 
-            let to_eg_val = EG_TABLE[c as usize][p as usize][to.idx() as usize];
-            let to_mg_val = MG_TABLE[c as usize][p as usize][to.idx() as usize];
+            let to_eg_val = EG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
+            let to_mg_val = MG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
             self.eg_piece_values[c as usize] += to_eg_val - from_eg_val;
             self.mg_piece_values[c as usize] += to_mg_val - from_mg_val;
+            self.game_phase += GAME_PHASE_INC[to_piece as usize];
+            self.game_phase -= GAME_PHASE_INC[from_piece as usize];
         }
-        self.hash ^= ZOBRIST_KEYS.get_key(c, p, from) ^ ZOBRIST_KEYS.get_key(c, p, to);
+        self.hash ^=
+            ZOBRIST_KEYS.get_key(c, from_piece, from) ^ ZOBRIST_KEYS.get_key(c, to_piece, to);
     }
 
     pub fn make_null_move(&mut self) {
@@ -811,9 +969,51 @@ impl Board {
         }
 
         if m.is_castle_king || m.is_castle_queen {
-            self.castle(self.to_play, m.from, m.to);
+            let (rook_from, rook_to) = if m.is_castle_king {
+                match self.to_play {
+                    Color::Black => (h8(), f8()),
+                    Color::White => (h1(), f1()),
+                }
+            } else {
+                match self.to_play {
+                    Color::Black => (a8(), d8()),
+                    Color::White => (a1(), d1()),
+                }
+            };
+            self.move_two_pieces(
+                self.to_play,
+                m.from,
+                m.to,
+                Piece::King,
+                rook_from,
+                rook_to,
+                Piece::Rook,
+            );
         } else {
-            self.move_piece(self.to_play, m.piece, m.from, m.to);
+            let to_piece = if let Some(promo) = m.promotion {
+                promo
+            } else {
+                m.piece
+            };
+            if let Some(capture) = m.capture {
+                let capture_pos = match (m.is_en_passant, self.to_play) {
+                    (true, Color::Black) => m.to.no(),
+                    (true, Color::White) => m.to.so(),
+                    _ => Some(m.to),
+                }
+                .unwrap();
+                self.capture_piece(
+                    self.to_play,
+                    m.piece,
+                    m.from,
+                    to_piece,
+                    m.to,
+                    capture,
+                    capture_pos,
+                );
+            } else {
+                self.move_piece(self.to_play, m.piece, m.from, to_piece, m.to);
+            }
         }
 
         let ep_target = if (m.piece == Piece::Pawn
@@ -849,16 +1049,6 @@ impl Board {
             }
         }
         if let Some(piece) = m.capture {
-            self.remove_piece(
-                !self.to_play,
-                piece,
-                match (m.is_en_passant, self.to_play) {
-                    (true, Color::Black) => m.to.no(),
-                    (true, Color::White) => m.to.so(),
-                    _ => Some(m.to),
-                }
-                .unwrap(),
-            );
             if piece == Piece::Rook {
                 if m.to == h1() {
                     inner &= 0b1110
@@ -870,10 +1060,6 @@ impl Board {
                     inner &= 0b0111
                 }
             }
-        }
-        if let Some(piece) = m.promotion {
-            self.add_piece(self.to_play, piece, m.to);
-            self.remove_piece(self.to_play, Piece::Pawn, m.to);
         }
         let new_move_rights = MoveRights {
             castling_ability: CastlingAbility(inner),
@@ -897,37 +1083,54 @@ impl Board {
             self.last_irreversible.pop();
         }
 
-        if let Some(piece) = m.promotion {
-            self.remove_piece(self.to_play, piece, m.to);
-            self.add_piece(self.to_play, Piece::Pawn, m.to);
-        }
-        self.move_piece(self.to_play, m.piece, m.to, m.from);
-        if let Some(piece) = m.capture {
-            self.add_piece(
-                !self.to_play,
-                piece,
-                match (m.is_en_passant, self.to_play) {
+        if m.is_castle_king || m.is_castle_queen {
+            let (rook_from, rook_to) = if m.is_castle_king {
+                match self.to_play {
+                    Color::Black => (h8(), f8()),
+                    Color::White => (h1(), f1()),
+                }
+            } else {
+                match self.to_play {
+                    Color::Black => (a8(), d8()),
+                    Color::White => (a1(), d1()),
+                }
+            };
+            self.move_two_pieces(
+                self.to_play,
+                m.to,
+                m.from,
+                Piece::King,
+                rook_to,
+                rook_from,
+                Piece::Rook,
+            );
+        } else {
+            let to_piece = if let Some(promo) = m.promotion {
+                promo
+            } else {
+                m.piece
+            };
+            if let Some(capture) = m.capture {
+                let capture_pos = match (m.is_en_passant, self.to_play) {
                     (true, Color::Black) => m.to.no(),
                     (true, Color::White) => m.to.so(),
                     _ => Some(m.to),
                 }
-                .unwrap(),
-            );
-        };
-        if m.is_castle_king {
-            let (to, from) = match self.to_play {
-                Color::Black => (h8(), f8()),
-                Color::White => (h1(), f1()),
-            };
-            self.move_piece(self.to_play, Piece::Rook, from, to)
+                .unwrap();
+                self.uncapture_piece(
+                    self.to_play,
+                    m.piece,
+                    m.from,
+                    to_piece,
+                    m.to,
+                    capture,
+                    capture_pos,
+                );
+            } else {
+                self.move_piece(self.to_play, to_piece, m.to, m.piece, m.from);
+            }
         }
-        if m.is_castle_queen {
-            let (to, from) = match self.to_play {
-                Color::Black => (a8(), d8()),
-                Color::White => (a1(), d1()),
-            };
-            self.move_piece(self.to_play, Piece::Rook, from, to)
-        }
+
         self.hash ^= ZOBRIST_KEYS.black_turn;
 
         if let Some(prev_rights) = self.move_rights.pop() {

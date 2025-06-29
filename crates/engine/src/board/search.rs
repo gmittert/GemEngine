@@ -1275,4 +1275,37 @@ Qa5 {-1.58/7 0.29s} 12. b4 {-0.11/5 0.31s} Qe5 {-2.36/7 0.40s}
 
         assert!(!eval.mate());
     }
+    #[test]
+    fn eval_bug9() {
+        let pgn = r###"
+[Event "?"]
+[Site "?"]
+[Date "2025.06.28"]
+[Round "1"]
+[White "gem_prev"]
+[Black "gem"]
+[Result "1-0"]
+[ECO "B54"]
+[GameDuration "00:00:08"]
+[GameEndTime "2025-06-28T21:20:32.782 PDT"]
+[GameStartTime "2025-06-28T21:20:24.196 PDT"]
+[Opening "Sicilian"]
+[PlyCount "31"]
+[Termination "abandoned"]
+[TimeControl "5+0.2"]
+
+1. e4 {book} c5 {book} 2. Nf3 {book} d6 {book} 3. d4 {book} cxd4 {book}
+4. Nxd4 {+2.93/6 0.38s} a6 {-2.18/7 0.39s} 5. Nc3 {+1.90/5 0.36s}
+g6 {-1.83/7 0.38s} 6. Be3 {+2.54/6 0.36s} Bg7 {-0.97/8 0.39s}
+7. Qd2 {+3.39/6 0.35s} Bd7 {-2.23/7 0.38s} 8. O-O-O {+3.55/6 0.34s}
+Nc6 {+1.07/7 0.37s} 9. Nxc6 {+1.26/5 0.33s} Bxc6 {+1.15/7 0.36s}
+10. Bc4 {+1.43/5 0.32s} Nf6 {+2.13/7 0.33s} 11. f3 {+1.13/5 0.32s}
+b5 {+2.42/7 0.33s} 12. Bb3 {+1.36/5 0.31s} b4 {+2.10/7 0.32s}
+13. Nd5 {+2.71/5 0.31s} Bxd5 {+2.42/7 0.32s} 14. Ba4+ {+3.26/5 0.30s}
+Kf8 {+1.21/7 0.31s} 15. exd5 {+0.90/5 0.29s} Qa5 {+1.61/7 0.30s}
+16. Bb3 {+0.74/5 0.29s} *"###;
+        let mut board = Board::from_pgn(pgn).expect("bad pgn?");
+        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(10000), 32);
+        assert!(!eval.mate());
+    }
 }

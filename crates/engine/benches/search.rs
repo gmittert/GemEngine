@@ -1,5 +1,5 @@
 use bitboard::{
-    moves::{Color, Move, Piece},
+    moves::{Move, Piece},
     posn::{e1, e2, e4, g1},
 };
 use criterion::{Criterion, criterion_group};
@@ -8,8 +8,21 @@ use engine::board;
 pub fn move_piece(c: &mut Criterion) {
     c.bench_function("move_piece", |b| {
         let mut board = board::starting_board();
+        let m = Move {
+            from: e2(),
+            to: e4(),
+            piece: Piece::Pawn,
+            capture: None,
+            promotion: None,
+            is_check: false,
+            is_mate: false,
+            is_en_passant: false,
+            is_castle_queen: false,
+            is_castle_king: false,
+        };
         b.iter(|| {
-            board.move_piece(Color::White, Piece::Pawn, e2(), e4());
+            board.make_move(&m);
+            board.undo_move(&m);
         })
     });
     c.bench_function("move_piece_castle", |b| {
@@ -31,6 +44,7 @@ pub fn move_piece(c: &mut Criterion) {
         };
         b.iter(|| {
             board.make_move(&castles);
+            board.undo_move(&castles);
         })
     });
 }
