@@ -227,14 +227,15 @@ impl Board {
         let Some(irr) = self.last_irreversible.last() else {
             return false;
         };
+        let mut count = 1;
         if self.half_move - irr >= 8 {
             for (_, prev_state) in &self.moves[*irr as usize..] {
                 if *prev_state == self.hash {
-                    return true;
+                    count += 1;
                 }
             }
         }
-        false
+        count >= 3
     }
 
     pub fn eval_null_move<const N: usize>(
