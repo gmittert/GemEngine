@@ -6,6 +6,7 @@ use bullet_lib::{
     trainer::save::SavedFormat,
     value::{NoOutputBuckets, ValueTrainer, ValueTrainerBuilder},
 };
+use itertools::izip;
 // Hyper parameters
 pub const SUPERBATCHES: usize = 160;
 pub const WDL_PROPORTION: f32 = 0.75;
@@ -32,7 +33,7 @@ impl Accumulator {
     /// Initialised with bias so we can just efficiently
     /// operate on it afterwards.
     pub fn new(net: &Network) -> Self {
-        net.feature_bias
+        net.feature_biases
     }
 
     /// Add a feature to an accumulator.
@@ -46,20 +47,57 @@ impl Accumulator {
         }
     }
 
-    /// Add a feature to an accumulator.
+    /// Simultaneously add and remove a feature to an accumulator.
     pub fn add_remove_feature(
         &mut self,
         add_feature_idx: usize,
         remove_feature_idx: usize,
         net: &Network,
     ) {
-        for ((acc, add), remove) in self
-            .vals
-            .iter_mut()
-            .zip(&net.feature_weights[add_feature_idx].vals)
-            .zip(&net.feature_weights[remove_feature_idx].vals)
-        {
+        for (acc, add, remove) in izip!(
+            self.vals.iter_mut(),
+            &net.feature_weights[add_feature_idx].vals,
+            &net.feature_weights[remove_feature_idx].vals,
+        ) {
             *acc += *add - *remove
+        }
+    }
+
+    /// Simultaneously add and remove two features to an accumulator.
+    pub fn add1_remove2_feature(
+        &mut self,
+        add_feature_idx: usize,
+        remove_feature_idx: usize,
+        remove_feature2_idx: usize,
+        net: &Network,
+    ) {
+        for (acc, add1, remove1, remove2) in izip!(
+            self.vals.iter_mut(),
+            &net.feature_weights[add_feature_idx].vals,
+            &net.feature_weights[remove_feature_idx].vals,
+            &net.feature_weights[remove_feature2_idx].vals,
+        ) {
+            *acc += *add1 - *remove1 - *remove2
+        }
+    }
+
+    /// Simultaneously add and remove two features from an accumulator.
+    pub fn add2_remove2_feature(
+        &mut self,
+        add_feature_idx: usize,
+        add_feature2_idx: usize,
+        remove_feature_idx: usize,
+        remove_feature2_idx: usize,
+        net: &Network,
+    ) {
+        for (acc, add1, add2, remove1, remove2) in izip!(
+            self.vals.iter_mut(),
+            &net.feature_weights[add_feature_idx].vals,
+            &net.feature_weights[add_feature2_idx].vals,
+            &net.feature_weights[remove_feature_idx].vals,
+            &net.feature_weights[remove_feature2_idx].vals,
+        ) {
+            *acc += *add1 + *add2 - *remove1 - *remove2
         }
     }
 
@@ -81,7 +119,7 @@ pub struct Network {
     /// Column-Major `HIDDEN_SIZE x 768` matrix.
     feature_weights: [Accumulator; 768],
     /// Vector with dimension `HIDDEN_SIZE`.
-    feature_bias: Accumulator,
+    feature_biases: Accumulator,
     /// Column-Major `1 x (2 * HIDDEN_SIZE)` matrix, we use it like this to make the code nicer in
     /// `Network::evaluate`.
     output_weights: [i16; 2 * HIDDEN_SIZE],
