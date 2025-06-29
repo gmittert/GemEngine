@@ -336,6 +336,11 @@ impl Board {
                 best_move: None,
             });
         }
+        // We need to recheck should_stop here -- the pvs in eval_null_move could have failed due
+        // to time out.
+        if should_stop.load(Ordering::Acquire) {
+            return None;
+        }
 
         if hash_move.is_none()
             && node_type == ExpectedNodeType::PV
