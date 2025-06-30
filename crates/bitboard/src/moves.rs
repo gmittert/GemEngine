@@ -121,8 +121,6 @@ pub struct Move {
     pub piece: Piece,
     pub capture: Option<Piece>,
     pub promotion: Option<Piece>,
-    pub is_check: bool,
-    pub is_mate: bool,
     pub is_en_passant: bool,
     pub is_castle_queen: bool,
     pub is_castle_king: bool,
@@ -140,13 +138,6 @@ impl Move {
 
 impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let is_check = if self.is_check {
-            "+"
-        } else if self.is_mate {
-            "#"
-        } else {
-            ""
-        };
         let promo = if let Some(piece) = self.promotion {
             format!("={piece:?}")
         } else {
@@ -160,9 +151,9 @@ impl fmt::Display for Move {
             Piece::Queen => "♛",
             Piece::King => {
                 if self.is_castle_king {
-                    return write!(f, "O-O{is_check}");
+                    return write!(f, "O-O");
                 } else if self.is_castle_queen {
-                    return write!(f, "O-O-O{is_check}");
+                    return write!(f, "O-O-O");
                 }
                 "♚"
             }
@@ -170,22 +161,20 @@ impl fmt::Display for Move {
                 Some(_) => {
                     return write!(
                         f,
-                        "{}x{}{}{}{}",
+                        "{}x{}{}{}",
                         self.from.file(),
                         self.to.file(),
                         self.to.rank(),
                         promo,
-                        is_check
                     );
                 }
                 None => {
                     return write!(
                         f,
-                        "{}{}{}{}",
+                        "{}{}{}",
                         self.to.file(),
                         self.to.rank(),
                         promo,
-                        is_check
                     );
                 }
             },
@@ -197,13 +186,12 @@ impl fmt::Display for Move {
         };
         write!(
             f,
-            "{}{}{}{}{}{}",
+            "{}{}{}{}{}",
             icon,
             capture,
             self.to.file(),
             self.to.rank(),
             promo,
-            is_check
         )
     }
 }

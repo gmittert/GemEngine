@@ -996,7 +996,7 @@ Rb8 {-3.94/8 5.0s} 47. b4 {+3.96/8 5.0s} Rb5 {-3.95/8 5.0s}
 Re3+ {-3.98/8 5.0s} 50. Ka4 {+3.98/9 5.0s} Re2 {-4.00/9 5.0s}
 51. Ra7+ {+3.98/9 5.0s} Kc8 {-4.00/9 5.0s} 52. Ra8+ {+3.98/9 5.0s}
 Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
-54. Ra8+ {+3.98/9 5.0s} Nb8 {-4.00/9 5.0s} *"###;
+54. Ra8+ {+3.98/9 5.0s} Nb8 {-4.00/9 5.0s} 55. Ra7 Nd7 *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::<1024>::new();
         let move_eval = board.best_move(6, 1, &cache, None).unwrap().eval;
@@ -1027,8 +1027,6 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
             piece: Piece::Queen,
             capture: Some(Piece::Pawn),
             promotion: None,
-            is_check: false,
-            is_mate: false,
             is_en_passant: false,
             is_castle_queen: false,
             is_castle_king: false,

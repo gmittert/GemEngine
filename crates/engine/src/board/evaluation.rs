@@ -462,8 +462,6 @@ mod tests {
             piece: Piece::Pawn,
             capture: None,
             promotion: None,
-            is_check: false,
-            is_mate: false,
             is_en_passant: false,
             is_castle_queen: false,
             is_castle_king: false,
