@@ -318,7 +318,7 @@ pub fn info(current_plies: u16, info_block: Info) {
 
 // This command tells the GUI which parameters can be changed in the engine.
 pub fn option(opt: EngineOption) {
-    print!("option {}", opt.name);
+    print!("option name {}", opt.name);
     print!(" type {}", opt.ty);
     if let Some(default) = opt.default {
         print!(" default {default}");

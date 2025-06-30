@@ -1048,17 +1048,17 @@ impl Board {
                 inner &= 0b0111
             }
         }
-        if let Some(piece) = m.capture {
-            if piece == Piece::Rook {
-                if m.to == h1() {
-                    inner &= 0b1110
-                } else if m.to == h8() {
-                    inner &= 0b1011
-                } else if m.to == a1() {
-                    inner &= 0b1101
-                } else if m.to == a8() {
-                    inner &= 0b0111
-                }
+        if let Some(piece) = m.capture
+            && piece == Piece::Rook
+        {
+            if m.to == h1() {
+                inner &= 0b1110
+            } else if m.to == h8() {
+                inner &= 0b1011
+            } else if m.to == a1() {
+                inner &= 0b1101
+            } else if m.to == a8() {
+                inner &= 0b0111
             }
         }
         let new_move_rights = MoveRights {

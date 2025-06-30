@@ -11,7 +11,7 @@ struct GemOptions {
     num_threads: usize,
 }
 
-const DEFAULT_THREADS: usize = 32;
+const DEFAULT_THREADS: usize = 4;
 
 impl GemOptions {
     fn default() -> GemOptions {
@@ -22,11 +22,11 @@ impl GemOptions {
 
     fn report() {
         uci::option(EngineOption {
-            name: String::from("NumThreads"),
+            name: String::from("Threads"),
             ty: EngineOptionType::Spin,
-            default: Some(String::from("32")),
+            default: Some(format!("{DEFAULT_THREADS}")),
             min: Some(1),
-            max: Some(512),
+            max: Some(1024),
         });
     }
 
