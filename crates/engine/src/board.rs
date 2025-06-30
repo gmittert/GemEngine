@@ -1134,17 +1134,12 @@ impl Board {
     }
 
     pub fn query_pos(&self, p: Posn, color: Color) -> Option<Piece> {
-        let pieces: [Piece; 6] = [
-            Piece::Pawn,
-            Piece::Rook,
-            Piece::Knight,
-            Piece::Bishop,
-            Piece::Queen,
-            Piece::King,
-        ];
-        pieces
-            .into_iter()
-            .find(|&i| self.piece(color, i).contains(p))
+        let pieces = match color {
+            Color::Black => self.black_pieces,
+            Color::White => self.white_pieces,
+        };
+        pieces.into_iter().position(|pieces| pieces.contains(p)).map(
+            |piece| unsafe{std::mem::transmute::<u8, Piece>(piece as u8)})
     }
 
     pub fn in_check(&self, color: Color) -> bool {
