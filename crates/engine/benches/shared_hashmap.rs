@@ -4,8 +4,7 @@ use bitboard::{
 };
 use criterion::{Criterion, black_box, criterion_group};
 use engine::{
-    board::evaluation::Evaluation,
-    transposition_table::{PackedTTEntry, ScoreType, TranspositionTable},
+    board::evaluation::Evaluation, shared_hashmap::SharedHashMap, transposition_table::{PackedTTEntry, ScoreType, TranspositionTable}
 };
 
 pub fn create(c: &mut Criterion) {
@@ -28,6 +27,15 @@ pub fn create(c: &mut Criterion) {
                 ScoreType::Exact,
             );
             black_box(entry);
+        })
+    });
+    c.bench_function("fill_linear", |b| {
+        const N: usize = 256 * 1024 * 1024 / 16 ;
+        let cache = SharedHashMap::<u64, N>::new();
+        b.iter(|| {
+            for i in 0..N {
+                cache.insert(i as u64, i as u64);
+            }
         })
     });
 }
