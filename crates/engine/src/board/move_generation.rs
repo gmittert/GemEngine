@@ -969,21 +969,17 @@ impl Board {
 
     // Compute the vertical and horizontal ray attacks of the rooks and queens (used with
     // bishop_queen_attacks to blend the queen attacks across two calls).
-    pub fn rook_queen_attacks(&self, color: Color) -> BitBoard {
-        let pieces = self.piece(color, Piece::Rook) | self.piece(color, Piece::Queen);
-
+    pub fn rook_attacks(rooks: BitBoard, all_pieces: BitBoard) -> BitBoard {
         let mut acc = BitBoard::empty();
-        for i in pieces {
-            acc |= sliding_attacks::compute_rook_attacks(i, self.pieces());
+        for i in rooks {
+            acc |= sliding_attacks::compute_rook_attacks(i, all_pieces);
         }
         acc
     }
 
-    pub fn rook_queen_attacks_pos(&self, pos: Posn, color: Color) -> BitBoard {
-        let pieces = self.piece(color, Piece::Rook) | self.piece(color, Piece::Queen);
-
-        let attacked_from = sliding_attacks::compute_rook_attacks(pos, self.pieces());
-        pieces & attacked_from
+    pub fn rook_attacks_pos(rooks: BitBoard, all_pieces: BitBoard, pos: Posn) -> BitBoard {
+        let attacked_from = sliding_attacks::compute_rook_attacks(pos, all_pieces);
+        rooks & attacked_from
     }
 
     pub fn bishop_can_capture(&self, color: Color, target: Posn) -> Option<AlgebraicMove> {
@@ -1011,21 +1007,17 @@ impl Board {
 
     // Compute the diagonal ray attacks of the bishops and queens (used with
     // rook_queen_attacks to blend the queen attacks across two calls).
-    pub fn bishop_queen_attacks(&self, color: Color) -> BitBoard {
-        let pieces = self.piece(color, Piece::Queen) | self.piece(color, Piece::Rook);
-
+    pub fn bishop_attacks(bishops: BitBoard, all_pieces: BitBoard) -> BitBoard {
         let mut acc = BitBoard::empty();
-        for i in pieces {
-            acc |= sliding_attacks::compute_bishop_attacks(i, self.pieces());
+        for i in bishops {
+            acc |= sliding_attacks::compute_bishop_attacks(i, all_pieces);
         }
         acc
     }
 
-    pub fn bishop_queen_attacks_pos(&self, pos: Posn, color: Color) -> BitBoard {
-        let pieces = self.piece(color, Piece::Queen) | self.piece(color, Piece::Bishop);
-
-        let attacked_from = sliding_attacks::compute_bishop_attacks(pos, self.pieces());
-        pieces & attacked_from
+    pub fn bishop_attacks_pos(bishops: BitBoard, all_pieces: BitBoard, pos: Posn) -> BitBoard {
+        let attacked_from = sliding_attacks::compute_bishop_attacks(pos, all_pieces);
+        bishops & attacked_from
     }
 
     pub fn queen_captures_it(&self) -> QueenCaptures {
@@ -1126,16 +1118,6 @@ impl Board {
         }
     }
 
-    pub fn bishop_attacks(&self, color: Color) -> BitBoard {
-        let bishops = self.piece(color, Piece::Bishop);
-
-        let mut acc = BitBoard::empty();
-        for i in bishops {
-            acc |= sliding_attacks::compute_bishop_attacks(i, self.pieces())
-        }
-        acc
-    }
-
     pub fn bishop_captures_it(&self) -> BishopCaptures {
         let bishops = match self.to_play {
             Color::White => self.white_pieces,
@@ -1199,16 +1181,12 @@ impl Board {
         })
     }
 
-    pub fn king_attacks_pos(&self, pos: Posn, color: Color) -> BitBoard {
-        let kings = self.piece(color, Piece::King);
-
+    pub fn king_attacks_pos(kings: BitBoard, pos: Posn) -> BitBoard {
         let attacked_from = KING_ATTACKS[pos.idx() as usize];
         kings & attacked_from
     }
 
-    pub fn king_attacks(&self, color: Color) -> BitBoard {
-        let kings = self.piece(color, Piece::King);
-
+    pub fn king_attacks(kings: BitBoard) -> BitBoard {
         if kings.0 == 0 {
             BitBoard::empty()
         } else {
@@ -1388,14 +1366,12 @@ impl Board {
         })
     }
 
-    pub fn knight_attacks_pos(&self, pos: Posn, color: Color) -> BitBoard {
-        let knights = self.piece(color, Piece::Knight);
+    pub fn knight_attacks_pos(knights: BitBoard, pos: Posn) -> BitBoard {
         let attacked_from = KNIGHT_ATTACKS[pos.idx() as usize];
         knights & attacked_from
     }
 
-    pub fn knight_attacks(&self, color: Color) -> BitBoard {
-        let knights = self.piece(color, Piece::Knight);
+    pub fn knight_attacks(knights: BitBoard) -> BitBoard {
         knights.into_iter().fold(BitBoard::empty(), |acc, knight| {
             acc | KNIGHT_ATTACKS[knight.idx() as usize]
         })
@@ -1452,9 +1428,7 @@ impl Board {
         }
     }
 
-    pub fn pawn_attacks_pos(&self, pos: Posn, color: Color) -> BitBoard {
-        let pawns = self.piece(color, Piece::Pawn);
-
+    pub fn pawn_attacks_pos(pawns: BitBoard, pos: Posn, color: Color) -> BitBoard {
         let attacked_from = match color {
             Color::White => [pos.se(), pos.sw()],
             Color::Black => [pos.ne(), pos.nw()],
@@ -1465,17 +1439,16 @@ impl Board {
         pawns & attacked_from
     }
 
-    pub fn pawn_attacks(&self, color: Color) -> BitBoard {
-        self.piece(color, Piece::Pawn)
-            .fold(BitBoard::empty(), |acc, p| {
-                acc | match color {
-                    Color::White => [p.ne(), p.nw()],
-                    Color::Black => [p.se(), p.sw()],
-                }
-                .into_iter()
-                .flatten()
-                .fold(BitBoard::empty(), |acc, p| acc | p)
-            })
+    pub fn pawn_attacks(pawns: BitBoard, color: Color) -> BitBoard {
+        pawns.fold(BitBoard::empty(), |acc, p| {
+            acc | match color {
+                Color::White => [p.ne(), p.nw()],
+                Color::Black => [p.se(), p.sw()],
+            }
+            .into_iter()
+            .flatten()
+            .fold(BitBoard::empty(), |acc, p| acc | p)
+        })
     }
 
     pub fn pawn_captures_it(&self) -> PawnCaptures {

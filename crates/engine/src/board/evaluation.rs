@@ -169,17 +169,29 @@ impl Board {
             return Evaluation(phase1_eval);
         }
 
-        let attacks_white = self.rook_queen_attacks(Color::White)
-            | self.bishop_queen_attacks(Color::White)
-            | self.king_attacks(Color::White)
-            | self.pawn_attacks(Color::White)
-            | self.knight_attacks(Color::White);
+        let attacks_white = Self::rook_attacks(
+            self.piece(Color::White, Piece::Rook)
+            | self.piece(Color::White, Piece::Queen),
+            self.pieces(),
+        ) | Self::bishop_attacks(
+            self.piece(Color::White, Piece::Bishop)
+            | self.piece(Color::White, Piece::Queen),
+            self.pieces(),
+        ) | Self::king_attacks(self.piece(Color::White, Piece::King))
+            | Self::pawn_attacks(self.piece(Color::White, Piece::Pawn), Color::White)
+            | Self::knight_attacks(self.piece(Color::White, Piece::Knight));
 
-        let attacks_black = self.rook_queen_attacks(Color::Black)
-            | self.bishop_queen_attacks(Color::Black)
-            | self.king_attacks(Color::Black)
-            | self.pawn_attacks(Color::Black)
-            | self.knight_attacks(Color::Black);
+        let attacks_black = Self::rook_attacks(
+            self.piece(Color::Black, Piece::Rook)
+            | self.piece(Color::Black, Piece::Queen),
+            self.pieces(),
+        ) | Self::bishop_attacks(
+            self.piece(Color::Black, Piece::Bishop)
+            | self.piece(Color::Black, Piece::Queen),
+            self.pieces(),
+        ) | Self::king_attacks(self.piece(Color::Black, Piece::King))
+            | Self::pawn_attacks(self.piece(Color::Black, Piece::Pawn), Color::Black)
+            | Self::knight_attacks(self.piece(Color::Black, Piece::Knight));
 
         let attacks_diff = attacks_white.len() as i16 - attacks_black.len() as i16;
         let doubled_pawns =
@@ -336,16 +348,44 @@ impl Board {
 
         let mut from_set = BitBoard::from(from_square);
         let mut occ = self.pieces();
-        let mut attadef = self.king_attacks_pos(to_square, Color::White)
-            | self.king_attacks_pos(to_square, Color::Black)
-            | self.rook_queen_attacks_pos(to_square, Color::White)
-            | self.rook_queen_attacks_pos(to_square, Color::Black)
-            | self.bishop_queen_attacks_pos(to_square, Color::White)
-            | self.bishop_queen_attacks_pos(to_square, Color::Black)
-            | self.knight_attacks_pos(to_square, Color::White)
-            | self.knight_attacks_pos(to_square, Color::Black)
-            | self.pawn_attacks_pos(to_square, Color::White)
-            | self.pawn_attacks_pos(to_square, Color::Black);
+        let mut attadef = Self::king_attacks_pos(self.piece(Color::White, Piece::King), to_square)
+            | Self::king_attacks_pos(self.piece(Color::Black, Piece::King), to_square)
+            | Self::rook_attacks_pos(
+                self.piece(Color::White, Piece::Rook)
+                | self.piece(Color::White, Piece::Queen),
+                self.pieces(),
+                to_square,
+            )
+            | Self::rook_attacks_pos(
+                self.piece(Color::Black, Piece::Rook)
+                | self.piece(Color::Black, Piece::Queen),
+                self.pieces(),
+                to_square,
+            )
+            | Self::bishop_attacks_pos(
+                self.piece(Color::White, Piece::Bishop)
+                | self.piece(Color::White, Piece::Queen),
+                self.pieces(),
+                to_square,
+            )
+            | Self::bishop_attacks_pos(
+                self.piece(Color::Black, Piece::Bishop)
+                | self.piece(Color::Black, Piece::Queen),
+                self.pieces(),
+                to_square,
+            )
+            | Self::knight_attacks_pos(self.piece(Color::White, Piece::Knight), to_square)
+            | Self::knight_attacks_pos(self.piece(Color::Black, Piece::Knight), to_square)
+            | Self::pawn_attacks_pos(
+                self.piece(Color::White, Piece::Pawn),
+                to_square,
+                Color::White,
+            )
+            | Self::pawn_attacks_pos(
+                self.piece(Color::Black, Piece::Pawn),
+                to_square,
+                Color::Black,
+            );
         gain[d] = PIECE_VALUES[target as usize];
         loop {
             d += 1; // next depth and side

@@ -1153,11 +1153,21 @@ impl Board {
     }
 
     pub fn attacked_by_side(&self, pos: Posn, color: Color) -> bool {
-        !self.knight_attacks_pos(pos, color).is_empty()
-            || !self.rook_queen_attacks_pos(pos, color).is_empty()
-            || !self.bishop_queen_attacks_pos(pos, color).is_empty()
-            || !self.pawn_attacks_pos(pos, color).is_empty()
-            || !self.king_attacks_pos(pos, color).is_empty()
+        !Self::knight_attacks_pos(self.piece(color, Piece::Knight), pos).is_empty()
+            || !Self::rook_attacks_pos(
+                self.piece(color, Piece::Rook) | self.piece(color, Piece::Queen),
+                self.pieces(),
+                pos,
+            )
+            .is_empty()
+            || !Self::bishop_attacks_pos(
+                self.piece(color, Piece::Bishop) | self.piece(color, Piece::Queen),
+                self.pieces(),
+                pos,
+            )
+            .is_empty()
+            || !Self::pawn_attacks_pos(self.piece(color, Piece::Pawn), pos, color).is_empty()
+            || !Self::king_attacks_pos(self.piece(color, Piece::King), pos).is_empty()
     }
 
     pub fn white_pieces(&self) -> BitBoard {
