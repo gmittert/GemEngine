@@ -130,6 +130,7 @@ pub struct Board {
     // Metadata about the current search
     pub seldepth: u16,
     pub nodes: usize,
+    pub qnodes: usize,
 
     #[cfg(feature = "nnue")]
     pub white_features: nnue::Accumulator,
@@ -1138,8 +1139,10 @@ impl Board {
             Color::Black => self.black_pieces,
             Color::White => self.white_pieces,
         };
-        pieces.into_iter().position(|pieces| pieces.contains(p)).map(
-            |piece| unsafe{std::mem::transmute::<u8, Piece>(piece as u8)})
+        pieces
+            .into_iter()
+            .position(|pieces| pieces.contains(p))
+            .map(|piece| unsafe { std::mem::transmute::<u8, Piece>(piece as u8) })
     }
 
     pub fn in_check(&self, color: Color) -> bool {
@@ -1199,8 +1202,8 @@ impl Board {
         self.seldepth = 0;
         self.nodes = 0;
     }
-    pub fn get_stats(&mut self) -> (u16, usize) {
-        (self.seldepth, self.nodes)
+    pub fn get_stats(&mut self) -> (u16, usize, usize) {
+        (self.seldepth, self.nodes, self.qnodes)
     }
 }
 
@@ -1327,6 +1330,7 @@ pub fn empty_board(turn: Color) -> Board {
         game_phase: 0,
         killer_moves: [[None, None]; 16],
         nodes: 0,
+        qnodes: 0,
         seldepth: 0,
         #[cfg(feature = "nnue")]
         white_features: nnue::Accumulator::new(&nnue::NNUE),

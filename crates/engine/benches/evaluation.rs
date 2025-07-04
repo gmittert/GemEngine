@@ -197,6 +197,31 @@ pub fn london(c: &mut Criterion) {
     group.finish()
 }
 
+pub fn london_qnodes(c: &mut Criterion<Nodes>) {
+    let mut group = c.benchmark_group("london_qnodes");
+    for num_cpus in [1, 2, 4, 8, 16, 32, 64].iter() {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(num_cpus),
+            num_cpus,
+            |b, &num_cpus| {
+                let mut board = board::Board::from_fen(
+                    "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
+                )
+                .expect("Invalid fen?");
+                b.iter_custom(|iters| {
+                    let mut qnodes = 0;
+                    for _i in 0..iters {
+                        let _ = board.it_depth_best_move(4, num_cpus);
+                        qnodes += board.qnodes;
+                    }
+                    qnodes
+                })
+            },
+        );
+    }
+    group.finish()
+}
+
 pub fn london_nodes(c: &mut Criterion<Nodes>) {
     let mut group = c.benchmark_group("london_nodes");
     for num_cpus in [1, 2, 4, 8, 16, 32, 64].iter() {
@@ -273,7 +298,7 @@ criterion_group!(
 criterion_group!(
     name = node_efficiency;
     config = Criterion::default().warm_up_time(Duration::from_nanos(1)).with_measurement(Nodes);
-    targets = london_nodes
+    targets = london_nodes, london_qnodes
 );
 criterion_group!(
     name = node_throughput;

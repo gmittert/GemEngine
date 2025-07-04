@@ -169,13 +169,7 @@ impl fmt::Display for Move {
                     );
                 }
                 None => {
-                    return write!(
-                        f,
-                        "{}{}{}",
-                        self.to.file(),
-                        self.to.rank(),
-                        promo,
-                    );
+                    return write!(f, "{}{}{}", self.to.file(), self.to.rank(), promo,);
                 }
             },
         };

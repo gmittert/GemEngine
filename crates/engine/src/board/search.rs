@@ -18,6 +18,7 @@ pub struct SearchInfo {
     pub nodes_per_sec: usize,
     pub seldepth: u16,
     pub hash_full: usize,
+    pub qnodes: usize,
 }
 
 #[derive(Debug)]
@@ -58,12 +59,13 @@ impl Board {
             depth += 1;
         }
 
-        let (seldepth, nodes) = self.get_stats();
+        let (seldepth, nodes, qnodes) = self.get_stats();
         let elapsed_ms = start.elapsed().as_millis().min(1);
         let info = SearchInfo {
             depth,
             seldepth: max(seldepth, self.half_move) - self.half_move,
             nodes,
+            qnodes,
             nodes_per_sec: 1000 * self.nodes / elapsed_ms as usize,
             time,
             hash_full: cache.hash_usage(),
@@ -103,11 +105,13 @@ impl Board {
         let cv = Condvar::new();
         let total_seldepth = AtomicU16::new(0);
         let total_nodes = AtomicUsize::new(self.nodes);
+        let total_qnodes = AtomicUsize::new(self.qnodes);
         let res = rayon::scope(|s| {
             for _ in 0..num_threads {
                 s.spawn(|_| {
                     let mut new_b = self.clone();
                     new_b.nodes = 0;
+                    new_b.qnodes = 0;
                     let res = new_b.pvs(
                         Evaluation::lost(self.half_move),
                         Evaluation::won(self.half_move),
@@ -117,6 +121,7 @@ impl Board {
                         ExpectedNodeType::PV,
                     );
                     let _ = &total_nodes.fetch_add(new_b.nodes, Ordering::AcqRel);
+                    let _ = &total_qnodes.fetch_add(new_b.qnodes, Ordering::AcqRel);
                     let _ = &total_seldepth.fetch_max(new_b.seldepth, Ordering::AcqRel);
                     if let Some(res) = res {
                         let mut eval = result.lock().unwrap();
@@ -152,10 +157,12 @@ impl Board {
         });
         self.seldepth = total_seldepth.load(Ordering::Acquire);
         self.nodes = total_nodes.load(Ordering::Acquire);
+        self.qnodes = total_qnodes.load(Ordering::Acquire);
         res
     }
 
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
+        self.qnodes += 1;
         let mut alpha = alpha;
         let stand_pat = self.eval(alpha, beta, self.to_play);
         tracing::event!(Level::INFO, stand_pat = stand_pat.0);
