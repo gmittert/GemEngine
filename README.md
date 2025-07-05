@@ -13,12 +13,12 @@ Cute Chess.
 
 ## Features
 
-- Multi core search
+- Lazy SMP Multi core search
 - Alpha beta search
 - PV Search
 - Zobrist hashing
 - Magic bit boards
-- Lockless transposition tables
+- xor-"lockless" Transposition Table
 - Iterative deeping search
 - Quiescence search
 - Static Exchange Evaluation

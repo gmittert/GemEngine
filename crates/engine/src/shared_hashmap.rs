@@ -1,8 +1,4 @@
-use portable_atomic::AtomicU128;
-use std::{
-    marker::PhantomData,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::cell::UnsafeCell;
 
 pub trait Encodable {
     fn from_u64(v: u64) -> Self;
@@ -19,62 +15,119 @@ impl Encodable for u64 {
     }
 }
 
-#[derive(Debug)]
-pub struct SharedHashMapEntry<T: Encodable> {
-    data: AtomicU128,
-    _value: PhantomData<T>,
+#[derive(Debug, Copy, Clone)]
+pub struct SharedHashMapEntry<T: Encodable + Copy + Clone> {
+    key_xor_v: u64,
+    value: T,
 }
 
 #[derive(Debug)]
-pub struct SharedHashMap<T: Encodable, const N: usize> {
-    data: Box<[SharedHashMapEntry<T>; N]>,
-    accepted: AtomicUsize,
+pub struct SharedHashMapInner<T: Encodable + Copy + Clone, const N: usize> {
+    data: UnsafeCell<[SharedHashMapEntry<T>; N]>,
 }
 
-/// A very simple lockless hashmap that supports get/set. The map also supports updates, but only
+#[derive(Debug)]
+pub struct SharedHashMap<T: Encodable + Copy + Clone, const N: usize> {
+    data: Box<SharedHashMapInner<T, N>>,
+}
+
+/// A very simple "lockless" hashmap that supports get/set. The map also supports updates, but only
 /// updates of values, the key must remain the same. This allows us to update the evaluation of a
 /// node if we compute the evaluation to a deeper later on due to reusing the cache between
 /// iteration of iterative deepening.
 ///
-/// I can't think of a way to support updates without introducing some sort of read/write in flight
-/// bit(s) that readers would have to increment or check for invalidations. Since I'd like to
-/// optimize for as cheap reads as possible
+/// In the pursuit of speed over correctness, we don't use atomics at all. Instead, we store the
+/// value along side the key xor'd with the value. If the key we're looking up doesn't xor
+/// correctly, we return that it's not found.
 ///
 /// Keys are stored next to the values they are associated with using modulo to find a spot. If the
 /// spot is already taken the insert will fail.
-unsafe impl<T: Encodable, const N: usize> Send for SharedHashMap<T, N> {}
-unsafe impl<T: Encodable, const N: usize> Sync for SharedHashMap<T, N> {}
-impl<T: Encodable, const N: usize> Default for SharedHashMap<T, N> {
+/// 
+/// Really though, this is just 4 hashmaps, and we try to search/find from each one in turn,
+/// starting from the smallest to the largest.
+unsafe impl<T: Encodable + Copy + Clone, const N: usize> Send for SharedHashMap<T, N> {}
+unsafe impl<T: Encodable + Copy + Clone, const N: usize> Sync for SharedHashMap<T, N> {}
+impl<T: Encodable + Copy + Clone, const N: usize> Default for SharedHashMap<T, N> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
-    pub fn hash_usage(&self) -> usize {
-        (1000 * self.accepted.load(Ordering::Relaxed)) / N
-    }
+impl<T: Encodable + Copy + Clone, const N: usize> SharedHashMap<T, N> {
     pub fn new() -> SharedHashMap<T, N> {
         // We use the nightly "new_zeroed" because doing a regular box new causes a stack overflow
-        // on non release builds. We also can't just do a `vec![SharedHashMapEntry::new(0,0); N]`
-        // because the atomics are not clonable.
-        let data = Box::<[SharedHashMapEntry<T>; N]>::new_zeroed();
+        // on non release builds.
+        let data = Box::<SharedHashMapInner<T, N>>::new_zeroed();
         let data = unsafe { data.assume_init() };
 
-        SharedHashMap::<T, N> {
-            data,
-            accepted: AtomicUsize::new(0),
-        }
+        SharedHashMap::<T, N> { data }
     }
 
+    pub fn clear(&self) {
+        (&mut unsafe { *self.data.data.get() }).fill(SharedHashMapEntry {
+            key_xor_v: 0,
+            value: T::from_u64(0),
+        })
+    }
+
+    // How deep we are able to search corresponds to how sparsely our hashmap will be filled, which
+    // corresponds to how long we are able to search for. We don't know how long we are going to
+    // search for a priori, this means we don't know how big our hashmap should be.
+    //
+    // Too big, and our use of modulo to place keys will randomly space them out through the, e.g.
+    // 256MiB of memory. Every insert is going to eat overhead creating pages, then paging them
+    // into cache.
+    //
+    // Too small, and we don't fit all the thing we want to cache.
+    //
+    // Instead, we attempt to somewhat naturally let the data choose the amount of pages it needs
+    // by having a multi-level modulus attempting to somewhat densely pack entries into the front
+    // of the map until it gets filled up.
+    //
+    // We have a form of n-hashing each entry can have several sections it can live, each section
+    // larger than the last. If an entry isn't in the first section, we continue checking via the
+    // later section hashes until it's found, or we find an empty key.
+    const THRESHOLDS: [usize; 4] = [128 * 1024, 1024 * 1024, 16 * 1024 * 1024, N];
+    const LEVELS: [usize; 4] = [
+        if N > Self::THRESHOLDS[0] {
+            Self::THRESHOLDS[0]
+        } else {
+            N
+        },
+        if N > Self::THRESHOLDS[1] {
+            Self::THRESHOLDS[1]
+        } else {
+            N
+        },
+        if N > Self::THRESHOLDS[2] {
+            Self::THRESHOLDS[2]
+        } else {
+            N
+        },
+        N,
+    ];
+
     pub fn get(&self, k: u64) -> Option<T> {
-        let pos: usize = k as usize % N;
-        let entry = self.data[pos].data.load(Ordering::Relaxed);
-        let header = (entry >> 64) as u64;
-        if header == 0 || header != k {
+        if k == 0 {
             return None;
         }
-        Some(T::from_u64(entry as u64))
+
+        let mut offset = 0;
+        for section in Self::LEVELS {
+            let pos = (k as usize + offset) % section;
+            offset += 1;
+            let key_xor_v = unsafe { &*self.data.data.get() }[pos].key_xor_v;
+            let v = &unsafe { &*self.data.data.get() }[pos].value;
+            let key = key_xor_v ^ v.to_u64();
+            if key == 0 {
+                return None;
+            }
+            if key != k {
+                continue;
+            }
+            return Some(T::from_u64(v.to_u64()));
+        }
+        None
     }
 
     /// Store a new key value pair in the hashmap. `insert` will not overwrite an existing entry,
@@ -90,26 +143,21 @@ impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
         // non zero).
         debug_assert_ne!(v.to_u64(), 0);
 
-        // Modulo is fine for now, our zorbrist keys are hopefully effectively random. Since we
-        // bail immediately if the spot is taken rather than trying to find a new one, we're not
-        // worried about bunching or needing a backup method.
-        let pos: usize = k as usize % N;
-        let entry = &self.data[pos].data;
+        let mut offset = 0;
+        for section in Self::LEVELS {
+            let pos = (k as usize + offset) % section;
+            offset += 1;
+            let data = unsafe { &mut *self.data.data.get() };
+            let exiting_key = &data[pos].key_xor_v;
+            if *exiting_key != 0 {
+                continue;
+            }
 
-        // Rather than checking the key, when we insert, we just try to insert the value
-        //
-        // The trick we'll rely on is that we're only allowed to replace an unintialized value, and
-        // the atomic cmpexchg will ensure that only one writer actually gets to write that value.
-        let expected = ((k as u128) << 64) | v.to_u64() as u128;
-        if entry
-            .compare_exchange(0, expected, Ordering::Relaxed, Ordering::Relaxed)
-            .is_err()
-        {
-            false
-        } else {
-            self.accepted.fetch_add(1, Ordering::Relaxed);
-            true
+            data[pos].key_xor_v = k ^ v.to_u64();
+            data[pos].value = v;
+            return true;
         }
+        false
     }
 
     /// Update an existing key in the hashmap from a known existing value to a new one.
@@ -117,28 +165,31 @@ impl<T: Encodable, const N: usize> SharedHashMap<T, N> {
     /// Returns the value previously contained in the hashmap. On a success, this will be equal to
     /// `from`.
     pub fn update(&self, k: u64, from: T, to: T) -> Result<T, T> {
-        let pos: usize = k as usize % N;
+        let mut offset = 0;
+        for section in Self::LEVELS {
+            let pos = (k as usize + offset) % section;
+            offset += 1;
 
-        // We don't really care about the ordering on success or failure here. The data will be
-        // valid regardless of whether a reader gets the old or new value.
-        let expected = ((k as u128) << 64) | from.to_u64() as u128;
-        let desired = ((k as u128) << 64) | to.to_u64() as u128;
-        match self.data[pos].data.compare_exchange(
-            expected,
-            desired,
-            Ordering::Relaxed,
-            Ordering::Relaxed,
-        ) {
-            Ok(v) => Ok(T::from_u64(v as u64)),
-            Err(v) => Err(T::from_u64(v as u64)),
+            let data = unsafe { &mut *self.data.data.get() };
+            let existing_value = &data[pos].value;
+            let existing_keyxv = &data[pos].key_xor_v;
+            let existing_key = existing_keyxv ^ existing_value.to_u64();
+            if existing_key != k {
+                continue;
+            }
+            if existing_value.to_u64() != from.to_u64() {
+                return Err(*existing_value);
+            }
+            data[pos].key_xor_v = k ^ to.to_u64();
+            data[pos].value = to;
+            return Ok(from);
         }
+        Err(T::from_u64(0))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::SharedHashMap;
 
     #[test]
@@ -162,56 +213,58 @@ mod tests {
     fn update_different_key() {
         let map: SharedHashMap<u64, 1024> = SharedHashMap::new();
         for i in 2..1026 {
-            let val = map.insert(i, i);
+            let val = map.insert(i, 10000 - i);
             assert_eq!(val, true);
         }
         for i in 2..1026 {
-            let val = map.insert(i + 1024, i);
-            assert_eq!(val, false);
+            // Wrong from
+            let val = map.update(i, 100 + i, 10000 + i);
+            assert_eq!(val, Err(10000 - i));
+        }
+        for i in 2..1026 {
+            // Doesn't exist
+            let val = map.update(i + 2024, 100 + i, 10000 + i);
+            assert_eq!(val, Err(0));
         }
     }
 
     #[test]
     fn update_same_key() {
         let map: SharedHashMap<u64, 1024> = SharedHashMap::new();
-        for i in 2..1026 {
-            let val = map.insert(i, i);
+        for i in 1..1025 {
+            let val = map.insert(i, 100000 - i);
             assert_eq!(val, true);
         }
-        for i in 2..1026 {
-            let val = map.update(i, i, i + 1024);
-            assert_eq!(val, Ok(i));
+        for i in 1..1025 {
+            let val = map.update(i, 100000 - i, (100000 - i) + 1024);
+            assert_eq!(val, Ok(100000 - i));
         }
-        for i in 2..1026 {
+        for i in 1..1025 {
             let val = map.get(i);
-            assert_eq!(val, Some(i + 1024));
+            assert_eq!(val, Some((100000 - i) + 1024));
         }
     }
 
     #[test]
     fn concurrent() {
-        let map: Arc<SharedHashMap<u64, 10000>> = Arc::new(SharedHashMap::new());
-        let r1_map = map.clone();
-        let r2_map = map.clone();
-        let r3_map = map.clone();
-        let r1 = std::thread::spawn(move || {
-            for i in 10000..20000 {
-                r1_map.insert(i, i);
-            }
+        let map: SharedHashMap<u64, 10000> = SharedHashMap::new();
+        rayon::scope(|s| {
+            s.spawn(|_| {
+                for i in 10000..20000 {
+                    map.insert(i, i);
+                }
+            });
+            s.spawn(|_| {
+                for i in 20000..30000 {
+                    map.insert(i, i);
+                }
+            });
+            s.spawn(|_| {
+                for i in 30000..40000 {
+                    map.insert(i, i);
+                }
+            });
         });
-        let r2 = std::thread::spawn(move || {
-            for i in 20000..30000 {
-                r2_map.insert(i, i);
-            }
-        });
-        let r3 = std::thread::spawn(move || {
-            for i in 30000..40000 {
-                r3_map.insert(i, i);
-            }
-        });
-        let _ = r1.join();
-        let _ = r2.join();
-        let _ = r3.join();
         let mut inserted_vals = 0;
         for i in 3..40000 {
             if let Some(val) = map.get(i) {

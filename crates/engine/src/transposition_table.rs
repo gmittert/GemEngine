@@ -126,8 +126,8 @@ impl<const N: usize> TranspositionTable<N> {
     pub fn new() -> TranspositionTable<N> {
         TranspositionTable::<N>(SharedHashMap::new())
     }
-    pub fn hash_usage(&self) -> usize {
-        self.0.hash_usage()
+    pub fn clear(&self) {
+        self.0.clear();
     }
     pub fn get(
         &self,
@@ -174,7 +174,9 @@ impl<const N: usize> TranspositionTable<N> {
         depth: u16,
         node_type: ScoreType,
     ) {
-        let mut expected = self.0.get(hash).unwrap();
+        let Some(mut expected) = self.0.get(hash) else {
+            return;
+        };
         while depth > expected.depth() {
             if let Err(v) = self.0.update(
                 hash,

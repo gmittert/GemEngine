@@ -68,7 +68,7 @@ impl Board {
             qnodes,
             nodes_per_sec: 1000 * self.nodes / elapsed_ms as usize,
             time,
-            hash_full: cache.hash_usage(),
+            hash_full: 0,
         };
         (
             completed_search

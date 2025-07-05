@@ -170,24 +170,20 @@ impl Board {
         }
 
         let attacks_white = Self::rook_attacks(
-            self.piece(Color::White, Piece::Rook)
-            | self.piece(Color::White, Piece::Queen),
+            self.piece(Color::White, Piece::Rook) | self.piece(Color::White, Piece::Queen),
             self.pieces(),
         ) | Self::bishop_attacks(
-            self.piece(Color::White, Piece::Bishop)
-            | self.piece(Color::White, Piece::Queen),
+            self.piece(Color::White, Piece::Bishop) | self.piece(Color::White, Piece::Queen),
             self.pieces(),
         ) | Self::king_attacks(self.piece(Color::White, Piece::King))
             | Self::pawn_attacks(self.piece(Color::White, Piece::Pawn), Color::White)
             | Self::knight_attacks(self.piece(Color::White, Piece::Knight));
 
         let attacks_black = Self::rook_attacks(
-            self.piece(Color::Black, Piece::Rook)
-            | self.piece(Color::Black, Piece::Queen),
+            self.piece(Color::Black, Piece::Rook) | self.piece(Color::Black, Piece::Queen),
             self.pieces(),
         ) | Self::bishop_attacks(
-            self.piece(Color::Black, Piece::Bishop)
-            | self.piece(Color::Black, Piece::Queen),
+            self.piece(Color::Black, Piece::Bishop) | self.piece(Color::Black, Piece::Queen),
             self.pieces(),
         ) | Self::king_attacks(self.piece(Color::Black, Piece::King))
             | Self::pawn_attacks(self.piece(Color::Black, Piece::Pawn), Color::Black)
@@ -351,26 +347,22 @@ impl Board {
         let mut attadef = Self::king_attacks_pos(self.piece(Color::White, Piece::King), to_square)
             | Self::king_attacks_pos(self.piece(Color::Black, Piece::King), to_square)
             | Self::rook_attacks_pos(
-                self.piece(Color::White, Piece::Rook)
-                | self.piece(Color::White, Piece::Queen),
+                self.piece(Color::White, Piece::Rook) | self.piece(Color::White, Piece::Queen),
                 self.pieces(),
                 to_square,
             )
             | Self::rook_attacks_pos(
-                self.piece(Color::Black, Piece::Rook)
-                | self.piece(Color::Black, Piece::Queen),
+                self.piece(Color::Black, Piece::Rook) | self.piece(Color::Black, Piece::Queen),
                 self.pieces(),
                 to_square,
             )
             | Self::bishop_attacks_pos(
-                self.piece(Color::White, Piece::Bishop)
-                | self.piece(Color::White, Piece::Queen),
+                self.piece(Color::White, Piece::Bishop) | self.piece(Color::White, Piece::Queen),
                 self.pieces(),
                 to_square,
             )
             | Self::bishop_attacks_pos(
-                self.piece(Color::Black, Piece::Bishop)
-                | self.piece(Color::Black, Piece::Queen),
+                self.piece(Color::Black, Piece::Bishop) | self.piece(Color::Black, Piece::Queen),
                 self.pieces(),
                 to_square,
             )
