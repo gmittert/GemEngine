@@ -11,7 +11,7 @@ fn eval_fen(fen: &str) -> Evaluation {
 }
 
 fn main() {
-    let mut trainer = nnue::get_trainer();
+    let mut trainer = nnue_train::get_trainer();
     trainer
         .optimiser
         .load_weights_from_file("checkpoints/1_simple-50/optimiser_state/weights.bin")

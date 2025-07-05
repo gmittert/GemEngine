@@ -16,7 +16,7 @@ fn main() {
     let initial_lr = 0.001;
     let final_lr = 0.001 * 0.3f32.powi(5);
 
-    let mut trainer = nnue::get_trainer();
+    let mut trainer = nnue_train::get_trainer();
 
     let schedule = TrainingSchedule {
         net_id: "1_simple".to_string(),

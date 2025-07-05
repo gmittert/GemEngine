@@ -312,6 +312,7 @@ version = "0.0.0"
 dependencies = [
  "engine",
  "nnue",
+ "nnue_train",
 ]
 
 [[package]]
@@ -509,8 +510,15 @@ checksum = "8456b021dfc471484f59d58babbe38656d1714bc96a75cfb12a5bfd976b8a829"
 name = "nnue"
 version = "0.0.0"
 dependencies = [
- "bullet_lib",
  "itertools 0.14.0",
+]
+
+[[package]]
+name = "nnue_train"
+version = "0.0.0"
+dependencies = [
+ "bullet_lib",
+ "nnue",
 ]
 
 [[package]]
@@ -1043,6 +1051,7 @@ version = "0.0.0"
 dependencies = [
  "bullet_lib",
  "nnue",
+ "nnue_train",
 ]
 
 [[package]]
