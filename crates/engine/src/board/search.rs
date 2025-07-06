@@ -252,8 +252,7 @@ impl Board {
         cache: &TranspositionTable<N>,
         should_stop: &AtomicBool,
     ) -> Option<Evaluation> {
-        #[cfg(not(feature = "nnue"))]
-        if self.game_phase == 24 {
+        if self.half_move > 50 {
             return None;
         }
         if target_depth - self.half_move < 2 || self.in_check(self.to_play) || beta.mate() {

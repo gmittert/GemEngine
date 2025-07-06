@@ -24,8 +24,3 @@ harness = false
 [build-dependencies]
 bitboard = { path = "../bitboard" }
 magics = { path = "../magics" }
-
-[features]
-# Enable nnue based evaluation
-nnue = []
-

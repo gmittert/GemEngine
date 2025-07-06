@@ -70,12 +70,8 @@ impl Gem {
 
 impl UciEngine for Gem {
     fn uci(&mut self) -> Result<(), String> {
-        #[cfg(feature = "nnue")]
-        id("gem-nnue", "Gwen Mittertreiner");
-        #[cfg(not(feature = "nnue"))]
         id("gem", "Gwen Mittertreiner");
 
-        // TODO: Implement options
         GemOptions::report();
         uci_ok();
         Ok(())

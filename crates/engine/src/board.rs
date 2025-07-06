@@ -3,13 +3,6 @@ mod move_generation;
 pub mod search;
 mod sliding_attacks;
 
-#[cfg(not(feature = "nnue"))]
-use crate::piece_square_tables::EG_TABLE;
-#[cfg(not(feature = "nnue"))]
-use crate::piece_square_tables::GAME_PHASE_INC;
-#[cfg(not(feature = "nnue"))]
-use crate::piece_square_tables::MG_TABLE;
-
 use crate::parser::Parser;
 use crate::pgn;
 use crate::pgn::GameTermination;
@@ -114,14 +107,6 @@ pub struct Board {
     pub full_move: u16,
     pub hash: u64,
 
-    #[cfg(not(feature = "nnue"))]
-    pub mg_piece_values: [i16; 2],
-    #[cfg(not(feature = "nnue"))]
-    pub eg_piece_values: [i16; 2],
-    // A progression of the game (out of 24)
-    #[cfg(not(feature = "nnue"))]
-    pub game_phase: u8,
-
     pub last_irreversible: Vec<u16>,
     pub moves: Vec<(Option<Posn>, u64)>,
     pub move_rights: Vec<MoveRights>,
@@ -132,9 +117,7 @@ pub struct Board {
     pub nodes: usize,
     pub qnodes: usize,
 
-    #[cfg(feature = "nnue")]
     pub white_features: nnue::Accumulator,
-    #[cfg(feature = "nnue")]
     pub black_features: nnue::Accumulator,
 }
 
@@ -147,19 +130,8 @@ impl PartialEq for Board {
             && self.full_move == other.full_move
             && self.move_rights == other.move_rights
             && self.hash == other.hash
-            && {
-                #[cfg(feature = "nnue")]
-                {
-                    self.white_features == other.white_features
-                        && self.black_features == other.black_features
-                }
-                #[cfg(not(feature = "nnue"))]
-                {
-                    self.game_phase == other.game_phase
-                        && self.mg_piece_values == other.mg_piece_values
-                        && self.eg_piece_values == other.eg_piece_values
-                }
-            }
+            && self.white_features == other.white_features
+            && self.black_features == other.black_features
     }
 }
 
@@ -471,20 +443,17 @@ impl Board {
     }
 
     pub fn add_piece(&mut self, c: Color, p: Piece, pos: Posn) {
-        #[cfg(feature = "nnue")]
-        {
-            let pc = 64 * p as usize;
-            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-            // Since our nnue is trained using chessboard, we need to flip the board.
-            //
-            // TODO: retrain using our own board representation.
-            let sq = pos.idx() as usize ^ 7;
-            let perspective = usize::from(c == Color::White);
-            self.white_features
-                .add_feature([384, 0][perspective] + pc + sq, &nnue::NNUE);
-            self.black_features
-                .add_feature([0, 384][perspective] + pc + (sq ^ 56), &nnue::NNUE);
-        }
+        let pc = 64 * p as usize;
+        // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+        // Since our nnue is trained using chessboard, we need to flip the board.
+        //
+        // TODO: retrain using our own board representation.
+        let sq = pos.idx() as usize ^ 7;
+        let perspective = usize::from(c == Color::White);
+        self.white_features
+            .add_feature([384, 0][perspective] + pc + sq, &nnue::NNUE);
+        self.black_features
+            .add_feature([0, 384][perspective] + pc + (sq ^ 56), &nnue::NNUE);
 
         match c {
             Color::Black => {
@@ -494,32 +463,21 @@ impl Board {
                 self.white_pieces[p as usize] |= pos;
             }
         };
-        #[cfg(not(feature = "nnue"))]
-        {
-            let eg_val = EG_TABLE[c as usize][p as usize][pos.idx() as usize];
-            let mg_val = MG_TABLE[c as usize][p as usize][pos.idx() as usize];
-            self.eg_piece_values[c as usize] += eg_val;
-            self.mg_piece_values[c as usize] += mg_val;
-            self.game_phase += GAME_PHASE_INC[p as usize];
-        }
         self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
     }
 
     pub fn remove_piece(&mut self, c: Color, p: Piece, pos: Posn) {
-        #[cfg(feature = "nnue")]
-        {
-            let pc = 64 * p as usize;
-            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-            // Since our nnue is trained using chessboard, we need to flip the board.
-            //
-            // TODO: retrain using our own board representation.
-            let sq = pos.idx() as usize ^ 7;
-            let perspective = usize::from(c == Color::White);
-            self.white_features
-                .remove_feature([384, 0][perspective] + pc + sq, &nnue::NNUE);
-            self.black_features
-                .remove_feature([0, 384][perspective] + pc + (sq ^ 56), &nnue::NNUE);
-        }
+        let pc = 64 * p as usize;
+        // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+        // Since our nnue is trained using chessboard, we need to flip the board.
+        //
+        // TODO: retrain using our own board representation.
+        let sq = pos.idx() as usize ^ 7;
+        let perspective = usize::from(c == Color::White);
+        self.white_features
+            .remove_feature([384, 0][perspective] + pc + sq, &nnue::NNUE);
+        self.black_features
+            .remove_feature([0, 384][perspective] + pc + (sq ^ 56), &nnue::NNUE);
 
         match c {
             Color::Black => {
@@ -529,14 +487,6 @@ impl Board {
                 self.white_pieces[p as usize] &= !BitBoard::from(pos);
             }
         };
-        #[cfg(not(feature = "nnue"))]
-        {
-            let eg_val = EG_TABLE[c as usize][p as usize][pos.idx() as usize];
-            let mg_val = MG_TABLE[c as usize][p as usize][pos.idx() as usize];
-            self.eg_piece_values[c as usize] -= eg_val;
-            self.mg_piece_values[c as usize] -= mg_val;
-            self.game_phase -= GAME_PHASE_INC[p as usize];
-        }
         self.hash ^= ZOBRIST_KEYS.get_key(c, p, pos);
     }
     pub fn from_algeabraic_unchecked(&self, m: &AlgebraicMove) -> Move {
@@ -634,35 +584,32 @@ impl Board {
         to2: Posn,
         piece2: Piece,
     ) {
-        #[cfg(feature = "nnue")]
-        {
-            let pc1 = 64 * piece1 as usize;
-            let pc2 = 64 * piece2 as usize;
-            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-            // Since our nnue is trained using chessboard, we need to flip the board.
-            //
-            // TODO: retrain using our own board representation.
-            let from_sq1 = from1.idx() as usize ^ 7;
-            let to_sq1 = to1.idx() as usize ^ 7;
-            let from_sq2 = from1.idx() as usize ^ 7;
-            let to_sq2 = to1.idx() as usize ^ 7;
-            let perspective = usize::from(c == Color::White);
+        let pc1 = 64 * piece1 as usize;
+        let pc2 = 64 * piece2 as usize;
+        // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+        // Since our nnue is trained using chessboard, we need to flip the board.
+        //
+        // TODO: retrain using our own board representation.
+        let from_sq1 = from1.idx() as usize ^ 7;
+        let to_sq1 = to1.idx() as usize ^ 7;
+        let from_sq2 = from1.idx() as usize ^ 7;
+        let to_sq2 = to1.idx() as usize ^ 7;
+        let perspective = usize::from(c == Color::White);
 
-            self.white_features.add2_remove2_feature(
-                [384, 0][perspective] + pc1 + to_sq1,
-                [384, 0][perspective] + pc2 + to_sq2,
-                [384, 0][perspective] + pc1 + from_sq1,
-                [384, 0][perspective] + pc2 + from_sq2,
-                &nnue::NNUE,
-            );
-            self.black_features.add2_remove2_feature(
-                [0, 384][perspective] + pc1 + (to_sq1 ^ 56),
-                [0, 384][perspective] + pc2 + (to_sq2 ^ 56),
-                [0, 384][perspective] + pc1 + (from_sq1 ^ 56),
-                [0, 384][perspective] + pc2 + (from_sq2 ^ 56),
-                &nnue::NNUE,
-            );
-        }
+        self.white_features.add2_remove2_feature(
+            [384, 0][perspective] + pc1 + to_sq1,
+            [384, 0][perspective] + pc2 + to_sq2,
+            [384, 0][perspective] + pc1 + from_sq1,
+            [384, 0][perspective] + pc2 + from_sq2,
+            &nnue::NNUE,
+        );
+        self.black_features.add2_remove2_feature(
+            [0, 384][perspective] + pc1 + (to_sq1 ^ 56),
+            [0, 384][perspective] + pc2 + (to_sq2 ^ 56),
+            [0, 384][perspective] + pc1 + (from_sq1 ^ 56),
+            [0, 384][perspective] + pc2 + (from_sq2 ^ 56),
+            &nnue::NNUE,
+        );
         match c {
             Color::Black => {
                 self.black_pieces[piece1 as usize] &= !BitBoard::from(from1);
@@ -677,24 +624,6 @@ impl Board {
                 self.white_pieces[piece2 as usize] |= to2;
             }
         };
-        #[cfg(not(feature = "nnue"))]
-        {
-            let from_eg_val = EG_TABLE[c as usize][piece1 as usize][from1.idx() as usize];
-            let from_mg_val = MG_TABLE[c as usize][piece1 as usize][from1.idx() as usize];
-
-            let to_eg_val = EG_TABLE[c as usize][piece1 as usize][to1.idx() as usize];
-            let to_mg_val = MG_TABLE[c as usize][piece1 as usize][to1.idx() as usize];
-
-            let rook_from_eg_val = EG_TABLE[c as usize][piece2 as usize][from2.idx() as usize];
-            let rook_from_mg_val = MG_TABLE[c as usize][piece2 as usize][from2.idx() as usize];
-
-            let rook_to_eg_val = EG_TABLE[c as usize][piece2 as usize][to2.idx() as usize];
-            let rook_to_mg_val = MG_TABLE[c as usize][piece2 as usize][to2.idx() as usize];
-            self.eg_piece_values[c as usize] += to_eg_val - from_eg_val;
-            self.mg_piece_values[c as usize] += to_mg_val - from_mg_val;
-            self.eg_piece_values[c as usize] += rook_to_eg_val - rook_from_eg_val;
-            self.mg_piece_values[c as usize] += rook_to_mg_val - rook_from_mg_val;
-        }
         self.hash ^= ZOBRIST_KEYS.get_key(c, piece1, from1)
             ^ ZOBRIST_KEYS.get_key(c, piece1, to1)
             ^ ZOBRIST_KEYS.get_key(c, piece2, from2)
@@ -711,33 +640,30 @@ impl Board {
         capture_piece: Piece,
         capture_pos: Posn,
     ) {
-        #[cfg(feature = "nnue")]
-        {
-            let from_pc = 64 * from_piece as usize;
-            let to_pc = 64 * to_piece as usize;
-            let capture_pc = 64 * capture_piece as usize;
-            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-            // Since our nnue is trained using chessboard, we need to flip the board.
-            //
-            // TODO: retrain using our own board representation.
-            let from_sq = from.idx() as usize ^ 7;
-            let to_sq = to.idx() as usize ^ 7;
-            let capture_sq = capture_pos.idx() as usize ^ 7;
-            let perspective = usize::from(c == Color::White);
+        let from_pc = 64 * from_piece as usize;
+        let to_pc = 64 * to_piece as usize;
+        let capture_pc = 64 * capture_piece as usize;
+        // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+        // Since our nnue is trained using chessboard, we need to flip the board.
+        //
+        // TODO: retrain using our own board representation.
+        let from_sq = from.idx() as usize ^ 7;
+        let to_sq = to.idx() as usize ^ 7;
+        let capture_sq = capture_pos.idx() as usize ^ 7;
+        let perspective = usize::from(c == Color::White);
 
-            self.white_features.add1_remove2_feature(
-                [384, 0][perspective] + to_pc + to_sq,
-                [0, 384][perspective] + capture_pc + capture_sq,
-                [384, 0][perspective] + from_pc + from_sq,
-                &nnue::NNUE,
-            );
-            self.black_features.add1_remove2_feature(
-                [0, 384][perspective] + to_pc + (to_sq ^ 56),
-                [384, 0][perspective] + capture_pc + (capture_sq ^ 56),
-                [0, 384][perspective] + from_pc + (from_sq ^ 56),
-                &nnue::NNUE,
-            );
-        }
+        self.white_features.add1_remove2_feature(
+            [384, 0][perspective] + to_pc + to_sq,
+            [0, 384][perspective] + capture_pc + capture_sq,
+            [384, 0][perspective] + from_pc + from_sq,
+            &nnue::NNUE,
+        );
+        self.black_features.add1_remove2_feature(
+            [0, 384][perspective] + to_pc + (to_sq ^ 56),
+            [384, 0][perspective] + capture_pc + (capture_sq ^ 56),
+            [0, 384][perspective] + from_pc + (from_sq ^ 56),
+            &nnue::NNUE,
+        );
 
         match c {
             Color::Black => {
@@ -751,26 +677,6 @@ impl Board {
                 self.white_pieces[to_piece as usize] |= to;
             }
         };
-        #[cfg(not(feature = "nnue"))]
-        {
-            let from_eg_val = EG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
-            let from_mg_val = MG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
-
-            let to_eg_val = EG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
-            let to_mg_val = MG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
-
-            let capture_eg_val =
-                EG_TABLE[!c as usize][capture_piece as usize][capture_pos.idx() as usize];
-            let capture_mg_val =
-                MG_TABLE[!c as usize][capture_piece as usize][capture_pos.idx() as usize];
-            self.eg_piece_values[c as usize] += to_eg_val - from_eg_val;
-            self.mg_piece_values[c as usize] += to_mg_val - from_mg_val;
-            self.eg_piece_values[!c as usize] -= capture_eg_val;
-            self.mg_piece_values[!c as usize] -= capture_mg_val;
-            self.game_phase -= GAME_PHASE_INC[capture_piece as usize];
-            self.game_phase += GAME_PHASE_INC[to_piece as usize];
-            self.game_phase -= GAME_PHASE_INC[from_piece as usize];
-        }
         self.hash ^= ZOBRIST_KEYS.get_key(c, from_piece, from)
             ^ ZOBRIST_KEYS.get_key(c, to_piece, to)
             ^ ZOBRIST_KEYS.get_key(!c, capture_piece, capture_pos);
@@ -786,33 +692,30 @@ impl Board {
         capture_piece: Piece,
         capture_pos: Posn,
     ) {
-        #[cfg(feature = "nnue")]
-        {
-            let from_pc = 64 * from_piece as usize;
-            let to_pc = 64 * to_piece as usize;
-            let capture_pc = 64 * capture_piece as usize;
-            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-            // Since our nnue is trained using chessboard, we need to flip the board.
-            //
-            // TODO: retrain using our own board representation.
-            let from_sq = from.idx() as usize ^ 7;
-            let to_sq = to.idx() as usize ^ 7;
-            let capture_sq = capture_pos.idx() as usize ^ 7;
-            let perspective = usize::from(c == Color::White);
+        let from_pc = 64 * from_piece as usize;
+        let to_pc = 64 * to_piece as usize;
+        let capture_pc = 64 * capture_piece as usize;
+        // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+        // Since our nnue is trained using chessboard, we need to flip the board.
+        //
+        // TODO: retrain using our own board representation.
+        let from_sq = from.idx() as usize ^ 7;
+        let to_sq = to.idx() as usize ^ 7;
+        let capture_sq = capture_pos.idx() as usize ^ 7;
+        let perspective = usize::from(c == Color::White);
 
-            self.white_features.add2_remove1_feature(
-                [0, 384][perspective] + capture_pc + capture_sq,
-                [384, 0][perspective] + from_pc + from_sq,
-                [384, 0][perspective] + to_pc + to_sq,
-                &nnue::NNUE,
-            );
-            self.black_features.add2_remove1_feature(
-                [384, 0][perspective] + capture_pc + (capture_sq ^ 56),
-                [0, 384][perspective] + from_pc + (from_sq ^ 56),
-                [0, 384][perspective] + to_pc + (to_sq ^ 56),
-                &nnue::NNUE,
-            );
-        }
+        self.white_features.add2_remove1_feature(
+            [0, 384][perspective] + capture_pc + capture_sq,
+            [384, 0][perspective] + from_pc + from_sq,
+            [384, 0][perspective] + to_pc + to_sq,
+            &nnue::NNUE,
+        );
+        self.black_features.add2_remove1_feature(
+            [384, 0][perspective] + capture_pc + (capture_sq ^ 56),
+            [0, 384][perspective] + from_pc + (from_sq ^ 56),
+            [0, 384][perspective] + to_pc + (to_sq ^ 56),
+            &nnue::NNUE,
+        );
 
         match c {
             Color::Black => {
@@ -826,26 +729,6 @@ impl Board {
                 self.white_pieces[to_piece as usize] &= !BitBoard::from(to);
             }
         };
-        #[cfg(not(feature = "nnue"))]
-        {
-            let from_eg_val = EG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
-            let from_mg_val = MG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
-
-            let to_eg_val = EG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
-            let to_mg_val = MG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
-
-            let capture_eg_val =
-                EG_TABLE[!c as usize][capture_piece as usize][capture_pos.idx() as usize];
-            let capture_mg_val =
-                MG_TABLE[!c as usize][capture_piece as usize][capture_pos.idx() as usize];
-            self.eg_piece_values[c as usize] += from_eg_val - to_eg_val;
-            self.mg_piece_values[c as usize] += from_mg_val - to_mg_val;
-            self.eg_piece_values[!c as usize] += capture_eg_val;
-            self.mg_piece_values[!c as usize] += capture_mg_val;
-            self.game_phase += GAME_PHASE_INC[capture_piece as usize];
-            self.game_phase += GAME_PHASE_INC[from_piece as usize];
-            self.game_phase -= GAME_PHASE_INC[to_piece as usize];
-        }
         self.hash ^= ZOBRIST_KEYS.get_key(c, from_piece, from)
             ^ ZOBRIST_KEYS.get_key(c, to_piece, to)
             ^ ZOBRIST_KEYS.get_key(!c, capture_piece, capture_pos);
@@ -859,29 +742,26 @@ impl Board {
         to_piece: Piece,
         to: Posn,
     ) {
-        #[cfg(feature = "nnue")]
-        {
-            let from_pc = 64 * from_piece as usize;
-            let to_pc = 64 * to_piece as usize;
-            // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-            // Since our nnue is trained using chessboard, we need to flip the board.
-            //
-            // TODO: retrain using our own board representation.
-            let from_sq = from.idx() as usize ^ 7;
-            let to_sq = to.idx() as usize ^ 7;
-            let perspective = usize::from(c == Color::White);
+        let from_pc = 64 * from_piece as usize;
+        let to_pc = 64 * to_piece as usize;
+        // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
+        // Since our nnue is trained using chessboard, we need to flip the board.
+        //
+        // TODO: retrain using our own board representation.
+        let from_sq = from.idx() as usize ^ 7;
+        let to_sq = to.idx() as usize ^ 7;
+        let perspective = usize::from(c == Color::White);
 
-            self.white_features.add_remove_feature(
-                [384, 0][perspective] + to_pc + to_sq,
-                [384, 0][perspective] + from_pc + from_sq,
-                &nnue::NNUE,
-            );
-            self.black_features.add_remove_feature(
-                [0, 384][perspective] + to_pc + (to_sq ^ 56),
-                [0, 384][perspective] + from_pc + (from_sq ^ 56),
-                &nnue::NNUE,
-            );
-        }
+        self.white_features.add_remove_feature(
+            [384, 0][perspective] + to_pc + to_sq,
+            [384, 0][perspective] + from_pc + from_sq,
+            &nnue::NNUE,
+        );
+        self.black_features.add_remove_feature(
+            [0, 384][perspective] + to_pc + (to_sq ^ 56),
+            [0, 384][perspective] + from_pc + (from_sq ^ 56),
+            &nnue::NNUE,
+        );
 
         match c {
             Color::Black => {
@@ -893,18 +773,6 @@ impl Board {
                 self.white_pieces[to_piece as usize] |= to;
             }
         };
-        #[cfg(not(feature = "nnue"))]
-        {
-            let from_eg_val = EG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
-            let from_mg_val = MG_TABLE[c as usize][from_piece as usize][from.idx() as usize];
-
-            let to_eg_val = EG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
-            let to_mg_val = MG_TABLE[c as usize][to_piece as usize][to.idx() as usize];
-            self.eg_piece_values[c as usize] += to_eg_val - from_eg_val;
-            self.mg_piece_values[c as usize] += to_mg_val - from_mg_val;
-            self.game_phase += GAME_PHASE_INC[to_piece as usize];
-            self.game_phase -= GAME_PHASE_INC[from_piece as usize];
-        }
         self.hash ^=
             ZOBRIST_KEYS.get_key(c, from_piece, from) ^ ZOBRIST_KEYS.get_key(c, to_piece, to);
     }
@@ -1322,19 +1190,11 @@ pub fn empty_board(turn: Color) -> Board {
             },
         last_irreversible: vec![0],
         moves: vec![],
-        #[cfg(not(feature = "nnue"))]
-        mg_piece_values: [0, 0],
-        #[cfg(not(feature = "nnue"))]
-        eg_piece_values: [0, 0],
-        #[cfg(not(feature = "nnue"))]
-        game_phase: 0,
         killer_moves: [[None, None]; 16],
         nodes: 0,
         qnodes: 0,
         seldepth: 0,
-        #[cfg(feature = "nnue")]
         white_features: nnue::Accumulator::new(&nnue::NNUE),
-        #[cfg(feature = "nnue")]
         black_features: nnue::Accumulator::new(&nnue::NNUE),
     }
 }

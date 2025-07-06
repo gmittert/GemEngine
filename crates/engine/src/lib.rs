@@ -5,7 +5,6 @@ pub mod parser;
 pub mod perft;
 pub mod pgn;
 pub mod piece_attack_tables;
-pub mod piece_square_tables;
 pub mod shared_hashmap;
 pub mod transposition_table;
 pub mod uci;
