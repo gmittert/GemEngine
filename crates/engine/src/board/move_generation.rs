@@ -859,10 +859,8 @@ pub struct PsuedoLegalCaptures {
     iter: std::iter::Chain<
         std::iter::Chain<
             std::iter::Chain<
-                std::iter::Chain<std::iter::Chain<KnightCaptures, BishopCaptures>, RookCaptures>,
+                std::iter::Chain<std::iter::Chain<PawnCaptures, KnightCaptures>, BishopCaptures>, RookCaptures>,
                 QueenCaptures,
-            >,
-            PawnCaptures,
         >,
         KingCaptures,
     >,
@@ -872,11 +870,11 @@ impl PsuedoLegalCaptures {
     fn new(board: &Board) -> PsuedoLegalCaptures {
         PsuedoLegalCaptures {
             iter: board
-                .knight_captures_it()
+                .pawn_captures_it()
+                .chain(board.knight_captures_it())
                 .chain(board.bishop_captures_it())
                 .chain(board.rook_captures_it())
                 .chain(board.queen_captures_it())
-                .chain(board.pawn_captures_it())
                 .chain(board.king_captures_it()),
         }
     }
@@ -1438,34 +1436,48 @@ impl Board {
         .fold(BitBoard::empty(), |acc, p| acc | p);
         pawns & attacked_from
     }
-
     pub fn pawn_attacks(pawns: BitBoard, color: Color) -> BitBoard {
-        pawns.fold(BitBoard::empty(), |acc, p| {
-            acc | match color {
-                Color::White => [p.ne(), p.nw()],
-                Color::Black => [p.se(), p.sw()],
+        const A_FILE: u64 = 0x8080_8080_8080_8080;
+        const H_FILE: u64 = 0x0101_0101_0101_0101;
+        match color {
+            Color::Black => {
+                let sw_attacks = (pawns.0 & !A_FILE) >> 7;
+                let se_attacks = (pawns.0 & !H_FILE) << 9;
+                BitBoard(sw_attacks | se_attacks)
             }
-            .into_iter()
-            .flatten()
-            .fold(BitBoard::empty(), |acc, p| acc | p)
-        })
+            Color::White => {
+                let nw_attacks = (pawns.0 & !A_FILE) << 9;
+                let ne_attacks = (pawns.0 & !H_FILE) << 7;
+                BitBoard(nw_attacks | ne_attacks)
+            }
+        }
     }
 
     pub fn pawn_captures_it(&self) -> PawnCaptures {
         let color = self.to_play;
         let pawns = self.piece(color, Piece::Pawn);
-
         let opponent_pieces = match color {
             Color::White => self.black_pieces(),
             Color::Black => self.white_pieces(),
         };
 
-        PawnCaptures::new(
-            pawns,
-            opponent_pieces,
-            color,
-            self.move_rights.last().and_then(|r| r.ep_target),
-        )
+        let ep_target = self.move_rights.last().and_then(|r| r.ep_target);
+        let ep_pos = ep_target
+            .map(|f| {
+                BitBoard::from(Posn::from(
+                    match color {
+                        Color::Black => Rank::Three,
+                        Color::White => Rank::Five,
+                    },
+                    f,
+                ))
+            })
+            .unwrap_or(BitBoard::empty());
+
+        let attacked_pawns = Self::pawn_attacks(opponent_pieces, !color) | ep_pos;
+        let pawns = attacked_pawns & pawns;
+
+        PawnCaptures::new(pawns, opponent_pieces, color, ep_target)
     }
 
     pub fn pawn_moves_it(&self) -> PawnMoves {

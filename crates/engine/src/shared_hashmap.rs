@@ -42,7 +42,7 @@ pub struct SharedHashMap<T: Encodable + Copy + Clone, const N: usize> {
 ///
 /// Keys are stored next to the values they are associated with using modulo to find a spot. If the
 /// spot is already taken the insert will fail.
-/// 
+///
 /// Really though, this is just 4 hashmaps, and we try to search/find from each one in turn,
 /// starting from the smallest to the largest.
 unsafe impl<T: Encodable + Copy + Clone, const N: usize> Send for SharedHashMap<T, N> {}

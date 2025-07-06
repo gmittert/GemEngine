@@ -7,11 +7,8 @@ pub const QA: i16 = 255;
 pub const QB: i16 = 64;
 pub const SCALE: i32 = 400;
 
-pub static NNUE: Network = unsafe {
-    std::mem::transmute(*include_bytes!(
-        "../../../weights/nnue.bin"
-    ))
-};
+pub static NNUE: Network =
+    unsafe { std::mem::transmute(*include_bytes!("../../../weights/nnue.bin")) };
 
 /// Accumulator code cribbed from the bullet examples in
 /// https://github.com/jw1912/bullet/blob/main/examples/simple.rs
