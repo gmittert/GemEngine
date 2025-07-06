@@ -252,7 +252,13 @@ impl Board {
         cache: &TranspositionTable<N>,
         should_stop: &AtomicBool,
     ) -> Option<Evaluation> {
-        if self.half_move > 50 {
+        // If we're down to king and pawns, we're at risk of zugzwang, skip evaluating the null
+        // move.
+        if self.piece(self.to_play, Piece::Rook).is_empty()
+            && self.piece(self.to_play, Piece::Bishop).is_empty()
+            && self.piece(self.to_play, Piece::Knight).is_empty()
+            && self.piece(self.to_play, Piece::Queen).is_empty()
+        {
             return None;
         }
         if target_depth - self.half_move < 2 || self.in_check(self.to_play) || beta.mate() {
