@@ -615,7 +615,7 @@ impl Board {
             return false;
         };
         match piece {
-            Piece::Pawn => self.pawn_moves_it().any(|x| x == *m),
+            Piece::Pawn => self.pawn_non_captures_it().any(|x| x == *m),
             Piece::Rook => self.rook_moves_it().any(|x| x == *m),
             Piece::Knight => self.knight_moves_it().any(|x| x == *m),
             Piece::Bishop => self.bishop_moves_it().any(|x| x == *m),

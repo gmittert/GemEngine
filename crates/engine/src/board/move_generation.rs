@@ -10,50 +10,34 @@ enum PawnMovesState {
     ReadPawn,
     Push1,
     Push2,
-    TakeEast,
-    TakeWest,
-    TakeEp,
     PromoteQueen,
-    PromoteRook,
     PromoteKnight,
+    PromoteRook,
     PromoteBishop,
-    Done,
 }
 
-pub struct PawnMoves {
+pub struct PawnNonCaptures {
     pawns: BitBoard,
-    opponent_pieces: BitBoard,
     pieces: BitBoard,
     from: Option<Posn>,
     color: Color,
     state: PawnMovesState,
-    next_state: PawnMovesState,
     to: Option<Posn>,
-    ep_target: Option<File>,
 }
 
-impl PawnMoves {
-    fn new(
-        pawns: BitBoard,
-        opponent_pieces: BitBoard,
-        pieces: BitBoard,
-        color: Color,
-        ep_target: Option<File>,
-    ) -> PawnMoves {
-        PawnMoves {
+impl PawnNonCaptures {
+    fn new(pawns: BitBoard, pieces: BitBoard, color: Color) -> PawnNonCaptures {
+        PawnNonCaptures {
             pawns,
-            opponent_pieces,
             pieces,
             from: None,
             color,
             state: PawnMovesState::ReadPawn,
-            next_state: PawnMovesState::Done,
             to: None,
-            ep_target,
         }
     }
 }
-impl Iterator for PawnMoves {
+impl Iterator for PawnNonCaptures {
     type Item = AlgebraicMove;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -68,7 +52,7 @@ impl Iterator for PawnMoves {
                         self.from = Some(pawn);
                         self.state = PawnMovesState::Push1;
                     } else {
-                        self.state = PawnMovesState::Done;
+                        return None;
                     }
                 }
                 PawnMovesState::Push1 => {
@@ -81,11 +65,18 @@ impl Iterator for PawnMoves {
                         if !self.pieces.contains(push_pos) {
                             if push_pos.rank() == promo_rank {
                                 self.to = Some(push_pos);
-                                self.next_state = PawnMovesState::TakeEast;
                                 self.state = PawnMovesState::PromoteQueen;
                                 continue;
                             } else {
-                                self.state = PawnMovesState::Push2;
+                                let can_double_push = match self.color {
+                                    Color::White => self.from.unwrap().rank() == Rank::Two,
+                                    Color::Black => self.from.unwrap().rank() == Rank::Seven,
+                                };
+                                self.state = if can_double_push {
+                                    PawnMovesState::Push2
+                                } else {
+                                    PawnMovesState::ReadPawn
+                                };
                                 return Some(AlgebraicMove {
                                     from: self.from.unwrap(),
                                     to: push_pos,
@@ -93,20 +84,11 @@ impl Iterator for PawnMoves {
                                 });
                             }
                         } else {
-                            self.state = PawnMovesState::TakeEast;
+                            self.state = PawnMovesState::ReadPawn;
                         }
                     }
                 }
                 PawnMovesState::Push2 => {
-                    let can_double_push = match self.color {
-                        Color::White => self.from.unwrap().rank() == Rank::Two,
-                        Color::Black => self.from.unwrap().rank() == Rank::Seven,
-                    };
-                    if !can_double_push {
-                        self.state = PawnMovesState::TakeEast;
-                        continue;
-                    }
-
                     let mdouble_push_pos = match self.color {
                         Color::White => self.from.unwrap().no().and_then(|x| x.no()),
                         Color::Black => self.from.unwrap().so().and_then(|x| x.so()),
@@ -114,107 +96,19 @@ impl Iterator for PawnMoves {
 
                     if let Some(double_push_pos) = mdouble_push_pos {
                         if !self.pieces.contains(double_push_pos) {
-                            if double_push_pos.rank() == promo_rank {
-                                self.to = Some(double_push_pos);
-                                self.next_state = PawnMovesState::TakeEast;
-                                self.state = PawnMovesState::PromoteQueen;
-                                continue;
-                            } else {
-                                self.state = PawnMovesState::TakeEast;
-                                return Some(AlgebraicMove {
-                                    from: self.from.unwrap(),
-                                    to: double_push_pos,
-                                    promotion: None,
-                                });
-                            }
-                        } else {
-                            self.state = PawnMovesState::TakeEast;
-                        }
-                    }
-                }
-                PawnMovesState::TakeEast => {
-                    let mpush_pos = match self.color {
-                        Color::White => self.from.unwrap().no(),
-                        Color::Black => self.from.unwrap().so(),
-                    };
-                    let Some(take_pos) = mpush_pos.and_then(|x| x.ea()) else {
-                        self.state = PawnMovesState::TakeWest;
-                        continue;
-                    };
-                    let can_capture = self.opponent_pieces.contains(take_pos);
-                    if !can_capture {
-                        self.state = PawnMovesState::TakeWest;
-                        continue;
-                    };
-                    if take_pos.rank() == promo_rank {
-                        self.to = Some(take_pos);
-                        self.next_state = PawnMovesState::TakeWest;
-                        self.state = PawnMovesState::PromoteQueen;
-                        continue;
-                    }
-                    self.state = PawnMovesState::TakeWest;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: take_pos,
-                        promotion: None,
-                    });
-                }
-                PawnMovesState::TakeWest => {
-                    let mpush_pos = match self.color {
-                        Color::White => self.from.unwrap().no(),
-                        Color::Black => self.from.unwrap().so(),
-                    };
-                    let Some(take_pos) = mpush_pos.and_then(|x| x.we()) else {
-                        self.state = PawnMovesState::TakeEp;
-                        continue;
-                    };
-                    let can_capture = self.opponent_pieces.contains(take_pos);
-                    if !can_capture {
-                        self.state = PawnMovesState::TakeEp;
-                        continue;
-                    };
-                    if take_pos.rank() == promo_rank {
-                        self.to = Some(take_pos);
-                        self.next_state = PawnMovesState::TakeEp;
-                        self.state = PawnMovesState::PromoteQueen;
-                        continue;
-                    }
-                    self.state = PawnMovesState::TakeEp;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: take_pos,
-                        promotion: None,
-                    });
-                }
-                PawnMovesState::TakeEp => {
-                    self.state = PawnMovesState::ReadPawn;
-                    if let Some(ep_target) = self.ep_target {
-                        let to = Posn::from(
-                            if self.color == Color::White {
-                                Rank::Six
-                            } else {
-                                Rank::Three
-                            },
-                            ep_target,
-                        );
-                        if (self.color == Color::White
-                            && (self.from.unwrap().nw() == Some(to)
-                                || self.from.unwrap().ne() == Some(to)))
-                            || (self.color == Color::Black
-                                && (self.from.unwrap().sw() == Some(to)
-                                    || self.from.unwrap().se() == Some(to)))
-                        {
+                            self.state = PawnMovesState::ReadPawn;
                             return Some(AlgebraicMove {
                                 from: self.from.unwrap(),
-                                to,
+                                to: double_push_pos,
                                 promotion: None,
                             });
+                        } else {
+                            self.state = PawnMovesState::ReadPawn;
                         }
                     }
                 }
-                PawnMovesState::Done => return None,
                 PawnMovesState::PromoteQueen => {
-                    self.state = PawnMovesState::PromoteRook;
+                    self.state = PawnMovesState::PromoteKnight;
                     return Some(AlgebraicMove {
                         from: self.from.unwrap(),
                         to: self.to.unwrap(),
@@ -230,7 +124,7 @@ impl Iterator for PawnMoves {
                     });
                 }
                 PawnMovesState::PromoteBishop => {
-                    self.state = PawnMovesState::PromoteKnight;
+                    self.state = PawnMovesState::ReadPawn;
                     return Some(AlgebraicMove {
                         from: self.from.unwrap(),
                         to: self.to.unwrap(),
@@ -238,7 +132,7 @@ impl Iterator for PawnMoves {
                     });
                 }
                 PawnMovesState::PromoteKnight => {
-                    self.state = self.next_state;
+                    self.state = PawnMovesState::PromoteRook;
                     return Some(AlgebraicMove {
                         from: self.from.unwrap(),
                         to: self.to.unwrap(),
@@ -859,8 +753,10 @@ pub struct PsuedoLegalCaptures {
     iter: std::iter::Chain<
         std::iter::Chain<
             std::iter::Chain<
-                std::iter::Chain<std::iter::Chain<PawnCaptures, KnightCaptures>, BishopCaptures>, RookCaptures>,
-                QueenCaptures,
+                std::iter::Chain<std::iter::Chain<PawnCaptures, KnightCaptures>, BishopCaptures>,
+                RookCaptures,
+            >,
+            QueenCaptures,
         >,
         KingCaptures,
     >,
@@ -894,7 +790,7 @@ pub struct PsuedoLegalRandomizedMoves {
         BishopMoves,
         RookMoves,
         QueenMoves,
-        PawnMoves,
+        std::iter::Chain<PawnCaptures, PawnNonCaptures>,
         KingMoves,
     ),
     rng: ThreadRng,
@@ -910,7 +806,7 @@ impl PsuedoLegalRandomizedMoves {
                 board.bishop_moves_it(),
                 board.rook_moves_it(),
                 board.queen_moves_it(),
-                board.pawn_moves_it(),
+                board.pawn_captures_it().chain(board.pawn_non_captures_it()),
                 board.king_moves_it(),
             ),
             rng: rand::rng(),
@@ -1480,22 +1376,18 @@ impl Board {
         PawnCaptures::new(pawns, opponent_pieces, color, ep_target)
     }
 
-    pub fn pawn_moves_it(&self) -> PawnMoves {
+    pub fn pawn_non_captures_it(&self) -> PawnNonCaptures {
         let color = self.to_play;
         let pawns = self.piece(color, Piece::Pawn);
+        let pieces = self.pieces();
 
-        let opponent_pieces = match color {
-            Color::White => self.black_pieces(),
-            Color::Black => self.white_pieces(),
+        // Skip blocked pawns
+        let non_blocked = match self.to_play {
+            Color::Black => pawns.0 & !(pieces.0 << 8),
+            Color::White => pawns.0 & !(pieces.0 >> 8),
         };
 
-        PawnMoves::new(
-            pawns,
-            opponent_pieces,
-            self.pieces(),
-            color,
-            self.move_rights.last().and_then(|r| r.ep_target),
-        )
+        PawnNonCaptures::new(BitBoard(non_blocked), self.pieces(), color)
     }
 
     pub fn pawn_moves(&self, out: &mut Vec<AlgebraicMove>) {

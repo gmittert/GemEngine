@@ -90,7 +90,7 @@ pub fn pawns(c: &mut Criterion) {
         let fen = "r1b1k1r1/p2pqp1p/1pn2n1b/P1pPp1p1/1P1QP2P/N1P2P1N/5KP1/R1B2BR1 w q - 0 1";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            let mut out = vec![];
+            let mut out = Vec::with_capacity(16);
             board.pawn_moves(&mut out);
             black_box(out);
         })
@@ -99,9 +99,10 @@ pub fn pawns(c: &mut Criterion) {
         let fen = "r1b1k1r1/p2pqp1p/1pn2n1b/P1pPp1p1/1P1QP2P/N1P2P1N/5KP1/R1B2BR1 w q - 0 1";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            let mut out = vec![];
-            out.extend(board.pawn_moves_it());
-            black_box(out);
+            let i = board.pawn_captures_it().chain(board.pawn_non_captures_it());
+            for m in i {
+                black_box(m);
+            }
         })
     });
 }
