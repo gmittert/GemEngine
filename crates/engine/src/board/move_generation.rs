@@ -1356,6 +1356,8 @@ impl Board {
             Color::White => self.black_pieces(),
             Color::Black => self.white_pieces(),
         };
+        let attacked_pawns = Self::pawn_attacks(opponent_pieces, !color);
+        let pawns = attacked_pawns & pawns;
 
         let ep_target = self.move_rights.last().and_then(|r| r.ep_target);
         let ep_pos = ep_target

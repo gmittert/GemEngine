@@ -164,7 +164,7 @@ impl Board {
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
         self.qnodes += 1;
         let mut alpha = alpha;
-        let stand_pat = self.eval(alpha, beta, self.to_play);
+        let stand_pat = self.eval(self.to_play);
         tracing::event!(Level::INFO, stand_pat = stand_pat.0);
         if stand_pat >= beta {
             return beta;
@@ -814,16 +814,8 @@ mod tests {
         let best_move = res.best_move;
         let eval = res.eval;
 
-        let evalw = board.eval(
-            Evaluation::lost(board.half_move),
-            Evaluation::won(board.half_move),
-            Color::White,
-        );
-        let evalb = board.eval(
-            Evaluation::lost(board.half_move),
-            Evaluation::won(board.half_move),
-            Color::Black,
-        );
+        let evalw = board.eval(Color::White);
+        let evalb = board.eval(Color::Black);
         assert!(evalw != Evaluation::draw());
         assert!(evalb != Evaluation::draw());
         assert!(eval != Evaluation::draw());
@@ -919,12 +911,8 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
 17. dxe5 {-0.22/7 5.0s} Qxd3 {7.9s} 18. Rxd3 {-0.29/7 5.0s} fxe3 {6.6s}
 19. Rxe3 {-0.71/7 5.0s} *
 "###;
-        let board = Board::from_pgn(pgn).expect("bad pgn?");
-        let eval = board.eval(
-            Evaluation::lost(board.half_move),
-            Evaluation::won(board.half_move),
-            Color::Black,
-        );
+        let mut board = Board::from_pgn(pgn).expect("bad pgn?");
+        let eval = board.eval(Color::Black);
         assert!(eval.0 < 0);
     }
     #[test]
@@ -1013,16 +1001,8 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let cache = TranspositionTable::<1024>::new();
         let move_eval = board.best_move(6, 1, &cache, None).unwrap().eval;
 
-        let evalw = board.eval(
-            Evaluation::lost(board.half_move),
-            Evaluation::won(board.half_move),
-            Color::White,
-        );
-        let evalb = board.eval(
-            Evaluation::lost(board.half_move),
-            Evaluation::won(board.half_move),
-            Color::Black,
-        );
+        let evalw = board.eval(Color::White);
+        let evalb = board.eval(Color::Black);
         assert_ne!(evalw, Evaluation::draw());
         assert_ne!(evalb, Evaluation::draw());
         assert_eq!(move_eval, Evaluation::draw());

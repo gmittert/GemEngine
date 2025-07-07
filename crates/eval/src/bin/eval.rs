@@ -2,12 +2,8 @@
 use engine::board::{Board, evaluation::Evaluation};
 
 fn eval_fen(fen: &str) -> Evaluation {
-    let board = Board::from_fen(fen).unwrap();
-    board.eval(
-        Evaluation::lost(board.half_move),
-        Evaluation::won(board.half_move),
-        board.to_play,
-    )
+    let mut board = Board::from_fen(fen).unwrap();
+    board.eval(board.to_play)
 }
 
 fn main() {

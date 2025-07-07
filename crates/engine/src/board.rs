@@ -3,6 +3,8 @@ mod move_generation;
 pub mod search;
 mod sliding_attacks;
 
+use crate::nnue_features;
+use crate::nnue_features::FeatureUpdate;
 use crate::parser::Parser;
 use crate::pgn;
 use crate::pgn::GameTermination;
@@ -119,6 +121,7 @@ pub struct Board {
 
     pub white_features: nnue::Accumulator,
     pub black_features: nnue::Accumulator,
+    pub unapplied_updates: Vec<nnue_features::FeatureUpdate>,
 }
 
 impl PartialEq for Board {
@@ -584,32 +587,16 @@ impl Board {
         to2: Posn,
         piece2: Piece,
     ) {
-        let pc1 = 64 * piece1 as usize;
-        let pc2 = 64 * piece2 as usize;
-        // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-        // Since our nnue is trained using chessboard, we need to flip the board.
-        //
-        // TODO: retrain using our own board representation.
-        let from_sq1 = from1.idx() as usize ^ 7;
-        let to_sq1 = to1.idx() as usize ^ 7;
-        let from_sq2 = from1.idx() as usize ^ 7;
-        let to_sq2 = to1.idx() as usize ^ 7;
-        let perspective = usize::from(c == Color::White);
+        self.unapplied_updates.push(FeatureUpdate::MoveTwo {
+            c,
+            from1,
+            to1,
+            piece1,
+            to2,
+            from2,
+            piece2,
+        });
 
-        self.white_features.add2_remove2_feature(
-            [384, 0][perspective] + pc1 + to_sq1,
-            [384, 0][perspective] + pc2 + to_sq2,
-            [384, 0][perspective] + pc1 + from_sq1,
-            [384, 0][perspective] + pc2 + from_sq2,
-            &nnue::NNUE,
-        );
-        self.black_features.add2_remove2_feature(
-            [0, 384][perspective] + pc1 + (to_sq1 ^ 56),
-            [0, 384][perspective] + pc2 + (to_sq2 ^ 56),
-            [0, 384][perspective] + pc1 + (from_sq1 ^ 56),
-            [0, 384][perspective] + pc2 + (from_sq2 ^ 56),
-            &nnue::NNUE,
-        );
         match c {
             Color::Black => {
                 self.black_pieces[piece1 as usize] &= !BitBoard::from(from1);
@@ -630,6 +617,52 @@ impl Board {
             ^ ZOBRIST_KEYS.get_key(c, piece2, to2);
     }
 
+    pub fn unmove_two_pieces(
+        &mut self,
+        c: Color,
+        from1: Posn,
+        to1: Posn,
+        piece1: Piece,
+        from2: Posn,
+        to2: Posn,
+        piece2: Piece,
+    ) {
+        if self.unapplied_updates.pop().is_none() {
+            nnue_features::unapply(
+                FeatureUpdate::MoveTwo {
+                    c,
+                    from1,
+                    to1,
+                    piece1,
+                    to2,
+                    from2,
+                    piece2,
+                },
+                &mut self.white_features,
+                &mut self.black_features,
+            );
+        }
+
+        match c {
+            Color::Black => {
+                self.black_pieces[piece1 as usize] &= !BitBoard::from(to1);
+                self.black_pieces[piece1 as usize] |= from1;
+                self.black_pieces[piece2 as usize] &= !BitBoard::from(to2);
+                self.black_pieces[piece2 as usize] |= from2;
+            }
+            Color::White => {
+                self.white_pieces[piece1 as usize] &= !BitBoard::from(to1);
+                self.white_pieces[piece1 as usize] |= from1;
+                self.white_pieces[piece2 as usize] &= !BitBoard::from(to2);
+                self.white_pieces[piece2 as usize] |= from2;
+            }
+        };
+        self.hash ^= ZOBRIST_KEYS.get_key(c, piece1, from1)
+            ^ ZOBRIST_KEYS.get_key(c, piece1, to1)
+            ^ ZOBRIST_KEYS.get_key(c, piece2, from2)
+            ^ ZOBRIST_KEYS.get_key(c, piece2, to2);
+    }
+
     pub fn capture_piece(
         &mut self,
         c: Color,
@@ -640,31 +673,16 @@ impl Board {
         capture_piece: Piece,
         capture_pos: Posn,
     ) {
-        let from_pc = 64 * from_piece as usize;
-        let to_pc = 64 * to_piece as usize;
-        let capture_pc = 64 * capture_piece as usize;
-        // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-        // Since our nnue is trained using chessboard, we need to flip the board.
-        //
-        // TODO: retrain using our own board representation.
-        let from_sq = from.idx() as usize ^ 7;
-        let to_sq = to.idx() as usize ^ 7;
-        let capture_sq = capture_pos.idx() as usize ^ 7;
-        let perspective = usize::from(c == Color::White);
-
-        self.white_features.add1_remove2_feature(
-            [384, 0][perspective] + to_pc + to_sq,
-            [0, 384][perspective] + capture_pc + capture_sq,
-            [384, 0][perspective] + from_pc + from_sq,
-            &nnue::NNUE,
-        );
-        self.black_features.add1_remove2_feature(
-            [0, 384][perspective] + to_pc + (to_sq ^ 56),
-            [384, 0][perspective] + capture_pc + (capture_sq ^ 56),
-            [0, 384][perspective] + from_pc + (from_sq ^ 56),
-            &nnue::NNUE,
-        );
-
+        self.unapplied_updates
+            .push(nnue_features::FeatureUpdate::Capture {
+                c,
+                from_piece,
+                from,
+                to_piece,
+                to,
+                capture_piece,
+                capture_pos,
+            });
         match c {
             Color::Black => {
                 self.black_pieces[from_piece as usize] &= !BitBoard::from(from);
@@ -692,31 +710,21 @@ impl Board {
         capture_piece: Piece,
         capture_pos: Posn,
     ) {
-        let from_pc = 64 * from_piece as usize;
-        let to_pc = 64 * to_piece as usize;
-        let capture_pc = 64 * capture_piece as usize;
-        // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-        // Since our nnue is trained using chessboard, we need to flip the board.
-        //
-        // TODO: retrain using our own board representation.
-        let from_sq = from.idx() as usize ^ 7;
-        let to_sq = to.idx() as usize ^ 7;
-        let capture_sq = capture_pos.idx() as usize ^ 7;
-        let perspective = usize::from(c == Color::White);
-
-        self.white_features.add2_remove1_feature(
-            [0, 384][perspective] + capture_pc + capture_sq,
-            [384, 0][perspective] + from_pc + from_sq,
-            [384, 0][perspective] + to_pc + to_sq,
-            &nnue::NNUE,
-        );
-        self.black_features.add2_remove1_feature(
-            [384, 0][perspective] + capture_pc + (capture_sq ^ 56),
-            [0, 384][perspective] + from_pc + (from_sq ^ 56),
-            [0, 384][perspective] + to_pc + (to_sq ^ 56),
-            &nnue::NNUE,
-        );
-
+        if self.unapplied_updates.pop().is_none() {
+            nnue_features::unapply(
+                nnue_features::FeatureUpdate::Capture {
+                    c,
+                    from_piece,
+                    from,
+                    to_piece,
+                    to,
+                    capture_piece,
+                    capture_pos,
+                },
+                &mut self.white_features,
+                &mut self.black_features,
+            );
+        }
         match c {
             Color::Black => {
                 self.black_pieces[from_piece as usize] |= from;
@@ -742,27 +750,14 @@ impl Board {
         to_piece: Piece,
         to: Posn,
     ) {
-        let from_pc = 64 * from_piece as usize;
-        let to_pc = 64 * to_piece as usize;
-        // Bulletformat/chessboard considers a1 to be 0, Gem considers h1 to be 0;
-        // Since our nnue is trained using chessboard, we need to flip the board.
-        //
-        // TODO: retrain using our own board representation.
-        let from_sq = from.idx() as usize ^ 7;
-        let to_sq = to.idx() as usize ^ 7;
-        let perspective = usize::from(c == Color::White);
-
-        self.white_features.add_remove_feature(
-            [384, 0][perspective] + to_pc + to_sq,
-            [384, 0][perspective] + from_pc + from_sq,
-            &nnue::NNUE,
-        );
-        self.black_features.add_remove_feature(
-            [0, 384][perspective] + to_pc + (to_sq ^ 56),
-            [0, 384][perspective] + from_pc + (from_sq ^ 56),
-            &nnue::NNUE,
-        );
-
+        self.unapplied_updates
+            .push(nnue_features::FeatureUpdate::MoveOne {
+                c,
+                from,
+                to,
+                from_piece,
+                to_piece,
+            });
         match c {
             Color::Black => {
                 self.black_pieces[from_piece as usize] &= !BitBoard::from(from);
@@ -771,6 +766,41 @@ impl Board {
             Color::White => {
                 self.white_pieces[from_piece as usize] &= !BitBoard::from(from);
                 self.white_pieces[to_piece as usize] |= to;
+            }
+        };
+        self.hash ^=
+            ZOBRIST_KEYS.get_key(c, from_piece, from) ^ ZOBRIST_KEYS.get_key(c, to_piece, to);
+    }
+
+    pub fn unmove_piece(
+        &mut self,
+        c: Color,
+        from_piece: Piece,
+        from: Posn,
+        to_piece: Piece,
+        to: Posn,
+    ) {
+        if self.unapplied_updates.pop().is_none() {
+            nnue_features::unapply(
+                nnue_features::FeatureUpdate::MoveOne {
+                    c,
+                    from,
+                    to,
+                    from_piece,
+                    to_piece,
+                },
+                &mut self.white_features,
+                &mut self.black_features,
+            );
+        }
+        match c {
+            Color::Black => {
+                self.black_pieces[from_piece as usize] |= from;
+                self.black_pieces[to_piece as usize] &= !BitBoard::from(to);
+            }
+            Color::White => {
+                self.white_pieces[from_piece as usize] |= from;
+                self.white_pieces[to_piece as usize] &= !BitBoard::from(to);
             }
         };
         self.hash ^=
@@ -952,13 +982,13 @@ impl Board {
                     Color::White => (a1(), d1()),
                 }
             };
-            self.move_two_pieces(
+            self.unmove_two_pieces(
                 self.to_play,
-                m.to,
                 m.from,
+                m.to,
                 Piece::King,
-                rook_to,
                 rook_from,
+                rook_to,
                 Piece::Rook,
             );
         } else {
@@ -984,7 +1014,7 @@ impl Board {
                     capture_pos,
                 );
             } else {
-                self.move_piece(self.to_play, to_piece, m.to, m.piece, m.from);
+                self.unmove_piece(self.to_play, m.piece, m.from, to_piece, m.to);
             }
         }
 
@@ -1196,6 +1226,7 @@ pub fn empty_board(turn: Color) -> Board {
         seldepth: 0,
         white_features: nnue::Accumulator::new(&nnue::NNUE),
         black_features: nnue::Accumulator::new(&nnue::NNUE),
+        unapplied_updates: Vec::with_capacity(8),
     }
 }
 

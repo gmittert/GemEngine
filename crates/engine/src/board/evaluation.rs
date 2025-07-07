@@ -123,7 +123,11 @@ pub struct SearchInfo {
 }
 
 impl Board {
-    pub fn eval(&self, _alpha: Evaluation, _beta: Evaluation, to_play: Color) -> Evaluation {
+    pub fn eval(&mut self, to_play: Color) -> Evaluation {
+        while let Some(update) = self.unapplied_updates.pop() {
+            nnue_features::apply(update, &mut self.white_features, &mut self.black_features);
+        }
+
         Evaluation(match to_play {
             Color::Black => nnue::NNUE.evaluate(&self.black_features, &self.white_features),
             Color::White => nnue::NNUE.evaluate(&self.white_features, &self.black_features),
@@ -268,53 +272,29 @@ mod tests {
 
     #[test]
     fn white_better() {
-        let b = Board::from_fen("rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1")
+        let mut b = Board::from_fen("rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1")
             .expect("failed to parse fen");
-        let eval_white = b.eval(
-            Evaluation::lost(b.half_move),
-            Evaluation::won(b.half_move),
-            Color::White,
-        );
-        let eval_black = b.eval(
-            Evaluation::lost(b.half_move),
-            Evaluation::won(b.half_move),
-            Color::Black,
-        );
+        let eval_white = b.eval(Color::White);
+        let eval_black = b.eval(Color::Black);
         assert!(eval_white.0 > 0);
         assert!(eval_black.0 < 0);
     }
 
     #[test]
     fn black_better() {
-        let b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w - - 0 1")
+        let mut b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w - - 0 1")
             .expect("failed to parse fen");
-        let eval_white = b.eval(
-            Evaluation::lost(b.half_move),
-            Evaluation::won(b.half_move),
-            Color::White,
-        );
-        let eval_black = b.eval(
-            Evaluation::lost(b.half_move),
-            Evaluation::won(b.half_move),
-            Color::Black,
-        );
+        let eval_white = b.eval(Color::White);
+        let eval_black = b.eval(Color::Black);
         assert!(eval_white.0 < 0);
         assert!(eval_black.0 > 0);
     }
 
     #[test]
     fn eval_starting_board() {
-        let b = starting_board();
-        let eval_white = b.eval(
-            Evaluation::lost(b.half_move),
-            Evaluation::won(b.half_move),
-            Color::White,
-        );
-        let eval_black = b.eval(
-            Evaluation::lost(b.half_move),
-            Evaluation::won(b.half_move),
-            Color::Black,
-        );
+        let mut b = starting_board();
+        let eval_white = b.eval(Color::White);
+        let eval_black = b.eval(Color::Black);
         assert!(eval_white.0 < 100 && eval_white.0 > -100);
         assert!(eval_black.0 < 100 && eval_black.0 > -100);
     }
@@ -322,11 +302,7 @@ mod tests {
     #[test]
     fn eval_starting_board_e4() {
         let mut b = starting_board();
-        let eval_white_before = b.eval(
-            Evaluation::lost(b.half_move),
-            Evaluation::won(b.half_move),
-            Color::White,
-        );
+        let eval_white_before = b.eval(Color::White);
         b.make_move(&Move {
             from: e2(),
             to: e4(),
@@ -337,11 +313,7 @@ mod tests {
             is_castle_queen: false,
             is_castle_king: false,
         });
-        let eval_white_after = b.eval(
-            Evaluation::lost(b.half_move),
-            Evaluation::won(b.half_move),
-            Color::White,
-        );
+        let eval_white_after = b.eval(Color::White);
         dbg!(eval_white_before);
         dbg!(eval_white_after);
         assert!(eval_white_before < eval_white_after);

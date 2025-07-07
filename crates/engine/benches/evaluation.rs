@@ -146,13 +146,9 @@ impl criterion::measurement::ValueFormatter for NodeThroughputFormatter {
 
 pub fn eval_fn(c: &mut Criterion) {
     c.bench_function("eval_start", |b| {
-        let board = board::starting_board();
+        let mut board = board::starting_board();
         b.iter(|| {
-            board.eval(
-                board::evaluation::Evaluation::lost(0),
-                board::evaluation::Evaluation::won(0),
-                Color::White,
-            );
+            board.eval(Color::White);
         })
     });
 }
