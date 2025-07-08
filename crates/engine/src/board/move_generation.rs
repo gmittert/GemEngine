@@ -416,49 +416,6 @@ impl Iterator for KingCaptures {
     }
 }
 
-pub struct QueenMoves {
-    queens: BitBoard,
-    allies: BitBoard,
-    pieces: BitBoard,
-    attacks: BitBoard,
-    from: Option<Posn>,
-}
-
-impl QueenMoves {
-    fn new(queens: BitBoard, allies: BitBoard, pieces: BitBoard) -> QueenMoves {
-        QueenMoves {
-            queens,
-            allies,
-            pieces,
-            from: None,
-            attacks: BitBoard::empty(),
-        }
-    }
-}
-impl Iterator for QueenMoves {
-    type Item = AlgebraicMove;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(attack) = self.attacks.next() {
-                return Some(AlgebraicMove {
-                    from: self.from.unwrap(),
-                    to: attack,
-                    promotion: None,
-                });
-            } else if let Some(next_queen) = self.queens.next() {
-                self.from = Some(next_queen);
-                self.attacks = !self.allies
-                    & (sliding_attacks::compute_rook_attacks(next_queen, self.pieces)
-                        | sliding_attacks::compute_bishop_attacks(next_queen, self.pieces));
-            } else {
-                // Finished all the queens
-                return None;
-            }
-        }
-    }
-}
-
 pub struct QueenCaptures {
     queens: BitBoard,
     enemies: BitBoard,
@@ -496,48 +453,6 @@ impl Iterator for QueenCaptures {
                         | sliding_attacks::compute_bishop_attacks(next_queen, self.pieces));
             } else {
                 // Finished all the queens
-                return None;
-            }
-        }
-    }
-}
-
-pub struct RookMoves {
-    rooks: BitBoard,
-    allies: BitBoard,
-    pieces: BitBoard,
-    attacks: BitBoard,
-    from: Option<Posn>,
-}
-
-impl RookMoves {
-    fn new(rooks: BitBoard, allies: BitBoard, pieces: BitBoard) -> RookMoves {
-        RookMoves {
-            rooks,
-            allies,
-            pieces,
-            from: None,
-            attacks: BitBoard::empty(),
-        }
-    }
-}
-impl Iterator for RookMoves {
-    type Item = AlgebraicMove;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(attack) = self.attacks.next() {
-                return Some(AlgebraicMove {
-                    from: self.from.unwrap(),
-                    to: attack,
-                    promotion: None,
-                });
-            } else if let Some(next_rook) = self.rooks.next() {
-                self.from = Some(next_rook);
-                self.attacks =
-                    !self.allies & sliding_attacks::compute_rook_attacks(next_rook, self.pieces);
-            } else {
-                // Finished all the rooks
                 return None;
             }
         }
@@ -586,48 +501,6 @@ impl Iterator for RookCaptures {
     }
 }
 
-pub struct BishopMoves {
-    bishops: BitBoard,
-    allies: BitBoard,
-    pieces: BitBoard,
-    attacks: BitBoard,
-    from: Option<Posn>,
-}
-
-impl BishopMoves {
-    fn new(bishops: BitBoard, allies: BitBoard, pieces: BitBoard) -> BishopMoves {
-        BishopMoves {
-            bishops,
-            allies,
-            pieces,
-            from: None,
-            attacks: BitBoard::empty(),
-        }
-    }
-}
-impl Iterator for BishopMoves {
-    type Item = AlgebraicMove;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(attack) = self.attacks.next() {
-                return Some(AlgebraicMove {
-                    from: self.from.unwrap(),
-                    to: attack,
-                    promotion: None,
-                });
-            } else if let Some(next_bishop) = self.bishops.next() {
-                self.from = Some(next_bishop);
-                self.attacks = !self.allies
-                    & sliding_attacks::compute_bishop_attacks(next_bishop, self.pieces);
-            } else {
-                // Finished all the bishops
-                return None;
-            }
-        }
-    }
-}
-
 pub struct BishopCaptures {
     bishops: BitBoard,
     enemies: BitBoard,
@@ -670,43 +543,63 @@ impl Iterator for BishopCaptures {
     }
 }
 
-pub struct KnightMoves {
-    knights: BitBoard,
+pub fn knight_moves_it(knights: BitBoard, allies: BitBoard) -> impl Iterator<Item = AlgebraicMove> {
+    knights.into_iter().flat_map(move |from| {
+        (!allies & KNIGHT_ATTACKS[from.idx() as usize]).map(move |to| AlgebraicMove {
+            from,
+            to,
+            promotion: None,
+        })
+    })
+}
+
+pub fn rook_moves_it(
+    rooks: BitBoard,
     allies: BitBoard,
-    attacks: BitBoard,
-    from: Option<Posn>,
-}
-
-impl KnightMoves {
-    fn new(knights: BitBoard, allies: BitBoard) -> KnightMoves {
-        KnightMoves {
-            knights,
-            allies,
-            from: None,
-            attacks: BitBoard::empty(),
-        }
-    }
-}
-impl Iterator for KnightMoves {
-    type Item = AlgebraicMove;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(attack) = self.attacks.next() {
-                return Some(AlgebraicMove {
-                    from: self.from.unwrap(),
-                    to: attack,
-                    promotion: None,
-                });
-            } else if let Some(next_knight) = self.knights.next() {
-                self.from = Some(next_knight);
-                self.attacks = !self.allies & KNIGHT_ATTACKS[next_knight.idx() as usize];
-            } else {
-                // Finished all the knights
-                return None;
+    all_pieces: BitBoard,
+) -> impl Iterator<Item = AlgebraicMove> {
+    rooks.flat_map(move |from| {
+        (!allies & sliding_attacks::compute_rook_attacks(from, all_pieces)).map(move |to| {
+            AlgebraicMove {
+                from,
+                to,
+                promotion: None,
             }
-        }
-    }
+        })
+    })
+}
+
+pub fn bishop_moves_it(
+    bishops: BitBoard,
+    allies: BitBoard,
+    all_pieces: BitBoard,
+) -> impl Iterator<Item = AlgebraicMove> {
+    bishops.flat_map(move |from| {
+        (!allies & sliding_attacks::compute_bishop_attacks(from, all_pieces)).map(move |to| {
+            AlgebraicMove {
+                from,
+                to,
+                promotion: None,
+            }
+        })
+    })
+}
+
+pub fn queen_moves_it(
+    queens: BitBoard,
+    allies: BitBoard,
+    all_pieces: BitBoard,
+) -> impl Iterator<Item = AlgebraicMove> {
+    queens.flat_map(move |from| {
+        (!allies
+            & (sliding_attacks::compute_rook_attacks(from, all_pieces)
+                | sliding_attacks::compute_bishop_attacks(from, all_pieces)))
+        .map(move |to| AlgebraicMove {
+            from,
+            to,
+            promotion: None,
+        })
+    })
 }
 
 pub struct KnightCaptures {
@@ -786,10 +679,10 @@ impl Iterator for PsuedoLegalCaptures {
 
 pub struct PsuedoLegalRandomizedMoves {
     iter: (
-        KnightMoves,
-        BishopMoves,
-        RookMoves,
-        QueenMoves,
+        Box<dyn Iterator<Item = AlgebraicMove>>,
+        Box<dyn Iterator<Item = AlgebraicMove>>,
+        Box<dyn Iterator<Item = AlgebraicMove>>,
+        Box<dyn Iterator<Item = AlgebraicMove>>,
         std::iter::Chain<PawnCaptures, PawnNonCaptures>,
         KingMoves,
     ),
@@ -800,12 +693,21 @@ pub struct PsuedoLegalRandomizedMoves {
 impl PsuedoLegalRandomizedMoves {
     fn new(board: &Board) -> PsuedoLegalRandomizedMoves {
         let dist = Uniform::try_from(0..=5).unwrap();
+        let knights = board.piece(board.to_play, Piece::Knight);
+        let rooks = board.piece(board.to_play, Piece::Rook);
+        let bishops = board.piece(board.to_play, Piece::Bishop);
+        let queens = board.piece(board.to_play, Piece::Queen);
+        let allies = match board.to_play {
+            Color::White => board.white_pieces(),
+            Color::Black => board.black_pieces(),
+        };
+        let all_pieces = board.pieces();
         PsuedoLegalRandomizedMoves {
             iter: (
-                board.knight_moves_it(),
-                board.bishop_moves_it(),
-                board.rook_moves_it(),
-                board.queen_moves_it(),
+                Box::new(knight_moves_it(knights, allies)),
+                Box::new(bishop_moves_it(bishops, allies, all_pieces)),
+                Box::new(rook_moves_it(rooks, allies, all_pieces)),
+                Box::new(queen_moves_it(queens, allies, all_pieces)),
                 board.pawn_captures_it().chain(board.pawn_non_captures_it()),
                 board.king_moves_it(),
             ),
@@ -926,17 +828,6 @@ impl Board {
         QueenCaptures::new(queens, enemy_pieces, self.pieces())
     }
 
-    pub fn queen_moves_it(&self) -> QueenMoves {
-        let color = self.to_play;
-        let queens = self.piece(color, Piece::Queen);
-        let allied_pieces = match color {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
-
-        QueenMoves::new(queens, allied_pieces, self.pieces())
-    }
-
     pub fn queen_moves(&self, out: &mut Vec<AlgebraicMove>) {
         let queens = match self.to_play {
             Color::White => self.white_pieces,
@@ -975,20 +866,6 @@ impl Board {
         RookCaptures::new(rooks, enemy_pieces, self.pieces())
     }
 
-    pub fn rook_moves_it(&self) -> RookMoves {
-        let rooks = match self.to_play {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Rook as usize];
-
-        let allied_pieces = match self.to_play {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
-
-        RookMoves::new(rooks, allied_pieces, self.pieces())
-    }
-
     pub fn rook_moves(&self, out: &mut Vec<AlgebraicMove>) {
         let rooks = match self.to_play {
             Color::White => self.white_pieces,
@@ -1024,20 +901,6 @@ impl Board {
         };
 
         BishopCaptures::new(bishops, enemy_pieces, self.pieces())
-    }
-
-    pub fn bishop_moves_it(&self) -> BishopMoves {
-        let bishops = match self.to_play {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Bishop as usize];
-
-        let allied_pieces = match self.to_play {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
-
-        BishopMoves::new(bishops, allied_pieces, self.pieces())
     }
 
     pub fn bishop_moves(&self, out: &mut Vec<AlgebraicMove>) {
@@ -1283,20 +1146,6 @@ impl Board {
         };
 
         KnightCaptures::new(knights, enemy_pieces)
-    }
-
-    pub fn knight_moves_it(&self) -> KnightMoves {
-        let knights = match self.to_play {
-            Color::White => self.white_pieces,
-            Color::Black => self.black_pieces,
-        }[Piece::Knight as usize];
-
-        let allied_pieces = match self.to_play {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
-
-        KnightMoves::new(knights, allied_pieces)
     }
 
     pub fn knight_moves(&self, out: &mut Vec<AlgebraicMove>) {

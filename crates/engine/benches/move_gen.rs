@@ -1,5 +1,9 @@
+use bitboard::moves::{Color, Piece};
 use criterion::{Criterion, black_box, criterion_group};
-use engine::board::Board;
+use engine::board::{
+    Board,
+    move_generation::{self},
+};
 
 pub fn knights(c: &mut Criterion) {
     c.bench_function("knights", |b| {
@@ -17,7 +21,12 @@ pub fn knights(c: &mut Criterion) {
         let fen = "rnbqkbnr/pppppppp/N2N1N2/7N/1N2N3/3N2N1/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            for m in board.knight_moves_it() {
+            let knights = board.piece(board.to_play, Piece::Knight);
+            let allies = match board.to_play {
+                Color::White => board.white_pieces(),
+                Color::Black => board.black_pieces(),
+            };
+            for m in move_generation::knight_moves_it(knights, allies) {
                 black_box(m);
             }
         })
@@ -40,7 +49,13 @@ pub fn rooks(c: &mut Criterion) {
         let fen = "rnbqkbnr/pppppppp/1R3R2/3R4/R6R/2R1R3/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            for m in board.rook_moves_it() {
+            let rooks = board.piece(board.to_play, Piece::Rook);
+            let allies = match board.to_play {
+                Color::White => board.white_pieces(),
+                Color::Black => board.black_pieces(),
+            };
+            let all_pieces = board.pieces();
+            for m in move_generation::rook_moves_it(rooks, allies, all_pieces) {
                 black_box(m);
             }
         })
@@ -63,7 +78,13 @@ pub fn bishops(c: &mut Criterion) {
         let fen = "rnbqkbnr/pppppppp/1B3B2/3B4/B6B/2B1B3/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            for m in board.bishop_moves_it() {
+            let bishops = board.piece(board.to_play, Piece::Bishop);
+            let allies = match board.to_play {
+                Color::White => board.white_pieces(),
+                Color::Black => board.black_pieces(),
+            };
+            let all_pieces = board.pieces();
+            for m in move_generation::bishop_moves_it(bishops, allies, all_pieces) {
                 black_box(m);
             }
         })
@@ -86,7 +107,13 @@ pub fn queens(c: &mut Criterion) {
         let fen = "rnbqkbnr/pppppppp/1Q3Q2/3Q4/Q6Q/2Q1Q3/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            for m in board.queen_moves_it() {
+            let queens = board.piece(board.to_play, Piece::Queen);
+            let allies = match board.to_play {
+                Color::White => board.white_pieces(),
+                Color::Black => board.black_pieces(),
+            };
+            let all_pieces = board.pieces();
+            for m in move_generation::queen_moves_it(queens, allies, all_pieces) {
                 black_box(m);
             }
         })

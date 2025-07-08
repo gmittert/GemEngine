@@ -1,5 +1,5 @@
 pub mod evaluation;
-mod move_generation;
+pub mod move_generation;
 pub mod search;
 mod sliding_attacks;
 
@@ -567,12 +567,27 @@ impl Board {
         let Some(piece) = self.query_pos(m.from, self.to_play) else {
             return false;
         };
+        let knights = self.piece(self.to_play, Piece::Knight);
+        let rooks = self.piece(self.to_play, Piece::Rook);
+        let bishops = self.piece(self.to_play, Piece::Bishop);
+        let queens = self.piece(self.to_play, Piece::Queen);
+        let allies = match self.to_play {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+        let all_pieces = self.pieces();
         match piece {
             Piece::Pawn => self.pawn_non_captures_it().any(|x| x == *m),
-            Piece::Rook => self.rook_moves_it().any(|x| x == *m),
-            Piece::Knight => self.knight_moves_it().any(|x| x == *m),
-            Piece::Bishop => self.bishop_moves_it().any(|x| x == *m),
-            Piece::Queen => self.queen_moves_it().any(|x| x == *m),
+            Piece::Rook => {
+                move_generation::rook_moves_it(rooks, allies, all_pieces).any(|x| x == *m)
+            }
+            Piece::Knight => move_generation::knight_moves_it(knights, allies).any(|x| x == *m),
+            Piece::Bishop => {
+                move_generation::bishop_moves_it(bishops, allies, all_pieces).any(|x| x == *m)
+            }
+            Piece::Queen => {
+                move_generation::queen_moves_it(queens, allies, all_pieces).any(|x| x == *m)
+            }
             Piece::King => self.king_moves_it().any(|x| x == *m),
         }
     }
