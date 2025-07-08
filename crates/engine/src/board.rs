@@ -567,6 +567,8 @@ impl Board {
         let Some(piece) = self.query_pos(m.from, self.to_play) else {
             return false;
         };
+        let to_play = self.to_play;
+        let pawns = self.piece(self.to_play, Piece::Pawn);
         let knights = self.piece(self.to_play, Piece::Knight);
         let rooks = self.piece(self.to_play, Piece::Rook);
         let bishops = self.piece(self.to_play, Piece::Bishop);
@@ -577,7 +579,9 @@ impl Board {
         };
         let all_pieces = self.pieces();
         match piece {
-            Piece::Pawn => self.pawn_non_captures_it().any(|x| x == *m),
+            Piece::Pawn => {
+                move_generation::pawn_non_captures_it(to_play, pawns, all_pieces).any(|x| x == *m)
+            }
             Piece::Rook => {
                 move_generation::rook_moves_it(rooks, allies, all_pieces).any(|x| x == *m)
             }

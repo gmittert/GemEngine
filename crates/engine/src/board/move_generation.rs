@@ -6,145 +6,6 @@ use crate::{board::sliding_attacks, piece_attack_tables::KNIGHT_ATTACKS};
 use rand::{distr::Uniform, prelude::*};
 
 #[derive(Debug, Clone, Copy)]
-enum PawnMovesState {
-    ReadPawn,
-    Push1,
-    Push2,
-    PromoteQueen,
-    PromoteKnight,
-    PromoteRook,
-    PromoteBishop,
-}
-
-pub struct PawnNonCaptures {
-    pawns: BitBoard,
-    pieces: BitBoard,
-    from: Option<Posn>,
-    color: Color,
-    state: PawnMovesState,
-    to: Option<Posn>,
-}
-
-impl PawnNonCaptures {
-    fn new(pawns: BitBoard, pieces: BitBoard, color: Color) -> PawnNonCaptures {
-        PawnNonCaptures {
-            pawns,
-            pieces,
-            from: None,
-            color,
-            state: PawnMovesState::ReadPawn,
-            to: None,
-        }
-    }
-}
-impl Iterator for PawnNonCaptures {
-    type Item = AlgebraicMove;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let promo_rank = match self.color {
-            Color::Black => Rank::One,
-            Color::White => Rank::Eight,
-        };
-        loop {
-            match self.state {
-                PawnMovesState::ReadPawn => {
-                    if let Some(pawn) = self.pawns.next() {
-                        self.from = Some(pawn);
-                        self.state = PawnMovesState::Push1;
-                    } else {
-                        return None;
-                    }
-                }
-                PawnMovesState::Push1 => {
-                    let mpush_pos = match self.color {
-                        Color::White => self.from.unwrap().no(),
-                        Color::Black => self.from.unwrap().so(),
-                    };
-
-                    if let Some(push_pos) = mpush_pos {
-                        if !self.pieces.contains(push_pos) {
-                            if push_pos.rank() == promo_rank {
-                                self.to = Some(push_pos);
-                                self.state = PawnMovesState::PromoteQueen;
-                                continue;
-                            } else {
-                                let can_double_push = match self.color {
-                                    Color::White => self.from.unwrap().rank() == Rank::Two,
-                                    Color::Black => self.from.unwrap().rank() == Rank::Seven,
-                                };
-                                self.state = if can_double_push {
-                                    PawnMovesState::Push2
-                                } else {
-                                    PawnMovesState::ReadPawn
-                                };
-                                return Some(AlgebraicMove {
-                                    from: self.from.unwrap(),
-                                    to: push_pos,
-                                    promotion: None,
-                                });
-                            }
-                        } else {
-                            self.state = PawnMovesState::ReadPawn;
-                        }
-                    }
-                }
-                PawnMovesState::Push2 => {
-                    let mdouble_push_pos = match self.color {
-                        Color::White => self.from.unwrap().no().and_then(|x| x.no()),
-                        Color::Black => self.from.unwrap().so().and_then(|x| x.so()),
-                    };
-
-                    if let Some(double_push_pos) = mdouble_push_pos {
-                        if !self.pieces.contains(double_push_pos) {
-                            self.state = PawnMovesState::ReadPawn;
-                            return Some(AlgebraicMove {
-                                from: self.from.unwrap(),
-                                to: double_push_pos,
-                                promotion: None,
-                            });
-                        } else {
-                            self.state = PawnMovesState::ReadPawn;
-                        }
-                    }
-                }
-                PawnMovesState::PromoteQueen => {
-                    self.state = PawnMovesState::PromoteKnight;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: self.to.unwrap(),
-                        promotion: Some(Piece::Queen),
-                    });
-                }
-                PawnMovesState::PromoteRook => {
-                    self.state = PawnMovesState::PromoteBishop;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: self.to.unwrap(),
-                        promotion: Some(Piece::Rook),
-                    });
-                }
-                PawnMovesState::PromoteBishop => {
-                    self.state = PawnMovesState::ReadPawn;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: self.to.unwrap(),
-                        promotion: Some(Piece::Bishop),
-                    });
-                }
-                PawnMovesState::PromoteKnight => {
-                    self.state = PawnMovesState::PromoteRook;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: self.to.unwrap(),
-                        promotion: Some(Piece::Knight),
-                    });
-                }
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
 enum PawnCapturesState {
     ReadPawn,
     TakeEast,
@@ -387,6 +248,83 @@ impl Iterator for KingMoves {
     }
 }
 
+pub fn pawn_non_captures_it(
+    color: Color,
+    pawns: BitBoard,
+    all_pieces: BitBoard,
+) -> impl Iterator<Item = AlgebraicMove> {
+    // Skip blocked pawns
+    let non_blocked = BitBoard(match color {
+        Color::Black => pawns.0 & !(all_pieces.0 << 8),
+        Color::White => pawns.0 & !(all_pieces.0 >> 8),
+    });
+
+    let promo_rank = match color {
+        Color::Black => Rank::One,
+        Color::White => Rank::Eight,
+    };
+
+    non_blocked.into_iter().flat_map(move |from| {
+        let push_pos = match color {
+            Color::White => from.no(),
+            Color::Black => from.so(),
+        }
+        .unwrap();
+        let promote = push_pos.rank() == promo_rank;
+        let can_double_push = match color {
+            Color::White => from.rank() == Rank::Two,
+            Color::Black => from.rank() == Rank::Seven,
+        };
+        let double_push_pos = match color {
+            Color::White => Posn::from(Rank::Four, from.file()),
+            Color::Black => Posn::from(Rank::Five, from.file()),
+        };
+        let (skip_amount, take_amount) = if can_double_push && !all_pieces.contains(double_push_pos)
+        {
+            (0, 2)
+        } else if promote {
+            (2, 4)
+        } else {
+            (1, 1)
+        };
+        [
+            AlgebraicMove {
+                from,
+                to: double_push_pos,
+                promotion: None,
+            },
+            AlgebraicMove {
+                from,
+                to: push_pos,
+                promotion: None,
+            },
+            AlgebraicMove {
+                from,
+                to: push_pos,
+                promotion: Some(Piece::Queen),
+            },
+            AlgebraicMove {
+                from,
+                to: push_pos,
+                promotion: Some(Piece::Knight),
+            },
+            AlgebraicMove {
+                from,
+                to: push_pos,
+                promotion: Some(Piece::Rook),
+            },
+            AlgebraicMove {
+                from,
+                to: push_pos,
+                promotion: Some(Piece::Bishop),
+            },
+        ]
+        .into_iter()
+        .skip(skip_amount)
+        .take(take_amount)
+    })
+}
+
 pub fn knight_moves_it(knights: BitBoard, allies: BitBoard) -> impl Iterator<Item = AlgebraicMove> {
     knights.into_iter().flat_map(move |from| {
         (!allies & KNIGHT_ATTACKS[from.idx() as usize]).map(move |to| AlgebraicMove {
@@ -525,7 +463,8 @@ pub struct PsuedoLegalRandomizedMoves {
         Box<dyn Iterator<Item = AlgebraicMove>>,
         Box<dyn Iterator<Item = AlgebraicMove>>,
         Box<dyn Iterator<Item = AlgebraicMove>>,
-        std::iter::Chain<PawnCaptures, PawnNonCaptures>,
+        Box<dyn Iterator<Item = AlgebraicMove>>,
+        PawnCaptures,
         KingMoves,
     ),
     rng: ThreadRng,
@@ -535,6 +474,8 @@ pub struct PsuedoLegalRandomizedMoves {
 impl PsuedoLegalRandomizedMoves {
     fn new(board: &Board) -> PsuedoLegalRandomizedMoves {
         let dist = Uniform::try_from(0..=5).unwrap();
+        let color = board.to_play;
+        let pawns = board.piece(board.to_play, Piece::Pawn);
         let knights = board.piece(board.to_play, Piece::Knight);
         let rooks = board.piece(board.to_play, Piece::Rook);
         let bishops = board.piece(board.to_play, Piece::Bishop);
@@ -550,12 +491,13 @@ impl PsuedoLegalRandomizedMoves {
                 Box::new(bishop_moves_it(bishops, allies, all_pieces)),
                 Box::new(rook_moves_it(rooks, allies, all_pieces)),
                 Box::new(queen_moves_it(queens, allies, all_pieces)),
-                board.pawn_captures_it().chain(board.pawn_non_captures_it()),
+                Box::new(pawn_non_captures_it(color, pawns, all_pieces)),
+                board.pawn_captures_it(),
                 board.king_moves_it(),
             ),
             rng: rand::rng(),
             dist,
-            remaining: vec![0, 1, 2, 3, 4, 5],
+            remaining: vec![0, 1, 2, 3, 4, 5, 6],
         }
     }
 }
@@ -576,7 +518,8 @@ impl Iterator for PsuedoLegalRandomizedMoves {
             2 => self.iter.2.next(),
             3 => self.iter.3.next(),
             4 => self.iter.4.next(),
-            _ => self.iter.5.next(),
+            5 => self.iter.5.next(),
+            _ => self.iter.6.next(),
         };
         if res.is_some() {
             return res;
@@ -997,20 +940,6 @@ impl Board {
         let pawns = attacked_pawns & pawns;
 
         PawnCaptures::new(pawns, opponent_pieces, color, ep_target)
-    }
-
-    pub fn pawn_non_captures_it(&self) -> PawnNonCaptures {
-        let color = self.to_play;
-        let pawns = self.piece(color, Piece::Pawn);
-        let pieces = self.pieces();
-
-        // Skip blocked pawns
-        let non_blocked = match self.to_play {
-            Color::Black => pawns.0 & !(pieces.0 << 8),
-            Color::White => pawns.0 & !(pieces.0 >> 8),
-        };
-
-        PawnNonCaptures::new(BitBoard(non_blocked), self.pieces(), color)
     }
 
     pub fn pawn_moves(&self, out: &mut Vec<AlgebraicMove>) {

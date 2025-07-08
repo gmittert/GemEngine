@@ -134,7 +134,14 @@ pub fn pawns(c: &mut Criterion) {
         let fen = "r1b1k1r1/p2pqp1p/1pn2n1b/P1pPp1p1/1P1QP2P/N1P2P1N/5KP1/R1B2BR1 w q - 0 1";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            let i = board.pawn_captures_it().chain(board.pawn_non_captures_it());
+            let pawns = board.piece(board.to_play, Piece::Pawn);
+            let to_play = board.to_play;
+            let all_pieces = board.pieces();
+            let i = board
+                .pawn_captures_it()
+                .chain(move_generation::pawn_non_captures_it(
+                    to_play, pawns, all_pieces,
+                ));
             for m in i {
                 black_box(m);
             }
