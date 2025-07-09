@@ -163,7 +163,16 @@ pub fn kings(c: &mut Criterion) {
         let fen = "r1b1k1r1/p2pqp1p/1pn2n1b/P1pPp1p1/1P1QP2P/N1P2P1N/5KP1/R1B2BR1 w q - 0 1";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            for m in board.king_moves_it() {
+            let kings = board.piece(board.to_play, Piece::King);
+            let allies = match board.to_play {
+                Color::White => board.white_pieces(),
+                Color::Black => board.black_pieces(),
+            };
+            let can_castle_king = board.can_castle_king(board.to_play);
+            let can_castle_queen = board.can_castle_king(board.to_play);
+            for m in
+                move_generation::king_moves_it(kings, allies, can_castle_king, can_castle_queen)
+            {
                 black_box(m);
             }
         })

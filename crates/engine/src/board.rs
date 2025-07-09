@@ -573,11 +573,14 @@ impl Board {
         let rooks = self.piece(self.to_play, Piece::Rook);
         let bishops = self.piece(self.to_play, Piece::Bishop);
         let queens = self.piece(self.to_play, Piece::Queen);
+        let kings = self.piece(self.to_play, Piece::King);
         let allies = match self.to_play {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
         };
         let all_pieces = self.pieces();
+        let can_castle_king = self.can_castle_king(self.to_play);
+        let can_castle_queen = self.can_castle_queen(self.to_play);
         match piece {
             Piece::Pawn => {
                 move_generation::pawn_non_captures_it(to_play, pawns, all_pieces).any(|x| x == *m)
@@ -592,7 +595,10 @@ impl Board {
             Piece::Queen => {
                 move_generation::queen_moves_it(queens, allies, all_pieces).any(|x| x == *m)
             }
-            Piece::King => self.king_moves_it().any(|x| x == *m),
+            Piece::King => {
+                move_generation::king_moves_it(kings, allies, can_castle_king, can_castle_queen)
+                    .any(|x| x == *m)
+            }
         }
     }
 

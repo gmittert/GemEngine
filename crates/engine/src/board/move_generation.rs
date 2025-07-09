@@ -184,70 +184,6 @@ impl Iterator for PawnCaptures {
     }
 }
 
-pub struct KingMoves {
-    kings: BitBoard,
-    allies: BitBoard,
-    attacks: BitBoard,
-    from: Option<Posn>,
-    can_castle_queen: bool,
-    can_castle_king: bool,
-}
-
-impl KingMoves {
-    fn new(
-        kings: BitBoard,
-        allies: BitBoard,
-        can_castle_queen: bool,
-        can_castle_king: bool,
-    ) -> KingMoves {
-        KingMoves {
-            kings,
-            allies,
-            attacks: BitBoard::empty(),
-            from: None,
-            can_castle_queen,
-            can_castle_king,
-        }
-    }
-}
-impl Iterator for KingMoves {
-    type Item = AlgebraicMove;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(attack) = self.attacks.next() {
-                return Some(AlgebraicMove {
-                    from: self.from.unwrap(),
-                    to: attack,
-                    promotion: None,
-                });
-            } else if let Some(next_king) = self.kings.next() {
-                self.from = Some(next_king);
-                self.attacks = !self.allies & KING_ATTACKS[next_king.idx() as usize];
-            } else {
-                // Finished all the kings
-                if self.can_castle_king {
-                    self.can_castle_king = false;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: self.from.unwrap().ea().and_then(|x| x.ea()).unwrap(),
-                        promotion: None,
-                    });
-                } else if self.can_castle_queen {
-                    self.can_castle_queen = false;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: self.from.unwrap().we().and_then(|x| x.we()).unwrap(),
-                        promotion: None,
-                    });
-                } else {
-                    return None;
-                }
-            }
-        }
-    }
-}
-
 pub fn pawn_non_captures_it(
     color: Color,
     pawns: BitBoard,
@@ -384,6 +320,45 @@ pub fn queen_moves_it(
     })
 }
 
+pub fn king_moves_it(
+    kings: BitBoard,
+    allied_pieces: BitBoard,
+    can_castle_king: bool,
+    can_castle_queen: bool,
+) -> impl Iterator<Item = AlgebraicMove> {
+    let from = Posn {
+        pos: unsafe { NonZero::new_unchecked(kings.0) },
+    };
+    let castle_king = if can_castle_king {
+        Some(AlgebraicMove {
+            from,
+            to: Posn::from(from.rank(), File::G),
+            promotion: None,
+        })
+    } else {
+        None
+    };
+    let castle_queen = if can_castle_queen {
+        Some(AlgebraicMove {
+            from,
+            to: Posn::from(from.rank(), File::C),
+            promotion: None,
+        })
+    } else {
+        None
+    };
+
+    let moves = (!allied_pieces & KING_ATTACKS[from.idx() as usize]).map(move |to| AlgebraicMove {
+        from,
+        to,
+        promotion: None,
+    });
+    castle_king
+        .into_iter()
+        .chain(castle_queen.into_iter())
+        .chain(moves)
+}
+
 pub fn knight_captures_it(
     knights: BitBoard,
     enemies: BitBoard,
@@ -465,7 +440,7 @@ pub struct PsuedoLegalRandomizedMoves {
         Box<dyn Iterator<Item = AlgebraicMove>>,
         Box<dyn Iterator<Item = AlgebraicMove>>,
         PawnCaptures,
-        KingMoves,
+        Box<dyn Iterator<Item = AlgebraicMove>>,
     ),
     rng: ThreadRng,
     dist: Uniform<u8>,
@@ -474,26 +449,33 @@ pub struct PsuedoLegalRandomizedMoves {
 impl PsuedoLegalRandomizedMoves {
     fn new(board: &Board) -> PsuedoLegalRandomizedMoves {
         let dist = Uniform::try_from(0..=5).unwrap();
-        let color = board.to_play;
         let pawns = board.piece(board.to_play, Piece::Pawn);
         let knights = board.piece(board.to_play, Piece::Knight);
         let rooks = board.piece(board.to_play, Piece::Rook);
         let bishops = board.piece(board.to_play, Piece::Bishop);
         let queens = board.piece(board.to_play, Piece::Queen);
+        let kings = board.piece(board.to_play, Piece::King);
         let allies = match board.to_play {
             Color::White => board.white_pieces(),
             Color::Black => board.black_pieces(),
         };
         let all_pieces = board.pieces();
+        let can_castle_king = board.can_castle_king(board.to_play);
+        let can_castle_queen = board.can_castle_queen(board.to_play);
         PsuedoLegalRandomizedMoves {
             iter: (
                 Box::new(knight_moves_it(knights, allies)),
                 Box::new(bishop_moves_it(bishops, allies, all_pieces)),
                 Box::new(rook_moves_it(rooks, allies, all_pieces)),
                 Box::new(queen_moves_it(queens, allies, all_pieces)),
-                Box::new(pawn_non_captures_it(color, pawns, all_pieces)),
+                Box::new(pawn_non_captures_it(board.to_play, pawns, all_pieces)),
                 board.pawn_captures_it(),
-                board.king_moves_it(),
+                Box::new(king_moves_it(
+                    kings,
+                    allies,
+                    can_castle_king,
+                    can_castle_queen,
+                )),
             ),
             rng: rand::rng(),
             dist,
@@ -537,6 +519,48 @@ impl Iterator for PsuedoLegalRandomizedMoves {
 }
 
 impl Board {
+    pub fn can_castle_king(&self, to_play: Color) -> bool {
+        let from = match to_play {
+            Color::Black => e8(),
+            Color::White => e1(),
+        };
+        if self
+            .move_rights
+            .last()
+            .map(|x| x.castling_ability.can_castle_king(to_play))
+            .unwrap_or(false)
+        {
+            !self.pieces().contains(Posn::from(from.rank(), File::G))
+                && !self.pieces().contains(Posn::from(from.rank(), File::F))
+                && !self.in_check(to_play)
+                && !self.attacked_by_side(Posn::from(from.rank(), File::F), !to_play)
+        } else {
+            false
+        }
+    }
+    pub fn can_castle_queen(&self, to_play: Color) -> bool {
+        let from = match to_play {
+            Color::Black => e8(),
+            Color::White => e1(),
+        };
+
+        // Computing the ability to castle needs the board to compute castling through check
+        if self
+            .move_rights
+            .last()
+            .map(|x| x.castling_ability.can_castle_queen(to_play))
+            .unwrap_or(false)
+        {
+            !self.pieces().contains(Posn::from(from.rank(), File::D))
+                && !self.pieces().contains(Posn::from(from.rank(), File::B))
+                && !self.pieces().contains(Posn::from(from.rank(), File::C))
+                && !self.in_check(to_play)
+                && !self.attacked_by_side(Posn::from(from.rank(), File::D), !to_play)
+                && !self.attacked_by_side(Posn::from(from.rank(), File::C), !to_play)
+        } else {
+            false
+        }
+    }
     pub fn rook_can_capture(&self, color: Color, target: Posn) -> Option<AlgebraicMove> {
         let pieces = self.piece(color, Piece::Rook);
 
@@ -698,66 +722,6 @@ impl Board {
             };
             KING_ATTACKS[from.idx() as usize]
         }
-    }
-
-    pub fn king_moves_it(&self) -> KingMoves {
-        let color = self.to_play;
-        let kings = self.piece(color, Piece::King);
-        let rooks = self.piece(color, Piece::Rook);
-
-        let allied_pieces = match color {
-            Color::White => self.white_pieces(),
-            Color::Black => self.black_pieces(),
-        };
-        let mut kings_it = kings;
-        let from = kings_it.next().unwrap();
-
-        // Computing the ability to castle needs the board to compute castling through check
-        let can_castle_king = if self
-            .move_rights
-            .last()
-            .map(|x| x.castling_ability.can_castle_king(self.to_play))
-            .unwrap_or(false)
-        {
-            !self.attacked_by_side(from.ea().unwrap(), !self.to_play)
-                && !self.attacked_by_side(from.ea().and_then(|x| x.ea()).unwrap(), !self.to_play)
-                && !self.in_check(self.to_play)
-                && !self.pieces().contains(from.ea().unwrap())
-                && !self
-                    .pieces()
-                    .contains(from.ea().and_then(|x| x.ea()).unwrap())
-                && rooks.contains(from.ea().and_then(|x| x.ea()).and_then(|x| x.ea()).unwrap())
-        } else {
-            false
-        };
-        let can_castle_queen = if self
-            .move_rights
-            .last()
-            .map(|x| x.castling_ability.can_castle_queen(self.to_play))
-            .unwrap_or(false)
-        {
-            !self.attacked_by_side(from.we().unwrap(), !self.to_play)
-                && !self.attacked_by_side(from.we().and_then(|x| x.we()).unwrap(), !self.to_play)
-                && !self.in_check(self.to_play)
-                && !self.pieces().contains(from.we().unwrap())
-                && !self
-                    .pieces()
-                    .contains(from.we().and_then(|x| x.we()).unwrap())
-                && !self
-                    .pieces()
-                    .contains(from.we().and_then(|x| x.we()).and_then(|x| x.we()).unwrap())
-                && rooks.contains(
-                    from.we()
-                        .and_then(|x| x.we())
-                        .and_then(|x| x.we())
-                        .and_then(|x| x.we())
-                        .unwrap(),
-                )
-        } else {
-            false
-        };
-
-        KingMoves::new(kings, allied_pieces, can_castle_queen, can_castle_king)
     }
 
     pub fn king_moves(&self, out: &mut Vec<AlgebraicMove>) {
