@@ -137,8 +137,9 @@ pub fn pawns(c: &mut Criterion) {
             let pawns = board.piece(board.to_play, Piece::Pawn);
             let to_play = board.to_play;
             let all_pieces = board.pieces();
-            let i = board
-                .pawn_captures_it()
+            let enemy_pieces = board.black_pieces();
+            let ep_target = board.move_rights.last().and_then(|x| x.ep_target);
+            let i = move_generation::pawn_captures_it(to_play, pawns, enemy_pieces, ep_target)
                 .chain(move_generation::pawn_non_captures_it(
                     to_play, pawns, all_pieces,
                 ));

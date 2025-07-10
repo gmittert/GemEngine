@@ -5,183 +5,92 @@ use crate::piece_attack_tables::KING_ATTACKS;
 use crate::{board::sliding_attacks, piece_attack_tables::KNIGHT_ATTACKS};
 use rand::{distr::Uniform, prelude::*};
 
-#[derive(Debug, Clone, Copy)]
-enum PawnCapturesState {
-    ReadPawn,
-    TakeEast,
-    TakeWest,
-    TakeEp,
-    PromoteQueen,
-    PromoteRook,
-    PromoteKnight,
-    PromoteBishop,
-    Done,
-}
-
-pub struct PawnCaptures {
+pub fn pawn_captures_it(
+    color: Color,
     pawns: BitBoard,
     opponent_pieces: BitBoard,
-    from: Option<Posn>,
-    color: Color,
-    state: PawnCapturesState,
-    next_state: PawnCapturesState,
-    to: Option<Posn>,
     ep_target: Option<File>,
-}
+) -> impl Iterator<Item = AlgebraicMove> {
+    let ep_pos = ep_target
+        .map(|f| {
+            BitBoard::from(Posn::from(
+                match color {
+                    Color::Black => Rank::Three,
+                    Color::White => Rank::Five,
+                },
+                f,
+            ))
+        })
+        .unwrap_or(BitBoard::empty());
+    let capture_targets = ep_pos | opponent_pieces;
 
-impl PawnCaptures {
-    fn new(
-        pawns: BitBoard,
-        opponent_pieces: BitBoard,
-        color: Color,
-        ep_target: Option<File>,
-    ) -> PawnCaptures {
-        PawnCaptures {
-            pawns,
-            opponent_pieces,
-            from: None,
-            color,
-            state: PawnCapturesState::ReadPawn,
-            next_state: PawnCapturesState::Done,
-            to: None,
-            ep_target,
-        }
-    }
-}
-impl Iterator for PawnCaptures {
-    type Item = AlgebraicMove;
+    // Only search pawns that can capture
+    let attacked_pawns = Board::pawn_attacks(capture_targets, !color);
+    let pawns = attacked_pawns & pawns;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let promo_rank = match self.color {
-            Color::Black => Rank::One,
-            Color::White => Rank::Eight,
+    let promo_rank = match color {
+        Color::Black => Rank::One,
+        Color::White => Rank::Eight,
+    };
+
+    pawns.into_iter().flat_map(move |from| {
+        let (atk_we, atk_ea) = match color {
+            Color::White => (from.nw(), from.ne()),
+            Color::Black => (from.sw(), from.se()),
         };
-        loop {
-            match self.state {
-                PawnCapturesState::ReadPawn => {
-                    if let Some(pawn) = self.pawns.next() {
-                        self.from = Some(pawn);
-                        self.state = PawnCapturesState::TakeEast;
-                    } else {
-                        self.state = PawnCapturesState::Done;
-                    }
-                }
-                PawnCapturesState::TakeEast => {
-                    let mpush_pos = match self.color {
-                        Color::White => self.from.unwrap().no(),
-                        Color::Black => self.from.unwrap().so(),
-                    };
-                    let Some(take_pos) = mpush_pos.and_then(|x| x.ea()) else {
-                        self.state = PawnCapturesState::TakeWest;
-                        continue;
-                    };
-                    let can_capture = self.opponent_pieces.contains(take_pos);
-                    if !can_capture {
-                        self.state = PawnCapturesState::TakeWest;
-                        continue;
-                    };
-                    if take_pos.rank() == promo_rank {
-                        self.to = Some(take_pos);
-                        self.next_state = PawnCapturesState::TakeWest;
-                        self.state = PawnCapturesState::PromoteQueen;
-                        continue;
-                    }
-                    self.state = PawnCapturesState::TakeWest;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: take_pos,
-                        promotion: None,
-                    });
-                }
-                PawnCapturesState::TakeWest => {
-                    let mpush_pos = match self.color {
-                        Color::White => self.from.unwrap().no(),
-                        Color::Black => self.from.unwrap().so(),
-                    };
-                    let Some(take_pos) = mpush_pos.and_then(|x| x.we()) else {
-                        self.state = PawnCapturesState::TakeEp;
-                        continue;
-                    };
-                    let can_capture = self.opponent_pieces.contains(take_pos);
-                    if !can_capture {
-                        self.state = PawnCapturesState::TakeEp;
-                        continue;
-                    };
-                    if take_pos.rank() == promo_rank {
-                        self.to = Some(take_pos);
-                        self.next_state = PawnCapturesState::TakeEp;
-                        self.state = PawnCapturesState::PromoteQueen;
-                        continue;
-                    }
-                    self.state = PawnCapturesState::TakeEp;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: take_pos,
-                        promotion: None,
-                    });
-                }
-                PawnCapturesState::TakeEp => {
-                    self.state = PawnCapturesState::ReadPawn;
-                    if let Some(ep_target) = self.ep_target {
-                        let to = Posn::from(
-                            if self.color == Color::White {
-                                Rank::Six
-                            } else {
-                                Rank::Three
-                            },
-                            ep_target,
-                        );
-                        if (self.color == Color::White
-                            && (self.from.unwrap().nw() == Some(to)
-                                || self.from.unwrap().ne() == Some(to)))
-                            || (self.color == Color::Black
-                                && (self.from.unwrap().sw() == Some(to)
-                                    || self.from.unwrap().se() == Some(to)))
-                        {
-                            return Some(AlgebraicMove {
-                                from: self.from.unwrap(),
-                                to,
-                                promotion: None,
-                            });
-                        }
-                    }
-                }
-                PawnCapturesState::Done => return None,
-                PawnCapturesState::PromoteQueen => {
-                    self.state = PawnCapturesState::PromoteRook;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: self.to.unwrap(),
-                        promotion: Some(Piece::Queen),
-                    });
-                }
-                PawnCapturesState::PromoteRook => {
-                    self.state = PawnCapturesState::PromoteBishop;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: self.to.unwrap(),
-                        promotion: Some(Piece::Rook),
-                    });
-                }
-                PawnCapturesState::PromoteBishop => {
-                    self.state = PawnCapturesState::PromoteKnight;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: self.to.unwrap(),
-                        promotion: Some(Piece::Bishop),
-                    });
-                }
-                PawnCapturesState::PromoteKnight => {
-                    self.state = self.next_state;
-                    return Some(AlgebraicMove {
-                        from: self.from.unwrap(),
-                        to: self.to.unwrap(),
-                        promotion: Some(Piece::Knight),
-                    });
-                }
-            }
-        }
-    }
+        let atk_we_iter = if let Some(to) = atk_we
+            && capture_targets.contains(to)
+        {
+            Some(to)
+        } else {
+            None
+        };
+        let atk_ea_iter = if let Some(to) = atk_ea
+            && capture_targets.contains(to)
+        {
+            Some(to)
+        } else {
+            None
+        };
+        let captures = atk_we_iter.into_iter().chain(atk_ea_iter.into_iter());
+        captures.flat_map(move |to| {
+            let (skip, take) = if to.rank() == promo_rank {
+                (1, 4)
+            } else {
+                (0, 1)
+            };
+            [
+                AlgebraicMove {
+                    from,
+                    to,
+                    promotion: None,
+                },
+                AlgebraicMove {
+                    from,
+                    to,
+                    promotion: Some(Piece::Queen),
+                },
+                AlgebraicMove {
+                    from,
+                    to,
+                    promotion: Some(Piece::Knight),
+                },
+                AlgebraicMove {
+                    from,
+                    to,
+                    promotion: Some(Piece::Rook),
+                },
+                AlgebraicMove {
+                    from,
+                    to,
+                    promotion: Some(Piece::Bishop),
+                },
+            ]
+            .into_iter()
+            .skip(skip)
+            .take(take)
+        })
+    })
 }
 
 pub fn pawn_non_captures_it(
@@ -439,7 +348,7 @@ pub struct PsuedoLegalRandomizedMoves {
         Box<dyn Iterator<Item = AlgebraicMove>>,
         Box<dyn Iterator<Item = AlgebraicMove>>,
         Box<dyn Iterator<Item = AlgebraicMove>>,
-        PawnCaptures,
+        Box<dyn Iterator<Item = AlgebraicMove>>,
         Box<dyn Iterator<Item = AlgebraicMove>>,
     ),
     rng: ThreadRng,
@@ -459,9 +368,14 @@ impl PsuedoLegalRandomizedMoves {
             Color::White => board.white_pieces(),
             Color::Black => board.black_pieces(),
         };
+        let enemies = match board.to_play {
+            Color::Black => board.white_pieces(),
+            Color::White => board.black_pieces(),
+        };
         let all_pieces = board.pieces();
         let can_castle_king = board.can_castle_king(board.to_play);
         let can_castle_queen = board.can_castle_queen(board.to_play);
+        let ep_target = board.move_rights.last().and_then(|x| x.ep_target);
         PsuedoLegalRandomizedMoves {
             iter: (
                 Box::new(knight_moves_it(knights, allies)),
@@ -469,7 +383,7 @@ impl PsuedoLegalRandomizedMoves {
                 Box::new(rook_moves_it(rooks, allies, all_pieces)),
                 Box::new(queen_moves_it(queens, allies, all_pieces)),
                 Box::new(pawn_non_captures_it(board.to_play, pawns, all_pieces)),
-                board.pawn_captures_it(),
+                Box::new(pawn_captures_it(board.to_play, pawns, enemies, ep_target)),
                 Box::new(king_moves_it(
                     kings,
                     allies,
@@ -877,35 +791,6 @@ impl Board {
         }
     }
 
-    pub fn pawn_captures_it(&self) -> PawnCaptures {
-        let color = self.to_play;
-        let pawns = self.piece(color, Piece::Pawn);
-        let opponent_pieces = match color {
-            Color::White => self.black_pieces(),
-            Color::Black => self.white_pieces(),
-        };
-        let attacked_pawns = Self::pawn_attacks(opponent_pieces, !color);
-        let pawns = attacked_pawns & pawns;
-
-        let ep_target = self.move_rights.last().and_then(|r| r.ep_target);
-        let ep_pos = ep_target
-            .map(|f| {
-                BitBoard::from(Posn::from(
-                    match color {
-                        Color::Black => Rank::Three,
-                        Color::White => Rank::Five,
-                    },
-                    f,
-                ))
-            })
-            .unwrap_or(BitBoard::empty());
-
-        let attacked_pawns = Self::pawn_attacks(opponent_pieces, !color) | ep_pos;
-        let pawns = attacked_pawns & pawns;
-
-        PawnCaptures::new(pawns, opponent_pieces, color, ep_target)
-    }
-
     pub fn pawn_moves(&self, out: &mut Vec<AlgebraicMove>) {
         let promo_rank = match self.to_play {
             Color::Black => Rank::One,
@@ -1088,6 +973,7 @@ impl Board {
     }
 
     pub fn pseudo_legal_captures_it(&self) -> impl Iterator<Item = AlgebraicMove> + use<> {
+        let pawns = self.piece(self.to_play, Piece::Pawn);
         let knights = self.piece(self.to_play, Piece::Knight);
         let rooks = self.piece(self.to_play, Piece::Rook);
         let bishops = self.piece(self.to_play, Piece::Bishop);
@@ -1098,12 +984,17 @@ impl Board {
             Color::Black => self.white_pieces(),
         };
         let all_pieces = self.pieces();
-        self.pawn_captures_it()
-            .chain(knight_captures_it(knights, enemies))
-            .chain(bishop_captures_it(bishops, enemies, all_pieces))
-            .chain(rook_captures_it(rooks, enemies, all_pieces))
-            .chain(queen_captures_it(queens, enemies, all_pieces))
-            .chain(king_captures_it(king, enemies))
+        pawn_captures_it(
+            self.to_play,
+            pawns,
+            enemies,
+            self.move_rights.last().and_then(|x| x.ep_target),
+        )
+        .chain(knight_captures_it(knights, enemies))
+        .chain(bishop_captures_it(bishops, enemies, all_pieces))
+        .chain(rook_captures_it(rooks, enemies, all_pieces))
+        .chain(queen_captures_it(queens, enemies, all_pieces))
+        .chain(king_captures_it(king, enemies))
     }
 
     pub fn pseudo_legal_randomized_moves_it(&self) -> PsuedoLegalRandomizedMoves {
