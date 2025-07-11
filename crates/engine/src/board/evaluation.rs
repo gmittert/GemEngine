@@ -450,7 +450,7 @@ mod tests {
             })
             .expect("bad move?");
 
-        assert!(board.has_three_fold_repetition());
+        assert!(board.has_draw());
     }
 
     #[test]
@@ -490,5 +490,15 @@ mod tests {
             })
             .expect("bad move?");
         assert_eq!(board.hash, starting_hash);
+    }
+
+    #[test]
+    fn draw_50_move() {
+        let pgn = r###"
+[Event "?"]
+
+1. d4 d5 2. Kd2 Kd7 3. Ke3 Ke6 4. Kf3 Kf6 5. Kg3 Kg6 6. Nf3 Nf6 7. Nc3 Nc6 8. Qd2 Qd7 9. Qd3+ Kh5 10. Kf4 Na5 11. Nb5 Nb3 12. Na3 Nc5 13. Nc4 Na6 14. Na3 Nb4 15. Nb5 Nc6 16. Nc3 Qd6+ 17. Ke3 Bh3 18. Bd2 Bg4 19. Bc1 Bf5 20. Bd2 Be6 21. Bc1 Bd7 22. Bd2 Be8 23. Bc1 Bd7 24. Na4 Be6 25. Bd2 Bf5 26. Bc3 Be6 27. Bb4 Bf5 28. Ba5 Be6 29. Be1 Bd7 30. Bb4 Bc8 31. Ba5 Bd7 32. Rb1 Bc8 33. Ra1 Be6 34. Rb1 Bc8 35. Rc1 Bf5 36. Rb1 Bg4 37. Rd1 Bf5 38. Rc1 Bh3 39. Re1 Bg4 40. Bb4 Bf5 41. Rd1 Be6 42. Rc1 Bf5 43. Re1 Bc8 44. Rb1 Bd7 45. Re1 Bh3 46. Ra1 Bg4 47. Rg1 Bc8 48. Ba5 Bg4 49. Bd2 Be6 50. Be1 Bc8 51. Bc3 Bd7 *"###;
+        let board = Board::from_pgn(pgn).expect("bad pgn?");
+        assert!(board.has_draw());
     }
 }

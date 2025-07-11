@@ -237,10 +237,13 @@ impl Board {
         alpha
     }
 
-    pub fn has_three_fold_repetition(&self) -> bool {
+    pub fn has_draw(&self) -> bool {
         let Some(irr) = self.last_irreversible.last() else {
             return false;
         };
+        if self.half_move - irr >= 100 {
+            return true;
+        }
         let mut count = 1;
         if self.half_move - irr >= 8 {
             for (_, prev_state) in &self.moves[*irr as usize..] {
@@ -324,7 +327,7 @@ impl Board {
             CacheResult::Miss => None,
         };
 
-        if self.has_three_fold_repetition() {
+        if self.has_draw() {
             return Some(SearchResult {
                 eval: Evaluation::draw(),
                 best_move: None,
