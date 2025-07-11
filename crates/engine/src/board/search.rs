@@ -106,12 +106,19 @@ impl Board {
         let total_seldepth = AtomicU16::new(0);
         let total_nodes = AtomicUsize::new(self.nodes);
         let total_qnodes = AtomicUsize::new(self.qnodes);
+        let thread_number = AtomicU16::new(0);
         let res = rayon::scope(|s| {
             for _ in 0..num_threads {
                 s.spawn(|_| {
                     let mut new_b = self.clone();
                     new_b.nodes = 0;
                     new_b.qnodes = 0;
+                    let tn = thread_number.fetch_add(1, Ordering::Relaxed);
+                    let target_depth = if tn == 0 {
+                        target_depth
+                    } else {
+                        target_depth + 1 + (tn % 2)
+                    };
                     let res = new_b.pvs(
                         Evaluation::lost(self.half_move),
                         Evaluation::won(self.half_move),
