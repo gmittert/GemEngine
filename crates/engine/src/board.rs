@@ -13,7 +13,6 @@ use bitboard::BitBoard;
 use bitboard::moves::{AlgebraicMove, Color, Move, Piece};
 use bitboard::posn::*;
 use std::fmt;
-use std::num::NonZero;
 
 #[derive(Debug, PartialEq)]
 // We only use 4 bits:
@@ -1069,13 +1068,7 @@ impl Board {
     }
 
     pub fn in_check(&self, color: Color) -> bool {
-        let king_pos = self.piece(color, Piece::King);
-        self.attacked_by_side(
-            Posn {
-                pos: unsafe { NonZero::new_unchecked(king_pos.0) },
-            },
-            !color,
-        )
+        self.attacked_by_side(self.piece(color, Piece::King).next().unwrap(), !color)
     }
 
     pub fn attacked_by_side(&self, pos: Posn, color: Color) -> bool {
@@ -1135,65 +1128,30 @@ impl fmt::Display for Board {
         let mut chars: [char; 64] = ['.'; 64];
 
         for (i, c) in chars.iter_mut().enumerate() {
-            if self
-                .black_piece(Piece::King)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            let i = i as u8;
+            if self.black_piece(Piece::King).contains(Posn::from_idx(i)) {
                 *c = '♔'
-            } else if self
-                .black_piece(Piece::Queen)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.black_piece(Piece::Queen).contains(Posn::from_idx(i)) {
                 *c = '♕'
-            } else if self
-                .black_piece(Piece::Knight)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.black_piece(Piece::Knight).contains(Posn::from_idx(i)) {
                 *c = '♘'
-            } else if self
-                .black_piece(Piece::Pawn)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.black_piece(Piece::Pawn).contains(Posn::from_idx(i)) {
                 *c = '♙'
-            } else if self
-                .black_piece(Piece::Bishop)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.black_piece(Piece::Bishop).contains(Posn::from_idx(i)) {
                 *c = '♗'
-            } else if self
-                .black_piece(Piece::Rook)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.black_piece(Piece::Rook).contains(Posn::from_idx(i)) {
                 *c = '♖'
-            } else if self
-                .white_piece(Piece::King)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.white_piece(Piece::King).contains(Posn::from_idx(i)) {
                 *c = '♚'
-            } else if self
-                .white_piece(Piece::Queen)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.white_piece(Piece::Queen).contains(Posn::from_idx(i)) {
                 *c = '♛'
-            } else if self
-                .white_piece(Piece::Knight)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.white_piece(Piece::Knight).contains(Posn::from_idx(i)) {
                 *c = '♞'
-            } else if self
-                .white_piece(Piece::Pawn)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.white_piece(Piece::Pawn).contains(Posn::from_idx(i)) {
                 *c = '♟'
-            } else if self
-                .white_piece(Piece::Bishop)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.white_piece(Piece::Bishop).contains(Posn::from_idx(i)) {
                 *c = '♝'
-            } else if self
-                .white_piece(Piece::Rook)
-                .contains(Posn::from_idx(i).unwrap())
-            {
+            } else if self.white_piece(Piece::Rook).contains(Posn::from_idx(i)) {
                 *c = '♜'
             }
         }

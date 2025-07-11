@@ -1,4 +1,4 @@
-use std::{fmt, num::NonZero};
+use std::fmt;
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -111,23 +111,60 @@ impl fmt::Display for File {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Posn {
-    pub pos: NonZero<u64>,
+    id: u8,
 }
 
 impl Posn {
     pub const fn from(rank: Rank, file: File) -> Posn {
         Posn {
-            pos: unsafe { NonZero::new_unchecked(1 << ((8 * (rank as u8)) + (file as u8))) },
+            id: (8 * (rank as u8)) + (file as u8),
         }
     }
 
-    pub const fn from_idx(i: usize) -> Option<Posn> {
-        unsafe { std::mem::transmute(1_u64 << i) }
+    pub const fn from_idx(i: u8) -> Posn {
+        debug_assert!(i < 64);
+        Posn { id: i }
     }
 
     #[inline]
-    pub const fn idx(&self) -> u32 {
-        self.pos.trailing_zeros()
+    pub const fn idx(&self) -> usize {
+        self.id as usize
+    }
+
+    #[inline]
+    pub const fn no(&self) -> Option<Posn> {
+        if self.id >= 56 {
+            None
+        } else {
+            Some(Posn { id: self.id + 8 })
+        }
+    }
+
+    #[inline]
+    pub const fn so(&self) -> Option<Posn> {
+        if self.id < 8 {
+            None
+        } else {
+            Some(Posn { id: self.id - 8 })
+        }
+    }
+
+    #[inline]
+    pub const fn we(&self) -> Option<Posn> {
+        if self.id % 8 == 7 {
+            None
+        } else {
+            Some(Posn { id: self.id + 1 })
+        }
+    }
+
+    #[inline]
+    pub const fn ea(&self) -> Option<Posn> {
+        if self.id % 8 == 0 {
+            None
+        } else {
+            Some(Posn { id: self.id - 1 })
+        }
     }
 
     #[inline]
@@ -158,101 +195,6 @@ impl Posn {
             6 => File::B,
             _ => File::A,
         }
-    }
-
-    pub const fn no(&self) -> Option<Posn> {
-        let no = self.pos.get() << 8;
-        unsafe { std::mem::transmute(no) }
-    }
-    pub const fn so(&self) -> Option<Posn> {
-        let so = self.pos.get() >> 8;
-        unsafe { std::mem::transmute(so) }
-    }
-    pub const fn ea(&self) -> Option<Posn> {
-        const A_FILE: u64 = 0x8080_8080_8080_8080;
-        let ea = (self.pos.get() >> 1) & !A_FILE;
-        unsafe { std::mem::transmute(ea) }
-    }
-    pub const fn we(&self) -> Option<Posn> {
-        const H_FILE: u64 = 0x0101_0101_0101_0101;
-        let we = (self.pos.get() << 1) & !H_FILE;
-        unsafe { std::mem::transmute(we) }
-    }
-    pub const fn nw(&self) -> Option<Posn> {
-        let no = self.pos.get() << 8;
-        const H_FILE: u64 = 0x0101_0101_0101_0101;
-        let nw = (no << 1) & !H_FILE;
-        unsafe { std::mem::transmute(nw) }
-    }
-    pub const fn ne(&self) -> Option<Posn> {
-        let no = self.pos.get() << 8;
-        const A_FILE: u64 = 0x8080_8080_8080_8080;
-        let ne = (no >> 1) & !A_FILE;
-        unsafe { std::mem::transmute(ne) }
-    }
-    pub const fn sw(&self) -> Option<Posn> {
-        let so = self.pos.get() >> 8;
-        const H_FILE: u64 = 0x0101_0101_0101_0101;
-        let sw = (so << 1) & !H_FILE;
-        unsafe { std::mem::transmute(sw) }
-    }
-    pub const fn se(&self) -> Option<Posn> {
-        let so = self.pos.get() >> 8;
-        const A_FILE: u64 = 0x8080_8080_8080_8080;
-        let se = (so >> 1) & !A_FILE;
-        unsafe { std::mem::transmute(se) }
-    }
-    pub const fn nnw(&self) -> Option<Posn> {
-        let nno = self.pos.get() << 16;
-        const H_FILE: u64 = 0x0101_0101_0101_0101;
-        let nnw = (nno << 1) & !H_FILE;
-        unsafe { std::mem::transmute(nnw) }
-    }
-    pub const fn nne(&self) -> Option<Posn> {
-        let nno = self.pos.get() << 16;
-        const A_FILE: u64 = 0x8080_8080_8080_8080;
-        let nne = (nno >> 1) & !A_FILE;
-        unsafe { std::mem::transmute(nne) }
-    }
-    pub const fn nww(&self) -> Option<Posn> {
-        let no = self.pos.get() << 8;
-        const H_FILE: u64 = 0x0101_0101_0101_0101;
-        let nw = (no << 1) & !H_FILE;
-        let nww = (nw << 1) & !H_FILE;
-        unsafe { std::mem::transmute(nww) }
-    }
-    pub const fn nee(&self) -> Option<Posn> {
-        let no = self.pos.get() << 8;
-        const A_FILE: u64 = 0x8080_8080_8080_8080;
-        let ne = (no >> 1) & !A_FILE;
-        let nee = (ne >> 1) & !A_FILE;
-        unsafe { std::mem::transmute(nee) }
-    }
-    pub const fn ssw(&self) -> Option<Posn> {
-        let sso = self.pos.get() >> 16;
-        const H_FILE: u64 = 0x0101_0101_0101_0101;
-        let ssw = (sso << 1) & !H_FILE;
-        unsafe { std::mem::transmute(ssw) }
-    }
-    pub const fn sse(&self) -> Option<Posn> {
-        let sso = self.pos.get() >> 16;
-        const A_FILE: u64 = 0x8080_8080_8080_8080;
-        let sse = (sso >> 1) & !A_FILE;
-        unsafe { std::mem::transmute(sse) }
-    }
-    pub const fn sww(&self) -> Option<Posn> {
-        let so = self.pos.get() >> 8;
-        const H_FILE: u64 = 0x0101_0101_0101_0101;
-        let sw = (so << 1) & !H_FILE;
-        let sww = (sw << 1) & !H_FILE;
-        unsafe { std::mem::transmute(sww) }
-    }
-    pub const fn see(&self) -> Option<Posn> {
-        let so = self.pos.get() >> 8;
-        const A_FILE: u64 = 0x8080_8080_8080_8080;
-        let se = (so >> 1) & !A_FILE;
-        let see = (se >> 1) & !A_FILE;
-        unsafe { std::mem::transmute(see) }
     }
 }
 

@@ -1,5 +1,3 @@
-use std::num::NonZero;
-
 use crate::board::*;
 use crate::piece_attack_tables::KING_ATTACKS;
 use crate::{board::sliding_attacks, piece_attack_tables::KNIGHT_ATTACKS};
@@ -35,8 +33,14 @@ pub fn pawn_captures_it(
 
     pawns.into_iter().flat_map(move |from| {
         let (atk_we, atk_ea) = match color {
-            Color::White => (from.nw(), from.ne()),
-            Color::Black => (from.sw(), from.se()),
+            Color::White => (
+                from.no().and_then(|p| p.we()),
+                from.no().and_then(|p| p.ea()),
+            ),
+            Color::Black => (
+                from.so().and_then(|p| p.we()),
+                from.so().and_then(|p| p.ea()),
+            ),
         };
         let atk_we_iter = if let Some(to) = atk_we
             && capture_targets.contains(to)
@@ -230,14 +234,12 @@ pub fn queen_moves_it(
 }
 
 pub fn king_moves_it(
-    kings: BitBoard,
+    mut kings: BitBoard,
     allied_pieces: BitBoard,
     can_castle_king: bool,
     can_castle_queen: bool,
 ) -> impl Iterator<Item = AlgebraicMove> {
-    let from = Posn {
-        pos: unsafe { NonZero::new_unchecked(kings.0) },
-    };
+    let from = kings.next().unwrap();
     let castle_king = if can_castle_king {
         Some(AlgebraicMove {
             from,
@@ -330,10 +332,11 @@ pub fn queen_captures_it(
     })
 }
 
-pub fn king_captures_it(king: BitBoard, enemies: BitBoard) -> impl Iterator<Item = AlgebraicMove> {
-    let from = Posn {
-        pos: unsafe { NonZero::new_unchecked(king.0) },
-    };
+pub fn king_captures_it(
+    mut king: BitBoard,
+    enemies: BitBoard,
+) -> impl Iterator<Item = AlgebraicMove> {
+    let from = king.next().unwrap();
     (enemies & KING_ATTACKS[from.idx() as usize]).map(move |to| AlgebraicMove {
         from,
         to,
@@ -626,30 +629,26 @@ impl Board {
         kings & attacked_from
     }
 
-    pub fn king_attacks(kings: BitBoard) -> BitBoard {
+    pub fn king_attacks(mut kings: BitBoard) -> BitBoard {
         if kings.0 == 0 {
             BitBoard::empty()
         } else {
             // There should always be one king.
-            let from = Posn {
-                pos: unsafe { NonZero::new_unchecked(kings.0) },
-            };
+            let from = kings.next().unwrap();
             KING_ATTACKS[from.idx() as usize]
         }
     }
 
     pub fn king_moves(&self, out: &mut Vec<AlgebraicMove>) {
         let color = self.to_play;
-        let kings = self.piece(color, Piece::King);
+        let mut kings = self.piece(color, Piece::King);
         let rooks = self.piece(color, Piece::Rook);
 
         let allied_pieces = match color {
             Color::White => self.white_pieces(),
             Color::Black => self.black_pieces(),
         };
-        let from = Posn {
-            pos: unsafe { NonZero::new_unchecked(kings.0) },
-        };
+        let from = kings.next().unwrap();
 
         for m in KING_ATTACKS[from.idx() as usize] & !allied_pieces {
             out.push(AlgebraicMove {
@@ -766,8 +765,8 @@ impl Board {
 
     pub fn pawn_attacks_pos(pawns: BitBoard, pos: Posn, color: Color) -> BitBoard {
         let attacked_from = match color {
-            Color::White => [pos.se(), pos.sw()],
-            Color::Black => [pos.ne(), pos.nw()],
+            Color::White => [pos.so().and_then(|p| p.ea()), pos.so().and_then(|p| p.we())],
+            Color::Black => [pos.no().and_then(|p| p.ea()), pos.no().and_then(|p| p.we())],
         }
         .into_iter()
         .flatten()
@@ -888,9 +887,11 @@ impl Board {
                     ep_target,
                 );
                 if (self.to_play == Color::White
-                    && (pawn.nw() == Some(to) || pawn.ne() == Some(to)))
+                    && (pawn.no().and_then(|p| p.we()) == Some(to)
+                        || pawn.no().and_then(|p| p.ea()) == Some(to)))
                     || (self.to_play == Color::Black
-                        && (pawn.sw() == Some(to) || pawn.se() == Some(to)))
+                        && (pawn.so().and_then(|p| p.we()) == Some(to)
+                            || pawn.so().and_then(|p| p.ea()) == Some(to)))
                 {
                     out.push(AlgebraicMove {
                         from: pawn,
@@ -916,8 +917,14 @@ impl Board {
         };
 
         let attacked_from = match color {
-            Color::White => [target_pos.se(), target_pos.sw()],
-            Color::Black => [target_pos.ne(), target_pos.nw()],
+            Color::White => [
+                target_pos.so().and_then(|p| p.ea()),
+                target_pos.so().and_then(|p| p.we()),
+            ],
+            Color::Black => [
+                target_pos.no().and_then(|p| p.ea()),
+                target_pos.no().and_then(|p| p.we()),
+            ],
         }
         .into_iter()
         .flatten()
@@ -1025,7 +1032,7 @@ mod tests {
     fn rook_moves_empty() {
         for i in 0..64 {
             let mut board = empty_board(Color::White);
-            board.add_piece(Color::White, Piece::Rook, Posn::from_idx(i).unwrap());
+            board.add_piece(Color::White, Piece::Rook, Posn::from_idx(i));
             let mut moves = vec![];
             board.rook_moves(&mut moves);
             assert_eq!(moves.len(), 14);
@@ -1036,7 +1043,7 @@ mod tests {
                 before.undo_move(&m);
                 assert_eq!(before, board);
             }
-            board.remove_piece(Color::White, Piece::Rook, Posn::from_idx(i).unwrap());
+            board.remove_piece(Color::White, Piece::Rook, Posn::from_idx(i));
         }
     }
 

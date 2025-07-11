@@ -1,5 +1,5 @@
 use bitboard::BitBoard;
-use bitboard::posn::{ALL_POSNS, Posn};
+use bitboard::posn::ALL_POSNS;
 use magics::{BBITS, BISHOP_MAGICS, BISHOP_MASK, RBITS, ROOK_MAGICS, ROOK_MASK};
 use std::arch::asm;
 use std::fs::File;
@@ -32,18 +32,18 @@ fn main() -> std::io::Result<()> {
 
             let mut acc = BitBoard::empty();
             for shift in [
-                |p: Posn| p.no(),
-                |p: Posn| p.so(),
-                |p: Posn| p.ea(),
-                |p: Posn| p.we(),
+                |b: BitBoard| b.no(),
+                |b: BitBoard| b.so(),
+                |b: BitBoard| b.ea(),
+                |b: BitBoard| b.we(),
             ] {
-                let mut slide = shift(pos);
-                while let Some(pos) = slide {
-                    acc |= pos;
-                    if board.contains(pos) {
+                let mut slide = shift(BitBoard::from(pos));
+                while !slide.is_empty() {
+                    acc |= slide;
+                    if !(board & slide).is_empty() {
                         break;
                     }
-                    slide = shift(pos);
+                    slide = shift(slide);
                 }
             }
             let key =
@@ -61,18 +61,18 @@ fn main() -> std::io::Result<()> {
 
             let mut acc = BitBoard::empty();
             for shift in [
-                |p: Posn| p.ne(),
-                |p: Posn| p.se(),
-                |p: Posn| p.nw(),
-                |p: Posn| p.sw(),
+                |b: BitBoard| b.no().ea(),
+                |b: BitBoard| b.so().ea(),
+                |b: BitBoard| b.no().we(),
+                |b: BitBoard| b.so().we(),
             ] {
-                let mut slide = shift(pos);
-                while let Some(pos) = slide {
-                    acc |= pos;
-                    if board.contains(pos) {
+                let mut slide = shift(BitBoard::from(pos));
+                while !slide.is_empty() {
+                    acc |= slide;
+                    if !(board & slide).is_empty() {
                         break;
                     }
-                    slide = shift(pos);
+                    slide = shift(slide);
                 }
             }
             let key =

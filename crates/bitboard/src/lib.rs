@@ -13,11 +13,11 @@ impl BitBoard {
     }
 
     pub const fn from(p: Posn) -> BitBoard {
-        BitBoard(p.pos.get())
+        BitBoard(1 << p.idx())
     }
 
     pub const fn contains(&self, p: Posn) -> bool {
-        self.0 & p.pos.get() != 0
+        self.0 & (1 << p.idx()) != 0
     }
 
     pub const fn is_empty(&self) -> bool {
@@ -26,6 +26,21 @@ impl BitBoard {
 
     pub const fn len(&self) -> usize {
         self.0.count_ones() as usize
+    }
+
+    pub const fn no(&self) -> BitBoard {
+        BitBoard(self.0 << 8)
+    }
+    pub const fn so(&self) -> BitBoard {
+        BitBoard(self.0 >> 8)
+    }
+    pub const fn ea(&self) -> BitBoard {
+        const A_FILE: u64 = 0x8080_8080_8080_8080;
+        BitBoard((self.0 >> 1) & !A_FILE)
+    }
+    pub const fn we(&self) -> BitBoard {
+        const H_FILE: u64 = 0x0101_0101_0101_0101;
+        BitBoard((self.0 << 1) & !H_FILE)
     }
 }
 
@@ -49,9 +64,13 @@ impl Iterator for BitBoard {
     type Item = Posn;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let lsb = (self.0 as i64) & (self.0 as i64).overflowing_neg().0;
+        let lsb = self.0.trailing_zeros();
         self.0 &= self.0.overflowing_sub(1).0;
-        unsafe { std::mem::transmute(lsb) }
+        if lsb >= 64 {
+            None
+        } else {
+            Some(Posn::from_idx(lsb as u8))
+        }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

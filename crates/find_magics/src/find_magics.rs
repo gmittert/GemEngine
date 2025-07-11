@@ -2,106 +2,6 @@ use bitboard::posn::*;
 use rand::prelude::*;
 use std::{arch::asm, io};
 
-static ROOK_MASK: [u64; 64] = {
-    let mut arr = [0; 64];
-    let mut i = 0;
-    while i < 64 {
-        let pos = Posn::from_idx(i).unwrap();
-
-        let mut acc = 0;
-
-        let mut slide = pos.no();
-        while let Some(pos) = slide {
-            if pos.no().is_none() {
-                break;
-            }
-            acc |= pos.pos.get();
-            slide = pos.no();
-        }
-
-        let mut slide = pos.so();
-        while let Some(pos) = slide {
-            if pos.so().is_none() {
-                break;
-            }
-            acc |= pos.pos.get();
-            slide = pos.so();
-        }
-
-        let mut slide = pos.ea();
-        while let Some(pos) = slide {
-            if pos.ea().is_none() {
-                break;
-            }
-            acc |= pos.pos.get();
-            slide = pos.ea();
-        }
-
-        let mut slide = pos.we();
-        while let Some(pos) = slide {
-            if pos.we().is_none() {
-                break;
-            }
-            acc |= pos.pos.get();
-            slide = pos.we();
-        }
-
-        arr[i] = acc;
-        i += 1;
-    }
-    arr
-};
-
-static BISHOP_MASK: [u64; 64] = {
-    let mut arr = [0; 64];
-    let mut i = 0;
-    while i < 64 {
-        let pos = Posn::from_idx(i).unwrap();
-
-        let mut acc = 0;
-
-        let mut slide = pos.ne();
-        while let Some(pos) = slide {
-            if pos.ne().is_none() {
-                break;
-            }
-            acc |= pos.pos.get();
-            slide = pos.ne();
-        }
-
-        let mut slide = pos.se();
-        while let Some(pos) = slide {
-            if pos.se().is_none() {
-                break;
-            }
-            acc |= pos.pos.get();
-            slide = pos.se();
-        }
-
-        let mut slide = pos.nw();
-        while let Some(pos) = slide {
-            if pos.nw().is_none() {
-                break;
-            }
-            acc |= pos.pos.get();
-            slide = pos.nw();
-        }
-
-        let mut slide = pos.sw();
-        while let Some(pos) = slide {
-            if pos.sw().is_none() {
-                break;
-            }
-            acc |= pos.pos.get();
-            slide = pos.sw();
-        }
-
-        arr[i] = acc;
-        i += 1;
-    }
-    arr
-};
-
 fn pdep(mask: u64, bits: u64) -> u64 {
     let mut x: u64;
     unsafe {
@@ -115,20 +15,9 @@ fn pdep(mask: u64, bits: u64) -> u64 {
     x
 }
 
-static RBITS: [u8; 64] = [
-    12, 11, 11, 11, 11, 11, 11, 12, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11,
-    11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11,
-    11, 10, 10, 10, 10, 10, 10, 11, 12, 11, 11, 11, 11, 11, 11, 12,
-];
-
-static BBITS: [u8; 64] = [
-    6, 5, 5, 5, 5, 5, 5, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 7, 7, 7, 7, 5, 5, 5, 5, 7, 9, 9, 7, 5, 5,
-    5, 5, 7, 9, 9, 7, 5, 5, 5, 5, 7, 7, 7, 7, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 5, 5, 5, 5, 5, 5, 6,
-];
-
 fn find_rook_magic(pos: Posn, rng: &mut StdRng) {
-    let mask = ROOK_MASK[pos.idx() as usize];
-    let num_bits = RBITS[pos.idx() as usize];
+    let mask = magics::ROOK_MASK[pos.idx() as usize];
+    let num_bits = magics::RBITS[pos.idx() as usize];
 
     let mut bitset: [u64; 1 << 9];
     'outer: loop {
@@ -162,8 +51,8 @@ fn find_rook_magic(pos: Posn, rng: &mut StdRng) {
 }
 
 fn find_bishop_magic(pos: Posn, rng: &mut StdRng) {
-    let mask = BISHOP_MASK[pos.idx() as usize];
-    let num_bits = BBITS[pos.idx() as usize];
+    let mask = magics::BISHOP_MASK[pos.idx() as usize];
+    let num_bits = magics::BBITS[pos.idx() as usize];
 
     let mut bitset: [u64; 1 << 6];
     'outer: loop {

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 bitboard = { path = "../bitboard" }
+magics = { path = "../magics" }
 rand = "0.8.5"
 
 [[bin]]

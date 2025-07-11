@@ -1,4 +1,4 @@
-use bitboard::posn::Posn;
+use bitboard::{BitBoard, posn::Posn};
 
 pub static RBITS: [u8; 64] = [
     12, 11, 11, 11, 11, 11, 11, 12, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11,
@@ -165,47 +165,47 @@ pub static BISHOP_MASK: [u64; 64] = {
     let mut arr = [0; 64];
     let mut i = 0;
     while i < 64 {
-        let pos = Posn::from_idx(i).unwrap();
+        let pos = BitBoard::from(Posn::from_idx(i));
 
         let mut acc = 0;
 
-        let mut slide = pos.ne();
-        while let Some(pos) = slide {
-            if pos.ne().is_none() {
+        let mut slide = pos.no().ea();
+        while !slide.is_empty() {
+            if slide.no().ea().is_empty() {
                 break;
             }
-            acc |= pos.pos.get();
-            slide = pos.ne();
+            acc |= slide.0;
+            slide = slide.no().ea();
         }
 
-        let mut slide = pos.se();
-        while let Some(pos) = slide {
-            if pos.se().is_none() {
+        let mut slide = pos.so().ea();
+        while !slide.is_empty() {
+            if slide.so().ea().is_empty() {
                 break;
             }
-            acc |= pos.pos.get();
-            slide = pos.se();
+            acc |= slide.0;
+            slide = slide.so().ea();
         }
 
-        let mut slide = pos.nw();
-        while let Some(pos) = slide {
-            if pos.nw().is_none() {
+        let mut slide = pos.no().we();
+        while !slide.is_empty() {
+            if slide.no().we().is_empty() {
                 break;
             }
-            acc |= pos.pos.get();
-            slide = pos.nw();
+            acc |= slide.0;
+            slide = slide.no().we();
         }
 
-        let mut slide = pos.sw();
-        while let Some(pos) = slide {
-            if pos.sw().is_none() {
+        let mut slide = pos.so().we();
+        while !slide.is_empty() {
+            if slide.so().we().is_empty() {
                 break;
             }
-            acc |= pos.pos.get();
-            slide = pos.sw();
+            acc |= slide.0;
+            slide = slide.so().we();
         }
 
-        arr[i] = acc;
+        arr[i as usize] = acc;
         i += 1;
     }
     arr
@@ -215,47 +215,47 @@ pub static ROOK_MASK: [u64; 64] = {
     let mut arr = [0; 64];
     let mut i = 0;
     while i < 64 {
-        let pos = Posn::from_idx(i).unwrap();
+        let pos = BitBoard::from(Posn::from_idx(i));
 
         let mut acc = 0;
 
         let mut slide = pos.no();
-        while let Some(pos) = slide {
-            if pos.no().is_none() {
+        while !slide.is_empty() {
+            if slide.no().is_empty() {
                 break;
             }
-            acc |= pos.pos.get();
-            slide = pos.no();
+            acc |= slide.0;
+            slide = slide.no();
         }
 
         let mut slide = pos.so();
-        while let Some(pos) = slide {
-            if pos.so().is_none() {
+        while !slide.is_empty() {
+            if slide.so().is_empty() {
                 break;
             }
-            acc |= pos.pos.get();
-            slide = pos.so();
+            acc |= slide.0;
+            slide = slide.so();
         }
 
         let mut slide = pos.ea();
-        while let Some(pos) = slide {
-            if pos.ea().is_none() {
+        while !slide.is_empty() {
+            if slide.ea().is_empty() {
                 break;
             }
-            acc |= pos.pos.get();
-            slide = pos.ea();
+            acc |= slide.0;
+            slide = slide.ea();
         }
 
         let mut slide = pos.we();
-        while let Some(pos) = slide {
-            if pos.we().is_none() {
+        while !slide.is_empty() {
+            if slide.we().is_empty() {
                 break;
             }
-            acc |= pos.pos.get();
-            slide = pos.we();
+            acc |= slide.0;
+            slide = slide.we();
         }
 
-        arr[i] = acc;
+        arr[i as usize] = acc;
         i += 1;
     }
     arr
