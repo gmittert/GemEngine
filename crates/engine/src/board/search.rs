@@ -408,6 +408,7 @@ impl Board {
             .into_iter()
             .chain(recapture)
             .chain(killer_moves)
+            .chain(self.pseudo_legal_captures_it())
             .chain(self.pseudo_legal_randomized_moves_it());
         let mut is_pv_node = false;
         let mut is_first_child = true;
