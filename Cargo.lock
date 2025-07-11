@@ -293,7 +293,6 @@ dependencies = [
  "magics",
  "nnue",
  "portable-atomic",
- "rand 0.9.1",
  "rayon",
  "tracing",
  "tracing-perfetto",
@@ -321,7 +320,7 @@ version = "0.0.0"
 dependencies = [
  "bitboard",
  "magics",
- "rand 0.8.5",
+ "rand 0.9.1",
 ]
 
 [[package]]

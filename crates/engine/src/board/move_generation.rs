@@ -1,7 +1,6 @@
 use crate::board::*;
 use crate::piece_attack_tables::KING_ATTACKS;
 use crate::{board::sliding_attacks, piece_attack_tables::KNIGHT_ATTACKS};
-use rand::{distr::Uniform, prelude::*};
 
 pub fn pawn_captures_it(
     color: Color,
@@ -342,97 +341,6 @@ pub fn king_captures_it(
         to,
         promotion: None,
     })
-}
-
-pub struct PsuedoLegalRandomizedMoves {
-    iter: (
-        Box<dyn Iterator<Item = AlgebraicMove>>,
-        Box<dyn Iterator<Item = AlgebraicMove>>,
-        Box<dyn Iterator<Item = AlgebraicMove>>,
-        Box<dyn Iterator<Item = AlgebraicMove>>,
-        Box<dyn Iterator<Item = AlgebraicMove>>,
-        Box<dyn Iterator<Item = AlgebraicMove>>,
-        Box<dyn Iterator<Item = AlgebraicMove>>,
-    ),
-    rng: ThreadRng,
-    dist: Uniform<u8>,
-    remaining: Vec<u8>,
-}
-impl PsuedoLegalRandomizedMoves {
-    fn new(board: &Board) -> PsuedoLegalRandomizedMoves {
-        let dist = Uniform::try_from(0..=5).unwrap();
-        let pawns = board.piece(board.to_play, Piece::Pawn);
-        let knights = board.piece(board.to_play, Piece::Knight);
-        let rooks = board.piece(board.to_play, Piece::Rook);
-        let bishops = board.piece(board.to_play, Piece::Bishop);
-        let queens = board.piece(board.to_play, Piece::Queen);
-        let kings = board.piece(board.to_play, Piece::King);
-        let allies = match board.to_play {
-            Color::White => board.white_pieces(),
-            Color::Black => board.black_pieces(),
-        };
-        let enemies = match board.to_play {
-            Color::Black => board.white_pieces(),
-            Color::White => board.black_pieces(),
-        };
-        let all_pieces = board.pieces();
-        let can_castle_king = board.can_castle_king(board.to_play);
-        let can_castle_queen = board.can_castle_queen(board.to_play);
-        let ep_target = board.move_rights.last().and_then(|x| x.ep_target);
-        PsuedoLegalRandomizedMoves {
-            iter: (
-                Box::new(knight_moves_it(knights, allies)),
-                Box::new(bishop_moves_it(bishops, allies, all_pieces)),
-                Box::new(rook_moves_it(rooks, allies, all_pieces)),
-                Box::new(queen_moves_it(queens, allies, all_pieces)),
-                Box::new(pawn_non_captures_it(board.to_play, pawns, all_pieces)),
-                Box::new(pawn_captures_it(board.to_play, pawns, enemies, ep_target)),
-                Box::new(king_moves_it(
-                    kings,
-                    allies,
-                    can_castle_king,
-                    can_castle_queen,
-                )),
-            ),
-            rng: rand::rng(),
-            dist,
-            remaining: vec![0, 1, 2, 3, 4, 5, 6],
-        }
-    }
-}
-impl Iterator for PsuedoLegalRandomizedMoves {
-    type Item = AlgebraicMove;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // We've got a somewhat cumbersome approach here. The goal is to randomly choose between
-        // the different iterators, removing them from the "remaining" set when they run out.
-        if self.remaining.is_empty() {
-            return None;
-        }
-        let random = self.dist.sample(&mut self.rng);
-        let idx = self.remaining[random as usize];
-        let res = match idx {
-            0 => self.iter.0.next(),
-            1 => self.iter.1.next(),
-            2 => self.iter.2.next(),
-            3 => self.iter.3.next(),
-            4 => self.iter.4.next(),
-            5 => self.iter.5.next(),
-            _ => self.iter.6.next(),
-        };
-        if res.is_some() {
-            return res;
-        }
-        // Here, we take whichever iterator index ran out, switch it to the last spot in the
-        // vector, then pop it as a way of removing the n'th index from the vector without shifting
-        // all the elements. Since we're using it as a set, we don't care about order.
-        self.remaining[random as usize] = *self.remaining.last().unwrap();
-        self.remaining.pop().unwrap();
-        if !self.remaining.is_empty() {
-            self.dist = Uniform::try_from(0..self.remaining.len() as u8).unwrap();
-        }
-        self.next()
-    }
 }
 
 impl Board {
@@ -1004,8 +912,33 @@ impl Board {
         .chain(king_captures_it(king, enemies))
     }
 
-    pub fn pseudo_legal_randomized_moves_it(&self) -> PsuedoLegalRandomizedMoves {
-        PsuedoLegalRandomizedMoves::new(self)
+    pub fn pseudo_legal_moves_it(&self) -> impl Iterator<Item=AlgebraicMove> + use<> {
+        let pawns = self.piece(self.to_play, Piece::Pawn);
+        let knights = self.piece(self.to_play, Piece::Knight);
+        let rooks = self.piece(self.to_play, Piece::Rook);
+        let bishops = self.piece(self.to_play, Piece::Bishop);
+        let queens = self.piece(self.to_play, Piece::Queen);
+        let kings = self.piece(self.to_play, Piece::King);
+        let allies = match self.to_play {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+        let enemies = match self.to_play {
+            Color::Black => self.white_pieces(),
+            Color::White => self.black_pieces(),
+        };
+        let all_pieces = self.pieces();
+        let can_castle_king = self.can_castle_king(self.to_play);
+        let can_castle_queen = self.can_castle_queen(self.to_play);
+        let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
+
+        pawn_non_captures_it(self.to_play, pawns, all_pieces)
+        .chain(knight_moves_it(knights, allies))
+        .chain(bishop_moves_it(bishops, allies, all_pieces))
+        .chain(rook_moves_it(rooks, allies, all_pieces))
+        .chain(queen_moves_it(queens, allies, all_pieces))
+        .chain(king_moves_it( kings, allies, can_castle_king, can_castle_queen))
+        .chain(pawn_captures_it(self.to_play, pawns, enemies, ep_target))
     }
 
     pub fn fill_pseudo_legal_moves(&mut self, moves: &mut Vec<AlgebraicMove>) {
