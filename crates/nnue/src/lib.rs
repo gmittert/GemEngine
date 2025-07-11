@@ -1,5 +1,12 @@
+#![feature(array_chunks, portable_simd)]
+// On znver1, Rust/LLVM's default auto vectorization only uses xmm registers to do 128 bits at a
+// time, even when zenver1 supports avx2.
+use std::simd::prelude::*;
+
 use itertools::izip;
+
 // Hyper parameters
+//
 pub const SUPERBATCHES: usize = 160;
 pub const WDL_PROPORTION: f32 = 0.75;
 pub const HIDDEN_SIZE: usize = 256;
@@ -134,35 +141,45 @@ pub struct Network {
     output_bias: i16,
 }
 
-#[inline]
-/// Clipped ReLU - Activation Function.
-/// Note that this takes the i16s in the accumulator to i32s.
-fn crelu(x: i16) -> i32 {
-    i32::from(x).clamp(0, i32::from(QA))
-}
-
 impl Network {
     /// Calculates the output of the network, starting from the already calculated hidden layer.
-    pub fn evaluate(&self, us: &Accumulator, them: &Accumulator) -> i32 {
-        // Initialise output with bias.
-        let mut output = i32::from(self.output_bias);
+    pub fn evaluate(&self, stm: &Accumulator, nstm: &Accumulator) -> i32 {
+        // Accumulator
+        let mut acc = i32x64::splat(0);
 
-        // Side-To-Move Accumulator -> Output.
-        for (&input, &weight) in us.vals.iter().zip(&self.output_weights[..HIDDEN_SIZE]) {
-            output += crelu(input) * i32::from(weight);
+        let crelu_min = i16x64::splat(0);
+        let crelu_max = i16x64::splat(QA);
+
+        // Side to move perspective.
+        for (inputs, weights) in stm
+            .vals
+            .array_chunks::<64>()
+            .zip(self.output_weights[..HIDDEN_SIZE].array_chunks::<64>())
+        {
+            // Cast up to i32s so we don't overflow when we multiply
+            let crelu_inputs = i16x64::from_array(*inputs)
+                .simd_clamp(crelu_min, crelu_max)
+                .cast::<i32>();
+            acc += crelu_inputs * i16x64::from_array(*weights).cast::<i32>();
         }
 
-        // Not-Side-To-Move Accumulator -> Output.
-        for (&input, &weight) in them.vals.iter().zip(&self.output_weights[HIDDEN_SIZE..]) {
-            output += crelu(input) * i32::from(weight);
+        // Not Side to move perspective.
+        for (input, weights) in nstm
+            .vals
+            .array_chunks::<64>()
+            .zip(self.output_weights[HIDDEN_SIZE..].array_chunks::<64>())
+        {
+            let crelu_input = i16x64::from_array(*input)
+                .simd_clamp(crelu_min, crelu_max)
+                .cast::<i32>();
+            acc += crelu_input * i16x64::from_array(*weights).cast::<i32>();
         }
 
-        // Apply eval scale.
+        // Sum up the accumulator and add in the final bias.
+        let mut output = acc.reduce_sum() + (self.output_bias as i32);
+
+        // Scale and remove quantization
         output *= SCALE;
-
-        // Remove quantisation.
-        output /= i32::from(QA) * i32::from(QB);
-
-        output
+        output / (i32::from(QA) * i32::from(QB))
     }
 }
