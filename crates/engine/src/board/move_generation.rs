@@ -912,7 +912,7 @@ impl Board {
         .chain(king_captures_it(king, enemies))
     }
 
-    pub fn pseudo_legal_moves_it(&self) -> impl Iterator<Item=AlgebraicMove> + use<> {
+    pub fn pseudo_legal_moves_it(&self) -> impl Iterator<Item = AlgebraicMove> + use<> {
         let pawns = self.piece(self.to_play, Piece::Pawn);
         let knights = self.piece(self.to_play, Piece::Knight);
         let rooks = self.piece(self.to_play, Piece::Rook);
@@ -933,12 +933,17 @@ impl Board {
         let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
 
         pawn_non_captures_it(self.to_play, pawns, all_pieces)
-        .chain(knight_moves_it(knights, allies))
-        .chain(bishop_moves_it(bishops, allies, all_pieces))
-        .chain(rook_moves_it(rooks, allies, all_pieces))
-        .chain(queen_moves_it(queens, allies, all_pieces))
-        .chain(king_moves_it( kings, allies, can_castle_king, can_castle_queen))
-        .chain(pawn_captures_it(self.to_play, pawns, enemies, ep_target))
+            .chain(knight_moves_it(knights, allies))
+            .chain(bishop_moves_it(bishops, allies, all_pieces))
+            .chain(rook_moves_it(rooks, allies, all_pieces))
+            .chain(queen_moves_it(queens, allies, all_pieces))
+            .chain(king_moves_it(
+                kings,
+                allies,
+                can_castle_king,
+                can_castle_queen,
+            ))
+            .chain(pawn_captures_it(self.to_play, pawns, enemies, ep_target))
     }
 
     pub fn fill_pseudo_legal_moves(&mut self, moves: &mut Vec<AlgebraicMove>) {

@@ -147,8 +147,8 @@ impl Network {
         // Accumulator
         let mut acc = i32x64::splat(0);
 
-        let crelu_min = i16x64::splat(0);
-        let crelu_max = i16x64::splat(QA);
+        let screlu_min = i16x64::splat(0);
+        let screlu_max = i16x64::splat(QA);
 
         // Side to move perspective.
         for (inputs, weights) in stm
@@ -157,10 +157,10 @@ impl Network {
             .zip(self.output_weights[..HIDDEN_SIZE].array_chunks::<64>())
         {
             // Cast up to i32s so we don't overflow when we multiply
-            let crelu_inputs = i16x64::from_array(*inputs)
-                .simd_clamp(crelu_min, crelu_max)
+            let screlu_inputs = i16x64::from_array(*inputs)
+                .simd_clamp(screlu_min, screlu_max)
                 .cast::<i32>();
-            acc += crelu_inputs * i16x64::from_array(*weights).cast::<i32>();
+            acc += screlu_inputs * screlu_inputs * i16x64::from_array(*weights).cast::<i32>();
         }
 
         // Not Side to move perspective.
@@ -169,16 +169,17 @@ impl Network {
             .array_chunks::<64>()
             .zip(self.output_weights[HIDDEN_SIZE..].array_chunks::<64>())
         {
-            let crelu_input = i16x64::from_array(*input)
-                .simd_clamp(crelu_min, crelu_max)
+            let screlu_inputs = i16x64::from_array(*input)
+                .simd_clamp(screlu_min, screlu_max)
                 .cast::<i32>();
-            acc += crelu_input * i16x64::from_array(*weights).cast::<i32>();
+            acc += screlu_inputs * screlu_inputs * i16x64::from_array(*weights).cast::<i32>();
         }
 
         // Sum up the accumulator and add in the final bias.
         let mut output = acc.reduce_sum() + (self.output_bias as i32);
 
         // Scale and remove quantization
+        output /= i32::from(QA);
         output *= SCALE;
         output / (i32::from(QA) * i32::from(QB))
     }
