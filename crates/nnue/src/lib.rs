@@ -9,13 +9,13 @@ use itertools::izip;
 //
 pub const SUPERBATCHES: usize = 160;
 pub const WDL_PROPORTION: f32 = 0.75;
-pub const HIDDEN_SIZE: usize = 256;
+pub const HIDDEN_SIZE: usize = 128;
 pub const QA: i16 = 255;
 pub const QB: i16 = 64;
 pub const SCALE: i32 = 400;
 
 pub static NNUE: Network =
-    unsafe { std::mem::transmute(*include_bytes!("../../../weights/nnue.bin")) };
+    unsafe { std::mem::transmute(*include_bytes!("../../../weights/nnue-128.bin")) };
 
 /// Accumulator code cribbed from the bullet examples in
 /// https://github.com/jw1912/bullet/blob/main/examples/simple.rs

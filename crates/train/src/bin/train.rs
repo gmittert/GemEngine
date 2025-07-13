@@ -19,12 +19,12 @@ fn main() {
     let mut trainer = nnue_train::get_trainer();
 
     let schedule = TrainingSchedule {
-        net_id: "1_simple".to_string(),
+        net_id: "2_gem_128HL".to_string(),
         eval_scale: SCALE as f32,
         steps: TrainingSteps {
             batch_size: 16_384,
             batches_per_superbatch: 6104,
-            start_superbatch: 1,
+            start_superbatch: 0,
             end_superbatch: SUPERBATCHES,
         },
         wdl_scheduler: wdl::ConstantWDL {
@@ -61,7 +61,7 @@ fn main() {
         SfBinpackLoader::new(file_path, buffer_size_mb, threads, filter)
     };
 
-    //trainer.load_weights_from_file("checkpoints/1_simple-160/optimiser_state/weights.bin");
+    //trainer.load_from_checkpoint("checkpoints/2_gem_128HL-100");
     trainer.run(&schedule, &settings, &data_loader);
     let starting_eval = trainer.eval("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     println!("starting Eval: {}", 400.0 * starting_eval);
