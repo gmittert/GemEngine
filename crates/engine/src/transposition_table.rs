@@ -1,14 +1,15 @@
 use std::num::NonZero;
+use std::ops;
 
-use crate::shared_hashmap::Encodable;
-use crate::{board::evaluation::Evaluation, shared_hashmap::SharedHashMap};
+use crate::board::evaluation::Evaluation;
 use bitboard::moves::{AlgebraicMove, Piece};
 use bitboard::posn::{File, Posn, Rank};
 use tracing::Level;
 
-#[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
 pub enum ScoreType {
-    Upper,
+    #[default]
+    Upper = 0,
     Lower,
     Exact,
 }
@@ -18,22 +19,177 @@ pub enum ScoreType {
 //    4..8 From rank
 //    8..12 To file
 //    12..16 To rank
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub struct PackedTTEntry {
-    eval: Evaluation,
-    depth: u16,
-    promo: Option<Piece>,
-    node_type: ScoreType,
-    data: Option<NonZero<u16>>,
+    pub eval: Evaluation,
+    pub depth: u16,
+    pub promo: Option<Piece>,
+    pub node_type: ScoreType,
+    pub data: Option<NonZero<u16>>,
 }
 
-impl Encodable for PackedTTEntry {
-    fn from_u64(v: u64) -> Self {
-        unsafe { std::mem::transmute(v) }
+impl PackedTTEntry {
+    fn empty(&self) -> bool {
+        (unsafe { std::mem::transmute::<PackedTTEntry, u64>(*self) }) == 0
+    }
+}
+
+impl ops::BitXor<u64> for PackedTTEntry {
+    type Output = u64;
+    fn bitxor(self, rhs: u64) -> Self::Output {
+        (unsafe { std::mem::transmute::<PackedTTEntry, u64>(self) }) ^ rhs
+    }
+}
+
+impl ops::BitXor<PackedTTEntry> for u64 {
+    type Output = u64;
+    fn bitxor(self, rhs: PackedTTEntry) -> Self::Output {
+        (unsafe { std::mem::transmute::<PackedTTEntry, u64>(rhs) }) ^ self
+    }
+}
+
+use std::cell::UnsafeCell;
+
+#[derive(Debug, Copy, Clone)]
+pub struct SharedHashMapEntry {
+    key_xor_v: u64,
+    value: PackedTTEntry,
+}
+
+#[derive(Debug)]
+#[repr(align(0x200000))]
+pub struct SharedHashMapInner {
+    data: UnsafeCell<[SharedHashMapEntry; DEFAULT_TT_SIZE]>,
+}
+
+#[derive(Debug)]
+pub struct SharedHashMap {
+    data: Box<SharedHashMapInner>,
+}
+
+/// A multi level "lockless" hashmap that supports insertion with a "keep deepest" replacement
+/// policy.
+///
+/// In the pursuit of speed over correctness, we don't use atomics at all. Instead, we store the
+/// value along side the key xor'd with the value. If the key we're looking up doesn't xor
+/// correctly, we return that it's not found.
+///
+/// To improve cache usage, we split the total size into 4 adjacent buckets, each larger than the
+/// last. We search from each one in turn, starting from the smallest to the largest.
+unsafe impl Send for SharedHashMap {}
+unsafe impl Sync for SharedHashMap {}
+impl Default for SharedHashMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SharedHashMap {
+    pub fn new() -> SharedHashMap {
+        // We use the nightly "new_zeroed" because doing a regular box new causes a stack overflow
+        // on non release builds.
+        let data = Box::<SharedHashMapInner>::new_zeroed();
+        let data = unsafe { data.assume_init() };
+
+        SharedHashMap { data }
     }
 
-    fn to_u64(&self) -> u64 {
-        unsafe { std::mem::transmute(*self) }
+    pub fn clear(&self) {
+        (&mut unsafe { *self.data.data.get() }).fill(SharedHashMapEntry {
+            key_xor_v: 0,
+            value: PackedTTEntry::default(),
+        })
+    }
+
+    // How deep we are able to search corresponds to how sparsely our hashmap will be filled, which
+    // corresponds to how long we are able to search for. We don't know how long we are going to
+    // search for a priori, this means we don't know how big our hashmap should be.
+    //
+    // Too big, and our use of modulo to place keys will randomly space them out through the, e.g.
+    // 256MiB of memory. Every insert is going to eat overhead creating pages, then paging them
+    // into cache.
+    //
+    // Too small, and we don't fit all the thing we want to cache.
+    //
+    // Instead, we attempt to somewhat naturally let the data choose the amount of pages it needs
+    // by having a multi-level modulus attempting to somewhat densely pack entries into the front
+    // of the map until it gets filled up.
+    //
+    // We break our table size into four smaller tables each larger than the previous which we
+    // check in turn.
+    const OFFSETS: [usize; 4] = [0, 2 * 1024 * 1024, 4 * 1024 * 1024, 8 * 1024 * 1024];
+    const LAYER_COUNT: usize = 4;
+    // Ensure that the sizes are powers of two to ensure modulo is efficient.
+    const SIZES: [usize; 4] = [
+        2 * 1024 * 1024,
+        2 * 1024 * 1024,
+        4 * 1024 * 1024,
+        8 * 1024 * 1024,
+    ];
+
+    pub fn get(&self, k: u64) -> Option<PackedTTEntry> {
+        if k == 0 {
+            return None;
+        }
+
+        for i in 0..Self::LAYER_COUNT {
+            let base = Self::OFFSETS[i];
+            let size = Self::SIZES[i];
+            let pos = base + (k as usize % size);
+            let key_xor_v = unsafe { &*self.data.data.get() }[pos].key_xor_v;
+            let v = &unsafe { &*self.data.data.get() }[pos].value;
+            let existing_key = key_xor_v ^ *v;
+            if existing_key == 0 {
+                return None;
+            }
+            if existing_key != k {
+                continue;
+            }
+            return Some(*v);
+        }
+        None
+    }
+
+    /// Store a new key value pair in the hashmap. `insert` will not overwrite an existing entry,
+    /// and will return a failure if something already exists in the desired hashmap position,
+    /// regardless of if the key matches.
+    pub fn insert(&self, k: u64, v: PackedTTEntry) {
+        // We reserve values of 0 to indicate uninitialized cells. For our use of this hashmap
+        // where we store PackedTTEntries which contain a move, these can never be 0. (Consider
+        // that a move contains a from an to position, and h1 is the only position that's encoded
+        // as 0. Since a move can't be both to and from h1, at least one of "to" or "from" must be
+        // non zero).
+        let mut insert_k = k;
+        let mut insert_v = v;
+        let mut insert_kxv = k ^ v;
+
+        for i in 0..Self::LAYER_COUNT {
+            let base = Self::OFFSETS[i];
+            let size = Self::SIZES[i];
+            let pos = base + (insert_k as usize % size);
+
+            let data = unsafe { &mut *self.data.data.get() };
+            let existing_val = data[pos].value;
+            let existing_kxv = data[pos].key_xor_v;
+            let existing_key = existing_kxv ^ existing_val;
+
+            // If it's empty, or the same key of a deeper depth, we can write in the new value.
+            if existing_val.empty()
+                || (existing_key == insert_k && insert_v.depth > existing_val.depth())
+            {
+                data[pos].value = insert_v;
+                data[pos].key_xor_v = insert_kxv;
+                return;
+            }
+
+            // If our depth is deeper that what's here, we can kick the entry and find a new spot
+            // for it.
+            if insert_v.depth() > existing_val.depth() {
+                std::mem::swap(&mut insert_kxv, &mut data[pos].key_xor_v);
+                std::mem::swap(&mut insert_v, &mut data[pos].value);
+                insert_k = insert_kxv ^ insert_v;
+            }
+        }
     }
 }
 
@@ -115,16 +271,16 @@ pub enum CacheResult {
 
 // 256MB with 16 bytes per entry
 pub const DEFAULT_TT_SIZE: usize = 256 * 1024 * 1024 / 16;
-pub struct TranspositionTable<const N: usize>(SharedHashMap<PackedTTEntry, N>);
-impl<const N: usize> Default for TranspositionTable<N> {
+pub struct TranspositionTable(SharedHashMap);
+impl Default for TranspositionTable {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<const N: usize> TranspositionTable<N> {
-    pub fn new() -> TranspositionTable<N> {
-        TranspositionTable::<N>(SharedHashMap::new())
+impl TranspositionTable {
+    pub fn new() -> TranspositionTable {
+        TranspositionTable(SharedHashMap::new())
     }
     pub fn clear(&self) {
         self.0.clear();
@@ -166,30 +322,6 @@ impl<const N: usize> TranspositionTable<N> {
         }
     }
 
-    pub fn update(
-        &self,
-        hash: u64,
-        eval: Evaluation,
-        best_move: Option<AlgebraicMove>,
-        depth: u16,
-        node_type: ScoreType,
-    ) {
-        let Some(mut expected) = self.0.get(hash) else {
-            return;
-        };
-        while depth > expected.depth() {
-            if let Err(v) = self.0.update(
-                hash,
-                expected,
-                PackedTTEntry::new(eval, depth, best_move, node_type),
-            ) {
-                expected = v;
-                continue;
-            }
-            break;
-        }
-    }
-
     pub fn insert(
         &self,
         hash: u64,
@@ -214,6 +346,131 @@ mod tests {
     use crate::board::search::ExpectedNodeType;
 
     use super::*;
+    use super::{PackedTTEntry, SharedHashMap};
+
+    #[test]
+    fn insert_get() {
+        let map: SharedHashMap = SharedHashMap::new();
+        for i in 0..1024 {
+            let val = map.get(i);
+            assert_eq!(val, None);
+        }
+        for i in 2..1026 {
+            map.insert(
+                i,
+                PackedTTEntry {
+                    eval: Evaluation(i as i16),
+                    ..Default::default()
+                },
+            );
+        }
+        for i in 2..1026 {
+            let val = map.get(i);
+            assert_eq!(val.unwrap().eval(), Evaluation(i as i16));
+        }
+    }
+
+    #[test]
+    fn insert_overwrite_same_key() {
+        // We expect inserts of the same key to automatically update the one value
+        let map = SharedHashMap::new();
+        for i in 0..10 {
+            map.insert(
+                255,
+                PackedTTEntry {
+                    eval: Evaluation(i as i16),
+                    depth: i,
+                    ..Default::default()
+                },
+            );
+        }
+        let Some(val) = map.get(255) else {
+            assert!(false);
+            return;
+        };
+        assert_eq!(val.depth(), 9);
+        assert_eq!(val.eval(), Evaluation(9 as i16));
+    }
+
+    #[test]
+    fn insert_overwrite_least_depth() {
+        let map = SharedHashMap::new();
+        for i in 0..DEFAULT_TT_SIZE {
+            map.insert(
+                i as u64,
+                PackedTTEntry {
+                    eval: Evaluation(i as i16),
+                    depth: 2,
+                    ..Default::default()
+                },
+            );
+        }
+        // We expect inserts of the a different key to overwrite something of lesser depth
+        map.insert(
+            255,
+            PackedTTEntry {
+                eval: Evaluation(123 as i16),
+                depth: 3,
+                ..Default::default()
+            },
+        );
+
+        let Some(val) = map.get(255) else {
+            assert!(false);
+            return;
+        };
+
+        assert_eq!(val.depth(), 3);
+        assert_eq!(val.eval(), Evaluation(123 as i16));
+    }
+
+    #[test]
+    fn concurrent() {
+        let map = SharedHashMap::new();
+        rayon::scope(|s| {
+            s.spawn(|_| {
+                for i in 10000..20000 {
+                    map.insert(
+                        i,
+                        PackedTTEntry {
+                            eval: Evaluation(i as i16),
+                            ..Default::default()
+                        },
+                    );
+                }
+            });
+            s.spawn(|_| {
+                for i in 20000..30000 {
+                    map.insert(
+                        i,
+                        PackedTTEntry {
+                            eval: Evaluation(i as i16),
+                            ..Default::default()
+                        },
+                    );
+                }
+            });
+            s.spawn(|_| {
+                for i in 30000..40000 {
+                    map.insert(
+                        i,
+                        PackedTTEntry {
+                            eval: Evaluation(i as i16),
+                            ..Default::default()
+                        },
+                    );
+                }
+            });
+        });
+        let mut inserted_vals = 0;
+        for i in 0..40000 {
+            if let Some(val) = map.get(i) {
+                inserted_vals += 1;
+                assert_eq!(val.eval.0, i as i16);
+            }
+        }
+        assert_eq!(inserted_vals, 30000);
+    }
 
     #[test]
     fn pack_unpack() {
@@ -245,7 +502,6 @@ mod tests {
             };
             let node_type = ScoreType::Exact;
             let tt = PackedTTEntry::new(eval, depth, Some(best_move), node_type);
-            println!("{:x}", tt.to_u64());
             assert_eq!(tt.eval(), eval);
             assert_eq!(tt.depth(), depth);
             assert_eq!(tt.best_move(), Some(best_move));
@@ -261,7 +517,6 @@ mod tests {
             };
             let node_type = ScoreType::Upper;
             let tt = PackedTTEntry::new(eval, depth, Some(best_move), node_type);
-            println!("{:x}", tt.to_u64());
             assert_eq!(tt.eval(), eval);
             assert_eq!(tt.depth(), depth);
             assert_eq!(tt.best_move(), Some(best_move));
@@ -273,7 +528,6 @@ mod tests {
             let best_move = None;
             let node_type = ScoreType::Upper;
             let tt = PackedTTEntry::new(eval, depth, best_move, node_type);
-            println!("{:x}", tt.to_u64());
             assert_eq!(tt.eval(), eval);
             assert_eq!(tt.depth(), depth);
             assert_eq!(tt.best_move(), best_move);
@@ -284,7 +538,7 @@ mod tests {
     #[test]
     fn expected_caching() {
         let mut board = crate::board::starting_board();
-        let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
+        let cache = TranspositionTable::new();
         let should_stop = AtomicBool::new(false);
         board.pvs(
             Evaluation::lost(board.half_move),

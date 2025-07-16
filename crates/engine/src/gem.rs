@@ -4,6 +4,7 @@ use bitboard::moves::Color;
 
 use crate::{
     board::{self, Board},
+    transposition_table::TranspositionTable,
     uci::{self, *},
 };
 
@@ -48,6 +49,7 @@ impl GemOptions {
 pub struct Gem {
     board: Board,
     options: GemOptions,
+    cache: TranspositionTable,
 }
 
 impl Default for Gem {
@@ -64,6 +66,7 @@ impl Gem {
         Gem {
             board: board::starting_board(),
             options: GemOptions::default(),
+            cache: TranspositionTable::new(),
         }
     }
 }
@@ -113,6 +116,7 @@ impl UciEngine for Gem {
 
     fn uci_new_game(&mut self) -> Result<(), String> {
         self.board = crate::board::starting_board();
+        self.cache.clear();
         Ok(())
     }
 
@@ -148,9 +152,11 @@ impl UciEngine for Gem {
             5000
         };
 
-        let (m, eval, info) = self
-            .board
-            .search_best_move_for(Duration::from_millis(search_ms), self.options.num_threads);
+        let (m, eval, info) = self.board.search_best_move_for(
+            Duration::from_millis(search_ms),
+            self.options.num_threads,
+            &self.cache,
+        );
         let Some(best_move) = m else {
             return Err(format!("Failed to find best move on board: {}", self.board));
         };

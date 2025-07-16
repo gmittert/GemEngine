@@ -2,7 +2,7 @@ use tracing::{Level, field, trace_span};
 
 use crate::board::evaluation::PIECE_VALUES;
 use crate::board::*;
-use crate::transposition_table::{CacheResult, DEFAULT_TT_SIZE, ScoreType, TranspositionTable};
+use crate::transposition_table::{CacheResult, ScoreType, TranspositionTable};
 use std::cmp::max;
 use std::sync::atomic::{AtomicU16, AtomicUsize};
 use std::sync::{Condvar, Mutex};
@@ -39,11 +39,11 @@ impl Board {
         &mut self,
         time: Duration,
         num_threads: usize,
+        cache: &TranspositionTable,
     ) -> (Option<Move>, Evaluation, SearchInfo) {
         self.reset_stats();
         let start = Instant::now();
         let end_time = start + time;
-        let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
         let mut completed_search = self.best_move(1, num_threads, &cache, None).unwrap();
         let mut depth = 2;
         loop {
@@ -80,7 +80,7 @@ impl Board {
     }
 
     pub fn it_depth_best_move(&mut self, target_depth: u16, num_threads: usize) -> SearchResult {
-        let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
+        let cache = TranspositionTable::new();
 
         let mut res = self.best_move(1, num_threads, &cache, None).unwrap();
         for depth in 1..target_depth {
@@ -91,11 +91,11 @@ impl Board {
         res
     }
 
-    pub fn best_move<const N: usize>(
+    pub fn best_move(
         &mut self,
         depth: u16,
         num_threads: usize,
-        cache: &TranspositionTable<N>,
+        cache: &TranspositionTable,
         time: Option<Duration>,
     ) -> Option<SearchResult> {
         let end_time = time.map(|t| Instant::now() + t);
@@ -255,11 +255,11 @@ impl Board {
         count >= 3
     }
 
-    pub fn eval_null_move<const N: usize>(
+    pub fn eval_null_move(
         &mut self,
         target_depth: u16,
         beta: Evaluation,
-        cache: &TranspositionTable<N>,
+        cache: &TranspositionTable,
         should_stop: &AtomicBool,
     ) -> Option<Evaluation> {
         // If we're down to king and pawns, we're at risk of zugzwang, skip evaluating the null
@@ -302,12 +302,12 @@ impl Board {
         target_depth + additions
     }
 
-    pub fn pvs<const N: usize>(
+    pub fn pvs(
         &mut self,
         alpha: Evaluation,
         beta: Evaluation,
         target_depth: u16,
-        cache: &TranspositionTable<N>,
+        cache: &TranspositionTable,
         should_stop: &AtomicBool,
         node_type: ExpectedNodeType,
     ) -> Option<SearchResult> {
@@ -491,26 +491,7 @@ impl Board {
 
                 if eval >= beta {
                     self.undo_move(&m);
-                    match cached_val {
-                        CacheResult::Miss => {
-                            cache.insert(
-                                self.hash,
-                                beta,
-                                best_move,
-                                target_depth,
-                                ScoreType::Lower,
-                            );
-                        }
-                        _ => {
-                            cache.update(
-                                self.hash,
-                                beta,
-                                best_move,
-                                target_depth,
-                                ScoreType::Lower,
-                            );
-                        }
-                    };
+                    cache.insert(self.hash, beta, best_move, target_depth, ScoreType::Lower);
                     if m.capture.is_none() {
                         // This is a quiet move that caused a beta cutoff, record this as a killer
                         // move! Since it's a strong move that didn't involve capturing anything,
@@ -567,14 +548,7 @@ impl Board {
         } else {
             ScoreType::Upper
         };
-        match cached_val {
-            CacheResult::Miss => {
-                cache.insert(self.hash, eval, best_move, target_depth, node_type);
-            }
-            _ => {
-                cache.update(self.hash, eval, best_move, target_depth, node_type);
-            }
-        };
+        cache.insert(self.hash, eval, best_move, target_depth, node_type);
         Some(SearchResult { eval, best_move })
     }
 }
@@ -588,7 +562,7 @@ mod tests {
     fn find_queen_take() {
         let mut b = Board::from_fen("4k3/pppppppp/8/8/7q/8/PPPPPPP1/RNBQKBNR w - - 0 1")
             .expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let best_move = b.best_move(4, 1, &cache, None).unwrap().best_move;
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -603,7 +577,7 @@ mod tests {
     fn take_back_trade() {
         let mut b = Board::from_fen("rn1qkbnr/ppp2ppp/3pB3/4p3/4P3/5N2/PPPP1PPP/RNBQK2R b - - 0 1")
             .expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let best_move = b.best_move(4, 1, &cache, None).unwrap().best_move;
         assert!(best_move.is_some());
         let best_move = best_move.unwrap();
@@ -618,7 +592,7 @@ mod tests {
     fn m1() {
         let mut b =
             Board::from_fen("1k6/ppp5/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let res = b.best_move(4, 1, &cache, None).unwrap();
         let best_move = res.best_move;
         let eval = res.eval;
@@ -637,7 +611,7 @@ mod tests {
     fn won() {
         let mut b =
             Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let res = b.best_move(4, 1, &cache, None).unwrap();
         let best_move = res.best_move;
         let eval = res.eval;
@@ -649,7 +623,7 @@ mod tests {
     fn lost() {
         let mut b =
             Board::from_fen("1k5R/ppp5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let res = b.best_move(4, 1, &cache, None).unwrap();
         let best_move = res.best_move;
         let eval = res.eval;
@@ -660,7 +634,7 @@ mod tests {
     #[test]
     fn stalemate() {
         let mut b = Board::from_fen("k7/2Q5/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let res = b.best_move(4, 1, &cache, None).unwrap();
         let best_move = res.best_move;
         let eval = res.eval;
@@ -671,13 +645,13 @@ mod tests {
     #[test]
     fn draw() {
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let eval = b.best_move(4, 1, &cache, None).unwrap().eval;
         println!("Eval: {}", eval);
         assert!(eval.0 < 100 && eval.0 > -100);
 
         let mut b = Board::from_fen("k7/8/8/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let eval = b.best_move(4, 1, &cache, None).unwrap().eval;
         assert!(eval.0 < 100 && eval.0 > -100);
     }
@@ -685,7 +659,7 @@ mod tests {
     fn mates() {
         let mut b =
             Board::from_fen("1k6/pppr4/8/8/8/8/8/K6R w - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let res = b.best_move(4, 1, &cache, None).unwrap();
         let best_move = res.best_move;
         let eval = res.eval;
@@ -702,7 +676,7 @@ mod tests {
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let res = b.best_move(4, 1, &cache, None).unwrap();
         let best_move = res.best_move;
         let eval = res.eval;
@@ -718,14 +692,14 @@ mod tests {
         assert_eq!(eval, Evaluation::m1(b.half_move));
 
         let mut b = Board::from_fen("k5RN/7R/8/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let eval = b.best_move(4, 1, &cache, None).unwrap().eval;
         println!("Eval: {}", eval);
         assert_eq!(eval, Evaluation::lost(b.half_move));
 
         let mut b =
             Board::from_fen("k6N/7R/6R1/8/8/8/8/K7 w - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let res = b.best_move(4, 1, &cache, None).unwrap();
         let best_move = res.best_move;
         let eval = res.eval;
@@ -740,7 +714,7 @@ mod tests {
 
         let mut b =
             Board::from_fen("1k5N/7R/6R1/8/8/8/8/K7 b - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let res = b.best_move(4, 1, &cache, None).unwrap();
         let best_move = res.best_move;
         let eval = res.eval;
@@ -758,7 +732,7 @@ mod tests {
     fn bishop_knight_mate() {
         let mut b =
             Board::from_fen("8/8/8/1B6/5N2/6K1/8/6k1 w - - 0 1").expect("failed to parse fen");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let res = b.best_move(4, 1, &cache, None).unwrap();
         let best_move = res.best_move;
         let eval = res.eval;
@@ -820,7 +794,7 @@ mod tests {
 41. Kd4 {+3.57/8 5.0s} Kh8 {5.8s} 42. Kd3 {+3.58/8 5.0s} Kh7 {4.9s}
 43. Kd4 {+3.57/8 5.0s} Rh8 {7.3s} 44. Kc4 {+3.58/8 5.0s} Rc8+ {6.7s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let res = board.best_move(6, 64, &cache, None).unwrap();
         let best_move = res.best_move;
         let eval = res.eval;
@@ -888,7 +862,7 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
         });
         assert!(res.is_ok());
 
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let eval = board.best_move(1, 1, &cache, None).unwrap().eval;
         assert!(eval.0 < 0);
     }
@@ -930,7 +904,7 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
     fn mate_in_2_format() {
         let fen = "6k1/p6p/3p2p1/3P1B2/2Q3n1/N1P5/Pr1B2P1/R3RK1q w - - 1 23";
         let mut board = Board::from_fen(fen).expect("bad fen?");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let eval = board.best_move(6, 1, &cache, None).unwrap().eval;
         let Some(mated_in) = eval.mated_in(board.half_move) else {
             assert!(false);
@@ -949,7 +923,7 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
     fn eval_bug4() {
         let fen = "r1b1k2r/pp1n3p/6pN/4pp2/3P3Q/8/2q1KPPP/3R1B1R w kq - 0 19";
         let mut board = Board::from_fen(fen).expect("bad fen?");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let move_eval = board.best_move(6, 1, &cache, None).unwrap().eval;
         println!("move_eval: {}", move_eval);
         assert!(move_eval.0 < 0);
@@ -1009,7 +983,7 @@ Re3+ {-3.98/8 5.0s} 50. Ka4 {+3.98/9 5.0s} Re2 {-4.00/9 5.0s}
 Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
 54. Ra8+ {+3.98/9 5.0s} Nb8 {-4.00/9 5.0s} 55. Ra7 Nd7 *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let move_eval = board.best_move(6, 1, &cache, None).unwrap().eval;
 
         let evalw = board.eval(Color::White);
@@ -1035,7 +1009,7 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
             is_castle_king: false,
         });
         let best_score = Evaluation::lost(board.half_move);
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let should_stop = AtomicBool::new(false);
         let eval = -board
             .pvs(
@@ -1077,7 +1051,7 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
             })
             .expect("bad move?");
 
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         let m = board
             .best_move(4, 32, &cache, None)
             .unwrap()
@@ -1092,7 +1066,7 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
             "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
         )
         .expect("Invalid fen?");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         board.best_move(4, 32, &cache, None).unwrap();
     }
 
@@ -1101,7 +1075,7 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
         let mut board =
             Board::from_fen("rn2k2r/1b1p1p2/p2ppn2/1p1P3p/2P3q1/1PNBP3/P3R1PP/R4Q1K b Qkq - 0 1")
                 .expect("Invalid fen?");
-        let cache = TranspositionTable::<1024>::new();
+        let cache = TranspositionTable::new();
         board.best_move(4, 64, &cache, None).unwrap();
     }
     #[test]
@@ -1143,7 +1117,7 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
 33. Kc3 {-2.62/11 5.0s} Qxb1 {7.6s} 34. Bb2 {-2.91/10 5.0s} Re7 {8.7s}
 35. Qa5 {-2.64/11 5.0s} Re8 {8.4s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
-        let cache = TranspositionTable::<DEFAULT_TT_SIZE>::new();
+        let cache = TranspositionTable::new();
         let res = board.best_move(8, 32, &cache, None).unwrap();
 
         assert!(!res.eval.mate());
@@ -1187,7 +1161,8 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
 33. Ke1 {-3.85/7 0.29s} Re2+ {+5.15/6 0.23s} 34. Kf1 {-1.56/7 0.21s} Rd2 {+1.56/6 0.21s}
 35. Ke1 {-1.20/7 0.21s} Re2+ {0.00/7 0.21s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
-        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(300), 16);
+        let cache = TranspositionTable::new();
+        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(300), 16, &cache);
 
         assert!(!eval.mate());
     }
@@ -1245,7 +1220,8 @@ Bd2 {-6.73/5 0.22s} 48. Be7 {+8.01/5 0.22s} Bc3 {-8.01/4 0.22s}
 Bd2+ {-4.30/4 0.21s} 51. Kg3 {0.00/5 0.21s}
 Be1+ {0.00/5 0.21s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
-        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(100), 16);
+        let cache = TranspositionTable::new();
+        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(100), 16, &cache);
 
         assert!(!eval.mate());
     }
@@ -1278,7 +1254,8 @@ Nc6 {-1.50/7 0.49s} 9. Nxc6 {+1.50/5 0.33s} bxc6 {-1.35/7 0.40s}
 Qa5 {-1.58/7 0.29s} 12. b4 {-0.11/5 0.31s} Qe5 {-2.36/7 0.40s}
 13. Bb2 {+0.03/5 0.31s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
-        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(400), 16);
+        let cache = TranspositionTable::new();
+        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(400), 16, &cache);
 
         assert!(!eval.mate());
     }
@@ -1312,7 +1289,8 @@ b5 {+2.42/7 0.33s} 12. Bb3 {+1.36/5 0.31s} b4 {+2.10/7 0.32s}
 Kf8 {+1.21/7 0.31s} 15. exd5 {+0.90/5 0.29s} Qa5 {+1.61/7 0.30s}
 16. Bb3 {+0.74/5 0.29s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
-        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(10000), 32);
+        let cache = TranspositionTable::new();
+        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(10000), 32, &cache);
         assert!(!eval.mate());
     }
 }

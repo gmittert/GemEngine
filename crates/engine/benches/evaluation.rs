@@ -161,7 +161,7 @@ pub fn start(c: &mut Criterion) {
             num_cpus,
             |b, &num_cpus| {
                 let mut board = board::starting_board();
-                let cache = TranspositionTable::<1024>::new();
+                let cache = TranspositionTable::new();
                 b.iter(|| {
                     board.best_move(4, num_cpus, &cache, None);
                 })
