@@ -543,6 +543,7 @@ mod tests {
         board.pvs(
             Evaluation::lost(board.half_move),
             Evaluation::won(board.half_move),
+            board.half_move,
             2,
             &cache,
             &should_stop,

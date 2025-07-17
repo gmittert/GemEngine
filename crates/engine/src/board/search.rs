@@ -27,7 +27,7 @@ pub struct SearchResult {
     best_move: Option<AlgebraicMove>,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum ExpectedNodeType {
     PV,
     Cut,
@@ -122,6 +122,7 @@ impl Board {
                     let res = new_b.pvs(
                         Evaluation::lost(self.half_move),
                         Evaluation::won(self.half_move),
+                        new_b.half_move,
                         target_depth,
                         cache,
                         &should_stop,
@@ -257,6 +258,7 @@ impl Board {
 
     pub fn eval_null_move(
         &mut self,
+        starting_depth: u16,
         target_depth: u16,
         beta: Evaluation,
         cache: &TranspositionTable,
@@ -282,6 +284,7 @@ impl Board {
         let search = self.pvs(
             -beta,
             Evaluation(-(beta.0 - 1)),
+            starting_depth,
             target_depth - 2,
             cache,
             should_stop,
@@ -294,18 +297,40 @@ impl Board {
         if eval >= beta { Some(eval) } else { None }
     }
 
-    fn search_extensions(&self, target_depth: u16) -> u16 {
-        let mut additions = 0;
-        if self.in_check(self.to_play) {
+    fn search_extensions(
+        &self,
+        starting_depth: u16,
+        target_depth: u16,
+        move_count: u8,
+        m: &Move,
+        expected_node: ExpectedNodeType,
+    ) -> u16 {
+        let mut additions = 0i16;
+        let remaining_depth = target_depth - self.half_move;
+        let giving_check = self.in_check(self.to_play);
+
+        // Late move reduction. After searching the first few moves, search later moves less
+        // deeply.
+        //
+        // Don't reduce the hash move, and the two killer moves
+        if move_count > 3
+            && remaining_depth > 2
+            && m.capture.is_none()
+            && expected_node != ExpectedNodeType::PV
+        {
+            additions -= 1;
+        }
+        if giving_check {
             additions += 1;
         }
-        target_depth + additions
+        ((target_depth as i16 + additions) as u16).min(starting_depth + 20)
     }
 
     pub fn pvs(
         &mut self,
         alpha: Evaluation,
         beta: Evaluation,
+        starting_depth: u16,
         target_depth: u16,
         cache: &TranspositionTable,
         should_stop: &AtomicBool,
@@ -353,7 +378,9 @@ impl Board {
             });
         }
 
-        if let Some(eval) = self.eval_null_move(target_depth, beta, cache, should_stop) {
+        if let Some(eval) =
+            self.eval_null_move(starting_depth, target_depth, beta, cache, should_stop)
+        {
             return Some(SearchResult {
                 eval,
                 best_move: None,
@@ -375,6 +402,7 @@ impl Board {
                 .pvs(
                     alpha,
                     beta,
+                    starting_depth,
                     target_depth - 2,
                     cache,
                     should_stop,
@@ -421,7 +449,7 @@ impl Board {
             .chain(self.pseudo_legal_captures_it())
             .chain(self.pseudo_legal_moves_it());
         let mut is_pv_node = false;
-        let mut is_first_child = true;
+        let mut move_count = 0;
         let mut best_move = None;
         for a in moves {
             let Some(m) = self.from_algeabraic(&a) else {
@@ -434,6 +462,7 @@ impl Board {
                     best_move = Some(a);
                 }
                 had_legal_move = true;
+                move_count += 1;
                 let span = match self.to_play {
                     Color::Black => trace_span!("white", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
                     Color::White => trace_span!("black", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
@@ -442,8 +471,7 @@ impl Board {
                 // node. Establish an exact score for it, and search a smaller window for
                 // everything else. If a move might actually be better, research it to find the
                 // actual score.
-                let eval_res = if is_first_child || alpha.mate() {
-                    is_first_child = false;
+                let eval_res = if move_count == 1 || alpha.mate() {
                     let expected_next_node = match node_type {
                         ExpectedNodeType::PV => ExpectedNodeType::PV,
                         ExpectedNodeType::Cut => ExpectedNodeType::All,
@@ -452,6 +480,7 @@ impl Board {
                     self.pvs(
                         -beta,
                         -alpha,
+                        starting_depth,
                         target_depth,
                         cache,
                         should_stop,
@@ -466,7 +495,14 @@ impl Board {
                     let mut score = self.pvs(
                         Evaluation(-alpha.0 - 1),
                         -alpha,
-                        self.search_extensions(target_depth),
+                        starting_depth,
+                        self.search_extensions(
+                            starting_depth,
+                            target_depth,
+                            move_count,
+                            &m,
+                            expected_next_node,
+                        ),
                         cache,
                         should_stop,
                         expected_next_node,
@@ -476,7 +512,15 @@ impl Board {
                         score = self.pvs(
                             -beta,
                             -alpha,
-                            self.search_extensions(target_depth),
+                            starting_depth,
+                            // When we research, we don't apply late move reduction.
+                            self.search_extensions(
+                                starting_depth,
+                                target_depth,
+                                move_count,
+                                &m,
+                                ExpectedNodeType::PV,
+                            ),
                             cache,
                             should_stop,
                             ExpectedNodeType::PV,
@@ -1015,6 +1059,7 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
             .pvs(
                 Evaluation::lost(board.half_move),
                 -best_score,
+                board.half_move,
                 4,
                 &cache,
                 &should_stop,
