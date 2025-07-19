@@ -169,6 +169,16 @@ impl Board {
         res
     }
 
+    pub fn mvv_lva(&self) -> impl Iterator<Item = AlgebraicMove> + use<> {
+        let mut vec = Vec::with_capacity(8);
+        vec.extend(self.pseudo_legal_captures_it().map(|m| {
+            let capture = self.query_pos(m.to, self.to_play).unwrap_or(Piece::Pawn);
+            (capture, m)
+        }));
+        vec.sort_by(|(p1, _), (p2, _)| p2.cmp(p1));
+        vec.into_iter().map(|(_, m)| m)
+    }
+
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
         self.qnodes += 1;
         let mut alpha = alpha;
@@ -452,7 +462,7 @@ impl Board {
             let Some(a) = moves.next() else {
                 match stage {
                     0 => {
-                        moves = Box::new(self.pseudo_legal_captures_it());
+                        moves = Box::new(self.mvv_lva());
                         stage = 1;
                         continue;
                     }
