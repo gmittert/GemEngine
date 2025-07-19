@@ -2,6 +2,187 @@ use crate::board::*;
 use crate::piece_attack_tables::KING_ATTACKS;
 use crate::{board::sliding_attacks, piece_attack_tables::KNIGHT_ATTACKS};
 
+impl Board {
+    #[inline]
+    pub fn pawn_captures(&self, out: &mut smallvec::SmallVec<[AlgebraicMove; 8]>) {
+        let pawns = self.piece(self.to_play, Piece::Pawn);
+        let opponent_pieces = match self.to_play {
+            Color::White => self.black_pieces(),
+            Color::Black => self.white_pieces(),
+        };
+        let color = self.to_play;
+
+        let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
+        let ep_pos = ep_target
+            .map(|f| {
+                BitBoard::from(Posn::from(
+                    match color {
+                        Color::Black => Rank::Three,
+                        Color::White => Rank::Five,
+                    },
+                    f,
+                ))
+            })
+            .unwrap_or(BitBoard::empty());
+        let capture_targets = ep_pos | opponent_pieces;
+
+        // Only search pawns that can capture
+        let attacked_pawns = Board::pawn_attacks(capture_targets, !color);
+        let pawns = attacked_pawns & pawns;
+
+        let promo_rank = match color {
+            Color::Black => Rank::One,
+            Color::White => Rank::Eight,
+        };
+
+        for from in pawns {
+            let (atk_we, atk_ea) = match color {
+                Color::White => (
+                    from.no().and_then(|p| p.we()),
+                    from.no().and_then(|p| p.ea()),
+                ),
+                Color::Black => (
+                    from.so().and_then(|p| p.we()),
+                    from.so().and_then(|p| p.ea()),
+                ),
+            };
+            if let Some(to) = atk_we
+                && capture_targets.contains(to)
+            {
+                if to.rank() == promo_rank {
+                    for piece in [Piece::Queen, Piece::Knight, Piece::Rook, Piece::Bishop] {
+                        out.push(AlgebraicMove {
+                            from,
+                            to,
+                            promotion: Some(piece),
+                        })
+                    }
+                } else {
+                    out.push(AlgebraicMove {
+                        from,
+                        to,
+                        promotion: None,
+                    })
+                }
+            }
+            if let Some(to) = atk_ea
+                && capture_targets.contains(to)
+            {
+                if to.rank() == promo_rank {
+                    for piece in [Piece::Queen, Piece::Knight, Piece::Rook, Piece::Bishop] {
+                        out.push(AlgebraicMove {
+                            from,
+                            to,
+                            promotion: Some(piece),
+                        })
+                    }
+                } else {
+                    out.push(AlgebraicMove {
+                        from,
+                        to,
+                        promotion: None,
+                    })
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn knight_captures(&self, out: &mut smallvec::SmallVec<[AlgebraicMove; 8]>) {
+        let knights = self.piece(self.to_play, Piece::Knight);
+        let enemies = match self.to_play {
+            Color::White => self.black_pieces(),
+            Color::Black => self.white_pieces(),
+        };
+        for from in knights {
+            for to in enemies & KNIGHT_ATTACKS[from.idx() as usize] {
+                out.push(AlgebraicMove {
+                    from,
+                    to,
+                    promotion: None,
+                })
+            }
+        }
+    }
+
+    #[inline]
+    pub fn bishop_captures(&self, out: &mut smallvec::SmallVec<[AlgebraicMove; 8]>) {
+        let bishops = self.piece(self.to_play, Piece::Bishop);
+        let enemies = match self.to_play {
+            Color::White => self.black_pieces(),
+            Color::Black => self.white_pieces(),
+        };
+        let all_pieces = self.pieces();
+        for from in bishops {
+            for to in enemies & sliding_attacks::compute_bishop_attacks(from, all_pieces) {
+                out.push(AlgebraicMove {
+                    from,
+                    to,
+                    promotion: None,
+                })
+            }
+        }
+    }
+
+    #[inline]
+    pub fn rook_captures(&self, out: &mut smallvec::SmallVec<[AlgebraicMove; 8]>) {
+        let rooks = self.piece(self.to_play, Piece::Rook);
+        let enemies = match self.to_play {
+            Color::White => self.black_pieces(),
+            Color::Black => self.white_pieces(),
+        };
+        let all_pieces = self.pieces();
+        for from in rooks {
+            for to in enemies & sliding_attacks::compute_rook_attacks(from, all_pieces) {
+                out.push(AlgebraicMove {
+                    from,
+                    to,
+                    promotion: None,
+                })
+            }
+        }
+    }
+
+    #[inline]
+    pub fn queen_captures(&self, out: &mut smallvec::SmallVec<[AlgebraicMove; 8]>) {
+        let queens = self.piece(self.to_play, Piece::Queen);
+        let enemies = match self.to_play {
+            Color::White => self.black_pieces(),
+            Color::Black => self.white_pieces(),
+        };
+        let all_pieces = self.pieces();
+        for from in queens {
+            for to in enemies
+                & (sliding_attacks::compute_rook_attacks(from, all_pieces)
+                    | sliding_attacks::compute_bishop_attacks(from, all_pieces))
+            {
+                out.push(AlgebraicMove {
+                    from,
+                    to,
+                    promotion: None,
+                })
+            }
+        }
+    }
+
+    #[inline]
+    pub fn king_captures(&self, out: &mut smallvec::SmallVec<[AlgebraicMove; 8]>) {
+        let mut king = self.piece(self.to_play, Piece::King);
+        let enemies = match self.to_play {
+            Color::White => self.black_pieces(),
+            Color::Black => self.white_pieces(),
+        };
+        let from = king.next().unwrap();
+        for to in enemies & KING_ATTACKS[from.idx() as usize] {
+            out.push(AlgebraicMove {
+                from,
+                to,
+                promotion: None,
+            })
+        }
+    }
+}
+
 pub fn pawn_captures_it(
     color: Color,
     pawns: BitBoard,
@@ -885,6 +1066,15 @@ impl Board {
             }
         }
         None
+    }
+
+    pub fn pseudo_legal_captures(&self, out: &mut smallvec::SmallVec<[AlgebraicMove; 8]>) {
+        self.pawn_captures(out);
+        self.knight_captures(out);
+        self.bishop_captures(out);
+        self.rook_captures(out);
+        self.queen_captures(out);
+        self.king_captures(out);
     }
 
     pub fn pseudo_legal_captures_it(&self) -> impl Iterator<Item = AlgebraicMove> + use<> {

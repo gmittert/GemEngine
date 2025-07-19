@@ -12,6 +12,7 @@ bitboard = { path = "../bitboard" }
 magics = { path = "../magics" }
 nnue = { path = "../nnue" }
 rayon = "1.10.0"
+smallvec = "1.15.0"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }

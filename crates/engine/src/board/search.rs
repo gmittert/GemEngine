@@ -1,3 +1,4 @@
+use smallvec::SmallVec;
 use tracing::{Level, field, trace_span};
 
 use crate::board::evaluation::PIECE_VALUES;
@@ -169,14 +170,15 @@ impl Board {
         res
     }
 
-    pub fn mvv_lva(&self) -> impl Iterator<Item = AlgebraicMove> + use<> {
-        let mut vec = Vec::with_capacity(8);
-        vec.extend(self.pseudo_legal_captures_it().map(|m| {
-            let capture = self.query_pos(m.to, self.to_play).unwrap_or(Piece::Pawn);
-            (capture, m)
-        }));
-        vec.sort_by(|(p1, _), (p2, _)| p2.cmp(p1));
-        vec.into_iter().map(|(_, m)| m)
+    pub fn mvv_lva(&self) -> SmallVec<[AlgebraicMove; 8]> {
+        let mut vec = SmallVec::<[AlgebraicMove; 8]>::new();
+        self.pseudo_legal_captures(&mut vec);
+        vec.sort_by(|m1, m2| {
+            let capture1 = self.query_pos(m1.to, self.to_play).unwrap_or(Piece::Pawn) as u8;
+            let capture2 = self.query_pos(m2.to, self.to_play).unwrap_or(Piece::Pawn) as u8;
+            capture2.cmp(&capture1)
+        });
+        vec
     }
 
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
@@ -190,8 +192,7 @@ impl Board {
         if alpha < stand_pat {
             alpha = stand_pat;
         }
-        let captures = self.pseudo_legal_captures_it();
-        for capture in captures {
+        for capture in self.mvv_lva() {
             // The most material this could swing is capturing a queen
             let mut big_change = PIECE_VALUES[Piece::Queen as usize];
             // While possibly promoting
@@ -462,7 +463,7 @@ impl Board {
             let Some(a) = moves.next() else {
                 match stage {
                     0 => {
-                        moves = Box::new(self.mvv_lva());
+                        moves = Box::new(self.mvv_lva().into_iter());
                         stage = 1;
                         continue;
                     }

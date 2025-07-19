@@ -294,6 +294,7 @@ dependencies = [
  "nnue",
  "portable-atomic",
  "rayon",
+ "smallvec",
  "tracing",
  "tracing-perfetto",
  "tracing-subscriber",
