@@ -442,20 +442,37 @@ impl Board {
         }
         .into_iter();
 
-        let moves = hash_move
-            .into_iter()
-            .chain(recapture)
-            .chain(killer_moves)
-            .chain(self.pseudo_legal_captures_it())
-            .chain(self.pseudo_legal_moves_it());
+        let mut moves: Box<dyn Iterator<Item = AlgebraicMove>> =
+            Box::new(hash_move.into_iter().chain(recapture).chain(killer_moves));
         let mut is_pv_node = false;
         let mut move_count = 0;
         let mut best_move = None;
-        for a in moves {
+        let mut stage = 0;
+        loop {
+            let Some(a) = moves.next() else {
+                match stage {
+                    0 => {
+                        moves = Box::new(self.pseudo_legal_captures_it());
+                        stage = 1;
+                        continue;
+                    }
+                    1 => {
+                        moves = Box::new(self.pseudo_legal_moves_it());
+                        stage = 2;
+                        continue;
+                    }
+                    _ => {
+                        break;
+                    }
+                }
+            };
             let Some(m) = self.from_algeabraic(&a) else {
                 debug_assert!(false, "Invalid move pulled from cache: {a}");
                 continue;
             };
+            if stage == 2 && m.capture.is_some() {
+                continue;
+            }
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
                 if best_move.is_none() {
