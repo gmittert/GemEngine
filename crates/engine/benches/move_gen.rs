@@ -7,10 +7,10 @@ use engine::board::{
 
 pub fn knights(c: &mut Criterion) {
     c.bench_function("knights", |b| {
-        let fen = "rnbqkbnr/pppppppp/N2N1N2/7N/1N2N3/3N2N1/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let fen = "r1b1kb1r/pp3ppp/1qn1pn2/2pp4/3P1B2/2P1PN2/PP1N1PPP/R2QKB1R w KQkq - 3 7";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
-            let mut out = Vec::with_capacity(16);
+            let mut out = Vec::with_capacity(8);
             board.knight_moves(&mut out);
             for m in out {
                 black_box(m);
@@ -18,7 +18,7 @@ pub fn knights(c: &mut Criterion) {
         })
     });
     c.bench_function("knights_it", |b| {
-        let fen = "rnbqkbnr/pppppppp/N2N1N2/7N/1N2N3/3N2N1/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let fen = "r1b1kb1r/pp3ppp/1qn1pn2/2pp4/3P1B2/2P1PN2/PP1N1PPP/R2QKB1R w KQkq - 3 7";
         let board = Board::from_fen(fen).expect("bad fen?");
         b.iter(|| {
             let knights = board.piece(board.to_play, Piece::Knight);
@@ -180,6 +180,27 @@ pub fn kings(c: &mut Criterion) {
     });
 }
 
+pub fn moves(c: &mut Criterion) {
+    c.bench_function("moves", |b| {
+        let fen = "r1b1kb1r/pp3ppp/1qn1pn2/2pp4/3P1B2/1QP1PN2/PP1N1PPP/R3KB1R b KQkq - 2 7";
+        let mut board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            let mut out = Vec::with_capacity(32);
+            board.fill_pseudo_legal_moves(&mut out);
+            black_box(out);
+        })
+    });
+    c.bench_function("moves_it", |b| {
+        let fen = "r1b1kb1r/pp3ppp/1qn1pn2/2pp4/3P1B2/1QP1PN2/PP1N1PPP/R3KB1R b KQkq - 2 7";
+        let board = Board::from_fen(fen).expect("bad fen?");
+        b.iter(|| {
+            for m in board.pseudo_legal_moves_it().take(8) {
+                black_box(m);
+            }
+        })
+    });
+}
+
 criterion_group!(
     iterative_compare,
     knights,
@@ -187,5 +208,6 @@ criterion_group!(
     bishops,
     queens,
     pawns,
-    kings
+    kings,
+    moves,
 );
