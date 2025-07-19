@@ -136,12 +136,12 @@ impl SharedHashMap {
             let base = Self::OFFSETS[i];
             let size = Self::SIZES[i];
             let pos = base + (k as usize % size);
-            let key_xor_v = unsafe { &*self.data.data.get() }[pos].key_xor_v;
             let v = &unsafe { &*self.data.data.get() }[pos].value;
-            let existing_key = key_xor_v ^ *v;
-            if existing_key == 0 {
+            if v.empty() {
                 return None;
             }
+            let key_xor_v = unsafe { &*self.data.data.get() }[pos].key_xor_v;
+            let existing_key = key_xor_v ^ *v;
             if existing_key != k {
                 continue;
             }
