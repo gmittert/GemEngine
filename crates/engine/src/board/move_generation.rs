@@ -450,80 +450,6 @@ pub fn king_moves_it(
         .chain(moves)
 }
 
-pub fn knight_captures_it(
-    knights: BitBoard,
-    enemies: BitBoard,
-) -> impl Iterator<Item = AlgebraicMove> {
-    knights.into_iter().flat_map(move |from| {
-        (enemies & KNIGHT_ATTACKS[from.idx() as usize]).map(move |to| AlgebraicMove {
-            from,
-            to,
-            promotion: None,
-        })
-    })
-}
-
-pub fn rook_captures_it(
-    rooks: BitBoard,
-    enemies: BitBoard,
-    all_pieces: BitBoard,
-) -> impl Iterator<Item = AlgebraicMove> {
-    rooks.flat_map(move |from| {
-        (enemies & sliding_attacks::compute_rook_attacks(from, all_pieces)).map(move |to| {
-            AlgebraicMove {
-                from,
-                to,
-                promotion: None,
-            }
-        })
-    })
-}
-
-pub fn bishop_captures_it(
-    bishops: BitBoard,
-    enemies: BitBoard,
-    all_pieces: BitBoard,
-) -> impl Iterator<Item = AlgebraicMove> {
-    bishops.flat_map(move |from| {
-        (enemies & sliding_attacks::compute_bishop_attacks(from, all_pieces)).map(move |to| {
-            AlgebraicMove {
-                from,
-                to,
-                promotion: None,
-            }
-        })
-    })
-}
-
-pub fn queen_captures_it(
-    queens: BitBoard,
-    enemies: BitBoard,
-    all_pieces: BitBoard,
-) -> impl Iterator<Item = AlgebraicMove> {
-    queens.flat_map(move |from| {
-        (enemies
-            & (sliding_attacks::compute_rook_attacks(from, all_pieces)
-                | sliding_attacks::compute_bishop_attacks(from, all_pieces)))
-        .map(move |to| AlgebraicMove {
-            from,
-            to,
-            promotion: None,
-        })
-    })
-}
-
-pub fn king_captures_it(
-    mut king: BitBoard,
-    enemies: BitBoard,
-) -> impl Iterator<Item = AlgebraicMove> {
-    let from = king.next().unwrap();
-    (enemies & KING_ATTACKS[from.idx() as usize]).map(move |to| AlgebraicMove {
-        from,
-        to,
-        promotion: None,
-    })
-}
-
 impl Board {
     pub fn can_castle_king(&self, to_play: Color) -> bool {
         let from = match to_play {
@@ -1075,31 +1001,6 @@ impl Board {
         self.rook_captures(out);
         self.queen_captures(out);
         self.king_captures(out);
-    }
-
-    pub fn pseudo_legal_captures_it(&self) -> impl Iterator<Item = AlgebraicMove> + use<> {
-        let pawns = self.piece(self.to_play, Piece::Pawn);
-        let knights = self.piece(self.to_play, Piece::Knight);
-        let rooks = self.piece(self.to_play, Piece::Rook);
-        let bishops = self.piece(self.to_play, Piece::Bishop);
-        let queens = self.piece(self.to_play, Piece::Queen);
-        let king = self.piece(self.to_play, Piece::King);
-        let enemies = match self.to_play {
-            Color::White => self.black_pieces(),
-            Color::Black => self.white_pieces(),
-        };
-        let all_pieces = self.pieces();
-        pawn_captures_it(
-            self.to_play,
-            pawns,
-            enemies,
-            self.move_rights.last().and_then(|x| x.ep_target),
-        )
-        .chain(knight_captures_it(knights, enemies))
-        .chain(bishop_captures_it(bishops, enemies, all_pieces))
-        .chain(rook_captures_it(rooks, enemies, all_pieces))
-        .chain(queen_captures_it(queens, enemies, all_pieces))
-        .chain(king_captures_it(king, enemies))
     }
 
     pub fn pseudo_legal_moves_it(&self) -> impl Iterator<Item = AlgebraicMove> + use<> {

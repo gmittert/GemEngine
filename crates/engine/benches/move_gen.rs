@@ -211,17 +211,6 @@ pub fn captures(c: &mut Criterion) {
             black_box(out);
         })
     });
-    c.bench_function("captures_it", |b| {
-        let fen = "r1b1kb1r/pp3ppp/1qn1p3/3p3n/2pP4/2P1PNB1/PPQN1PPP/R3KB1R b KQkq - 3 9";
-        let board = Board::from_fen(fen).expect("bad fen?");
-        b.iter(|| {
-            let mut out = Vec::with_capacity(8);
-            out.extend(board.pseudo_legal_captures_it());
-            for m in out {
-                black_box(m);
-            }
-        })
-    });
 }
 
 criterion_group!(
