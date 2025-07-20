@@ -115,16 +115,29 @@ impl SharedHashMap {
     // by having a multi-level modulus attempting to somewhat densely pack entries into the front
     // of the map until it gets filled up.
     //
-    // We break our table size into four smaller tables each larger than the previous which we
+    // We break our table size into seval smaller tables each larger than the previous which we
     // check in turn.
-    const OFFSETS: [usize; 4] = [0, 2 * 1024 * 1024, 4 * 1024 * 1024, 8 * 1024 * 1024];
     const LAYER_COUNT: usize = 4;
     // Ensure that the sizes are powers of two to ensure modulo is efficient.
-    const SIZES: [usize; 4] = [
-        2 * 1024 * 1024,
-        2 * 1024 * 1024,
-        4 * 1024 * 1024,
-        8 * 1024 * 1024,
+    const SIZES: [usize; 8] = [
+        0x4000, // 2 MiB
+        0x4000, // 2 MiB
+        0x8000, // 4 MiB
+        0x10000, // 8 MiB
+        0x20000, // 16 MiB
+        0x40000, // 32 MiB
+        0x80000, // 64 MiB
+        0x100000, // 128 MiB
+    ];
+    const OFFSETS: [usize; 8] = [
+        0,
+        0x4000,
+        0x8000,
+        0x10000,
+        0x20000,
+        0x40000,
+        0x80000,
+        0x100000,
     ];
 
     pub fn get(&self, k: u64) -> Option<PackedTTEntry> {
