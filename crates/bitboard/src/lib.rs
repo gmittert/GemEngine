@@ -48,7 +48,7 @@ impl std::fmt::Display for BitBoard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for rank in 0..8 {
             for file in 0..8 {
-                if (self.0 & (1 << ((8 * rank) + file))) != 0 {
+                if (self.0 & (1 << ((8 * (7-rank)) + (7-file)))) != 0 {
                     write!(f, "o")?;
                 } else {
                     write!(f, ".")?;

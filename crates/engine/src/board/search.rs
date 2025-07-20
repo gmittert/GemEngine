@@ -1366,4 +1366,38 @@ Kf8 {+1.21/7 0.31s} 15. exd5 {+0.90/5 0.29s} Qa5 {+1.61/7 0.30s}
         let (_, eval, _) = board.search_best_move_for(Duration::from_millis(10000), 32, &cache);
         assert!(!eval.mate());
     }
+    #[test]
+    fn eval_bug10() {
+        let pgn = r###"
+[Event "?"]
+[Site "?"]
+[Date "2025.07.19"]
+[Round "?"]
+[White "halcyon"]
+[Black "gem"]
+[Result "1-0"]
+[ECO "C26"]
+[GameDuration "00:01:28"]
+[GameEndTime "2025-07-19T22:01:49.752 PDT"]
+[GameStartTime "2025-07-19T22:00:21.726 PDT"]
+[Opening "Vienna"]
+[PlyCount "87"]
+[TimeControl "200/10+1"]
+[Variation "Falkbeer variation"]
+
+1. e4 {+0.12/10 1.0s} e5 {-0.60/11 1.1s} 2. Nc3 {+0.13/10 0.98s}
+Nf6 {-0.01/10 1.0s} 3. Nf3 {+0.05/10 1.0s} Nc6 {-0.09/12 1.0s}
+4. d4 {+0.27/9 1.0s} exd4 {+0.05/12 1.0s} 5. Nxd4 {+0.41/11 1.0s}
+Bb4 {-0.24/11 1.0s} 6. Nxc6 {+0.32/11 1.0s} bxc6 {-0.24/10 1.0s}
+7. e5 {+0.23/10 1.0s} Qe7 {+1.70/11 1.0s} 8. Qe2 {0.00/11 1.00s}
+Nd5 {+2.66/12 1.0s} 9. Bd2 {-0.29/12 1.0s} Nxc3 {+2.20/12 1.0s}
+10. bxc3 {+0.05/11 1.00s} *"###;
+        let mut board = Board::from_pgn(pgn).expect("bad pgn?");
+        let cache = TranspositionTable::new();
+        let p = board.query_pos(b4(), Color::Black);
+        println!("p: {:?}", p);
+        let SearchResult{ eval: _, best_move } =  board.best_move(2, 1, &cache, None).unwrap();
+        println!("Move: {}", best_move.unwrap());
+        assert!(best_move.unwrap().from == b4());
+    }
 }

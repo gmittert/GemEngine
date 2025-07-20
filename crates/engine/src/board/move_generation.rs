@@ -10,13 +10,15 @@ impl Board {
             Color::White => self.black_pieces(),
             Color::Black => self.white_pieces(),
         };
-        let color = self.to_play;
-
+        let promo_rank = match self.to_play {
+            Color::Black => Rank::One,
+            Color::White => Rank::Eight,
+        };
         let ep_target = self.move_rights.last().and_then(|x| x.ep_target);
         let ep_pos = ep_target
             .map(|f| {
                 BitBoard::from(Posn::from(
-                    match color {
+                    match self.to_play {
                         Color::Black => Rank::Three,
                         Color::White => Rank::Five,
                     },
@@ -27,16 +29,11 @@ impl Board {
         let capture_targets = ep_pos | opponent_pieces;
 
         // Only search pawns that can capture
-        let attacked_pawns = Board::pawn_attacks(capture_targets, !color);
+        let attacked_pawns = Board::pawn_attacks(capture_targets, !self.to_play);
         let pawns = attacked_pawns & pawns;
 
-        let promo_rank = match color {
-            Color::Black => Rank::One,
-            Color::White => Rank::Eight,
-        };
-
         for from in pawns {
-            let (atk_we, atk_ea) = match color {
+            let (atk_we, atk_ea) = match self.to_play {
                 Color::White => (
                     from.no().and_then(|p| p.we()),
                     from.no().and_then(|p| p.ea()),
@@ -794,7 +791,7 @@ impl Board {
         match color {
             Color::Black => {
                 let sw_attacks = (pawns.0 & !A_FILE) >> 7;
-                let se_attacks = (pawns.0 & !H_FILE) << 9;
+                let se_attacks = (pawns.0 & !H_FILE) >> 9;
                 BitBoard(sw_attacks | se_attacks)
             }
             Color::White => {
@@ -2131,5 +2128,12 @@ mod tests {
                 assert_eq!(before, board);
             }
         }
+    }
+    #[test]
+    fn pawn_capture() {
+        let board = Board::from_fen("r1b1k2r/p1ppqppp/2p5/4P3/1b6/2P5/P1PBQPPP/R3KB1R w KQkq - 0 10").expect("Bad fen");
+        let mut out = smallvec::SmallVec::new();
+        board.pawn_captures(&mut out);
+        assert_eq!(out.len(), 1);
     }
 }
