@@ -2131,7 +2131,9 @@ mod tests {
     }
     #[test]
     fn pawn_capture() {
-        let board = Board::from_fen("r1b1k2r/p1ppqppp/2p5/4P3/1b6/2P5/P1PBQPPP/R3KB1R w KQkq - 0 10").expect("Bad fen");
+        let board =
+            Board::from_fen("r1b1k2r/p1ppqppp/2p5/4P3/1b6/2P5/P1PBQPPP/R3KB1R w KQkq - 0 10")
+                .expect("Bad fen");
         let mut out = smallvec::SmallVec::new();
         board.pawn_captures(&mut out);
         assert_eq!(out.len(), 1);

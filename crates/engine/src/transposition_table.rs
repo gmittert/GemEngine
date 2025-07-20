@@ -4,7 +4,7 @@ use std::ops;
 use crate::board::evaluation::Evaluation;
 use bitboard::moves::{AlgebraicMove, Piece};
 use bitboard::posn::{File, Posn, Rank};
-use tracing::Level;
+use tracing::{Level, trace_span};
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
 pub enum ScoreType {
@@ -117,27 +117,20 @@ impl SharedHashMap {
     //
     // We break our table size into seval smaller tables each larger than the previous which we
     // check in turn.
-    const LAYER_COUNT: usize = 4;
+    const LAYER_COUNT: usize = 8;
     // Ensure that the sizes are powers of two to ensure modulo is efficient.
     const SIZES: [usize; 8] = [
-        0x4000, // 2 MiB
-        0x4000, // 2 MiB
-        0x8000, // 4 MiB
-        0x10000, // 8 MiB
-        0x20000, // 16 MiB
-        0x40000, // 32 MiB
-        0x80000, // 64 MiB
+        0x4000,   // 2 MiB
+        0x4000,   // 2 MiB
+        0x8000,   // 4 MiB
+        0x10000,  // 8 MiB
+        0x20000,  // 16 MiB
+        0x40000,  // 32 MiB
+        0x80000,  // 64 MiB
         0x100000, // 128 MiB
     ];
     const OFFSETS: [usize; 8] = [
-        0,
-        0x4000,
-        0x8000,
-        0x10000,
-        0x20000,
-        0x40000,
-        0x80000,
-        0x100000,
+        0, 0x4000, 0x8000, 0x10000, 0x20000, 0x40000, 0x80000, 0x100000,
     ];
 
     pub fn get(&self, k: u64) -> Option<PackedTTEntry> {
@@ -305,6 +298,7 @@ impl TranspositionTable {
         beta: Evaluation,
         target_depth: u16,
     ) -> CacheResult {
+        let _span = trace_span!("hashmap get", hash = hash, alpha=%alpha, beta=%beta, target_depth=%target_depth).entered();
         if let Some(entry) = self.0.get(hash) {
             // We can use this cache entry if:
             // - The node is deep enough
@@ -315,11 +309,13 @@ impl TranspositionTable {
             if entry.depth() >= target_depth && node_type == ScoreType::Exact {
                 tracing::event!(Level::INFO, name = "Exact Cutoff",);
                 CacheResult::Cutoff(entry.best_move(), eval)
-            } else if entry.depth() >= target_depth && node_type == ScoreType::Upper && eval < alpha
+            } else if entry.depth() >= target_depth
+                && node_type == ScoreType::Upper
+                && eval <= alpha
             {
                 tracing::event!(Level::INFO, name = "Upperbound Cutoff",);
                 CacheResult::Cutoff(entry.best_move(), eval)
-            } else if entry.depth() >= target_depth && node_type == ScoreType::Lower && eval > beta
+            } else if entry.depth() >= target_depth && node_type == ScoreType::Lower && eval >= beta
             {
                 tracing::event!(Level::INFO, name = "Lowerbound Cutoff",);
                 CacheResult::Cutoff(entry.best_move(), eval)
@@ -343,10 +339,16 @@ impl TranspositionTable {
         target_depth: u16,
         node_type: ScoreType,
     ) {
-        tracing::event!(Level::INFO, name = "inserting", eval = eval.0, hash = hash, node_type=?ScoreType::Upper);
         self.0.insert(
             hash,
             PackedTTEntry::new(eval, target_depth, best_move, node_type),
+        );
+        tracing::event!(Level::INFO,
+        name = "inserting",
+        eval = eval.0,
+        hash = hash,
+        node_type=?ScoreType::Upper,
+        depth=target_depth
         );
     }
 }

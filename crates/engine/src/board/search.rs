@@ -1,5 +1,5 @@
 use smallvec::SmallVec;
-use tracing::{Level, field, trace_span};
+use tracing::{Level, field, info_span};
 
 use crate::board::evaluation::PIECE_VALUES;
 use crate::board::*;
@@ -216,8 +216,8 @@ impl Board {
 
             if !self.in_check(!self.to_play) {
                 let span = match self.to_play {
-                    Color::Black => trace_span!("quiesece white", inspecting = %m, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
-                    Color::White => trace_span!("quiesce black", inspecting = %m, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
+                    Color::Black => info_span!("quiesece white", inspecting = %m, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
+                    Color::White => info_span!("quiesce black", inspecting = %m, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
                 };
                 let eval = -self.quiesce(-beta, -alpha);
 
@@ -275,6 +275,7 @@ impl Board {
         cache: &TranspositionTable,
         should_stop: &AtomicBool,
     ) -> Option<Evaluation> {
+        let _span = info_span!("null move").entered();
         // If we're down to king and pawns, we're at risk of zugzwang, skip evaluating the null
         // move.
         if self.piece(self.to_play, Piece::Rook).is_empty()
@@ -373,7 +374,7 @@ impl Board {
         // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't
         // want to compute taking a pawn with our queen and just stop computing there, for example.
         if self.half_move >= target_depth {
-            let span = trace_span!(
+            let span = info_span!(
                 "quiesece",
                 alpha = alpha.0,
                 beta = beta.0,
@@ -407,7 +408,7 @@ impl Board {
             && node_type == ExpectedNodeType::PV
             && target_depth - self.half_move > 2
         {
-            trace_span!("iid");
+            let _span = info_span!("iid").entered();
             // Do internal iterative deepening.
             hash_move = self
                 .pvs(
@@ -463,11 +464,13 @@ impl Board {
             let Some(a) = moves.next() else {
                 match stage {
                     0 => {
+                        tracing::event!(Level::INFO, name = "Starting mvv_lva",);
                         moves = Box::new(self.mvv_lva().into_iter());
                         stage = 1;
                         continue;
                     }
                     1 => {
+                        tracing::event!(Level::INFO, name = "All other moves",);
                         moves = Box::new(self.pseudo_legal_moves_it());
                         stage = 2;
                         continue;
@@ -492,8 +495,8 @@ impl Board {
                 had_legal_move = true;
                 move_count += 1;
                 let span = match self.to_play {
-                    Color::Black => trace_span!("white", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
-                    Color::White => trace_span!("black", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
+                    Color::Black => info_span!("white", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
+                    Color::White => info_span!("black", piece = %m.piece, to = %m.to, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
                 };
                 // PV Search: We'd ordered our hash move in front and it's likely to be the PV
                 // node. Establish an exact score for it, and search a smaller window for
@@ -509,7 +512,13 @@ impl Board {
                         -beta,
                         -alpha,
                         starting_depth,
-                        target_depth,
+                        self.search_extensions(
+                            starting_depth,
+                            target_depth,
+                            move_count,
+                            &m,
+                            expected_next_node,
+                        ),
                         cache,
                         should_stop,
                         expected_next_node,
@@ -537,6 +546,7 @@ impl Board {
                     )?;
 
                     if alpha < -score.eval && -score.eval < beta {
+                        tracing::event!(Level::INFO, name = "Re-search",);
                         score = self.pvs(
                             -beta,
                             -alpha,
@@ -1363,7 +1373,7 @@ Kf8 {+1.21/7 0.31s} 15. exd5 {+0.90/5 0.29s} Qa5 {+1.61/7 0.30s}
 16. Bb3 {+0.74/5 0.29s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::new();
-        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(10000), 32, &cache);
+        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(1000), 32, &cache);
         assert!(!eval.mate());
     }
     #[test]
@@ -1396,8 +1406,40 @@ Nd5 {+2.66/12 1.0s} 9. Bd2 {-0.29/12 1.0s} Nxc3 {+2.20/12 1.0s}
         let cache = TranspositionTable::new();
         let p = board.query_pos(b4(), Color::Black);
         println!("p: {:?}", p);
-        let SearchResult{ eval: _, best_move } =  board.best_move(2, 1, &cache, None).unwrap();
+        let SearchResult { eval: _, best_move } = board.best_move(2, 1, &cache, None).unwrap();
         println!("Move: {}", best_move.unwrap());
         assert!(best_move.unwrap().from == b4());
+    }
+    #[test]
+    fn bishop_sack_queen_trap() {
+        let cache = TranspositionTable::new();
+        // Fill up the cache
+        let fens = [
+            "r1bqk2r/ppp2ppp/2n1pn2/3p4/1bPP4/2N1P3/PP1B1PPP/R2QKBNR w KQkq - 0 6",
+            "r1bqk2r/ppp2ppp/2n1pn2/3p4/2PP4/P1b1P3/1P1B1PPP/R2QKBNR w KQkq - 0 7",
+            "r1bqk2r/ppp2ppp/2n1p3/3p4/2PPn3/P1B1P3/1P3PPP/R2QKBNR w KQkq - 1 8",
+            "r1bqk2r/ppp2ppp/2n1p3/3p4/2PP4/P1n1P3/1P3PPP/2RQKBNR w Kkq - 0 9",
+            "r1bq1rk1/ppp2ppp/2n1p3/3p4/2PP4/P1R1P3/1P3PPP/3QKBNR w K - 1 10",
+            "r1bq1rk1/ppp2ppp/2n5/3p4/3P4/P1R1P3/1P3PPP/3QKBNR w K - 0 11",
+            "r1b2rk1/ppp2ppp/2n5/3p2q1/3P4/P1RBP3/1P3PPP/3QK1NR w K - 2 12",
+        ];
+        for fen in fens {
+            let mut b = Board::from_fen(fen).expect("failed to parse fen");
+            let _ = b.best_move(9, 1, &cache, None);
+        }
+
+        let fen = "r1b2rk1/ppp2ppp/2n5/3p4/3P4/P1RBPN2/1P3PqP/3QK2R w K - 0 13";
+        let mut b = Board::from_fen(fen).expect("failed to parse fen");
+
+        for i in 1..8 {
+            let _ = b.best_move(i, 1, &cache, None);
+        }
+
+        let SearchResult { eval, best_move } = b.best_move(9, 1, &cache, None).unwrap();
+
+        println!("best move: {}", best_move.unwrap());
+        println!("eval: {}", eval);
+        assert_eq!(best_move.unwrap().from, d3());
+        assert_eq!(best_move.unwrap().to, h7());
     }
 }
