@@ -4,7 +4,7 @@ use std::ops;
 use crate::board::evaluation::Evaluation;
 use bitboard::moves::{AlgebraicMove, Piece};
 use bitboard::posn::{File, Posn, Rank};
-use tracing::{Level, trace_span};
+use tracing::{Level, instrument};
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Debug, Clone, Copy, Default)]
 pub enum ScoreType {
@@ -291,6 +291,8 @@ impl TranspositionTable {
     pub fn clear(&self) {
         self.0.clear();
     }
+
+    #[instrument(skip(self))]
     pub fn get(
         &self,
         hash: u64,
@@ -298,7 +300,6 @@ impl TranspositionTable {
         beta: Evaluation,
         target_depth: u16,
     ) -> CacheResult {
-        let _span = trace_span!("hashmap get", hash = hash, alpha=%alpha, beta=%beta, target_depth=%target_depth).entered();
         if let Some(entry) = self.0.get(hash) {
             // We can use this cache entry if:
             // - The node is deep enough

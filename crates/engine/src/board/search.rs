@@ -1,5 +1,5 @@
 use smallvec::SmallVec;
-use tracing::{Level, field, info_span};
+use tracing::{field, info_span, instrument, Level};
 
 use crate::board::evaluation::PIECE_VALUES;
 use crate::board::*;
@@ -184,6 +184,7 @@ impl Board {
         vec
     }
 
+    #[instrument(skip(self), ret)]
     pub fn quiesce(&mut self, alpha: Evaluation, beta: Evaluation) -> Evaluation {
         self.qnodes += 1;
         let mut alpha = alpha;
@@ -218,14 +219,7 @@ impl Board {
             self.make_move(&m);
 
             if !self.in_check(!self.to_play) {
-                let span = match self.to_play {
-                    Color::Black => info_span!("quiesece white", inspecting = %m, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
-                    Color::White => info_span!("quiesce black", inspecting = %m, alpha = -beta.0, beta = -alpha.0, eval = field::Empty).entered(),
-                };
                 let eval = -self.quiesce(-beta, -alpha);
-
-                span.record("eval", eval.0);
-                drop(span);
                 if eval >= beta {
                     self.undo_move(&m);
 
@@ -270,6 +264,7 @@ impl Board {
         count >= 3
     }
 
+    #[instrument(skip_all)]
     pub fn eval_null_move(
         &mut self,
         starting_depth: u16,
@@ -278,7 +273,6 @@ impl Board {
         cache: &TranspositionTable,
         should_stop: &AtomicBool,
     ) -> Option<Evaluation> {
-        let _span = info_span!("null move").entered();
         // If we're down to king and pawns, we're at risk of zugzwang, skip evaluating the null
         // move.
         if self.piece(self.to_play, Piece::Rook).is_empty()
@@ -377,18 +371,8 @@ impl Board {
         // If we've got deep enough, run a quiesence search to reduce horizon effects. We don't
         // want to compute taking a pawn with our queen and just stop computing there, for example.
         if self.half_move >= target_depth {
-            let span = info_span!(
-                "quiesece",
-                alpha = alpha.0,
-                beta = beta.0,
-                eval = field::Empty
-            )
-            .entered();
-
-            let eval = self.quiesce(alpha, beta);
-            span.record("eval", eval.0);
             return Some(SearchResult {
-                eval,
+                eval: self.quiesce(alpha, beta),
                 best_move: None,
             });
         }
