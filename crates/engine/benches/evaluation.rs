@@ -173,7 +173,7 @@ pub fn start(c: &mut Criterion) {
 
 pub fn london(c: &mut Criterion) {
     let mut group = c.benchmark_group("london");
-    for depth in 0..10 {
+    for depth in 0..15 {
         for num_cpus in [1, 2, 4, 8, 16, 32, 64].iter() {
             group.bench_with_input(
                 BenchmarkId::from_parameter(format!("{}ply/{}cpu", depth, num_cpus)),
@@ -183,9 +183,11 @@ pub fn london(c: &mut Criterion) {
                         "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
                     )
                     .expect("Invalid fen?");
-                    b.iter(|| {
-                        board.it_depth_best_move(depth, num_cpus);
-                    })
+                    b.iter_batched(
+                        TranspositionTable::new,
+                        |tt| board.it_depth_best_move(depth, num_cpus, &tt),
+                        criterion::BatchSize::PerIteration,
+                    );
                 },
             );
         }
@@ -207,7 +209,8 @@ pub fn london_qnodes(c: &mut Criterion<Nodes>) {
                 b.iter_custom(|iters| {
                     let mut qnodes = 0;
                     for _i in 0..iters {
-                        let _ = board.it_depth_best_move(4, num_cpus);
+                        let tt = TranspositionTable::new();
+                        let _ = board.it_depth_best_move(4, num_cpus, &tt);
                         qnodes += board.qnodes;
                     }
                     qnodes
@@ -232,7 +235,8 @@ pub fn london_nodes(c: &mut Criterion<Nodes>) {
                 b.iter_custom(|iters| {
                     let mut nodes = 0;
                     for _i in 0..iters {
-                        let _ = board.it_depth_best_move(4, num_cpus);
+                        let tt = TranspositionTable::new();
+                        let _ = board.it_depth_best_move(4, num_cpus, &tt);
                         nodes += board.nodes;
                     }
                     nodes
@@ -258,7 +262,8 @@ pub fn london_node_throughput(c: &mut Criterion<NodeThroughput>) {
                     let mut nodes = 0;
                     let begin = Instant::now();
                     for _i in 0..iters {
-                        let _ = board.it_depth_best_move(4, num_cpus);
+                        let tt = TranspositionTable::new();
+                        let _ = board.it_depth_best_move(4, num_cpus, &tt);
                         nodes += board.nodes;
                     }
                     (nodes, begin.elapsed())

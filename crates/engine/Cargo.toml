@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 tracing = { version = "0.1.41", features = ["release_max_level_off"] }
 tracing-subscriber = "0.3.19"
-portable-atomic = { version = "1.10.0", default-features = false, features = ["require-cas"]}
 tracing-perfetto = "0.1.4"
 bitboard = { path = "../bitboard" }
 magics = { path = "../magics" }

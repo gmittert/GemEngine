@@ -80,9 +80,12 @@ impl Board {
         )
     }
 
-    pub fn it_depth_best_move(&mut self, target_depth: u16, num_threads: usize) -> SearchResult {
-        let cache = TranspositionTable::new();
-
+    pub fn it_depth_best_move(
+        &mut self,
+        target_depth: u16,
+        num_threads: usize,
+        cache: &TranspositionTable,
+    ) -> SearchResult {
         let mut res = self.best_move(1, num_threads, &cache, None).unwrap();
         for depth in 1..target_depth {
             res = self
@@ -832,7 +835,7 @@ mod tests {
             "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
         )
         .expect("Invalid fen?");
-        board.it_depth_best_move(6, 64);
+        board.it_depth_best_move(6, 64, &TranspositionTable::new());
     }
 
     #[test]
@@ -998,7 +1001,9 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
     fn mate_1_disconnect() {
         let fen = "6rk/p1p5/4BNQ1/4P3/4P3/2p2P2/6R1/3R3K w - - 1 39";
         let mut board = Board::from_fen(fen).expect("bad fen?");
-        let eval = board.it_depth_best_move(7, 32).eval;
+        let eval = board
+            .it_depth_best_move(7, 32, &TranspositionTable::new())
+            .eval;
         assert_eq!(eval, Evaluation::m1(board.half_move));
     }
     #[test]
