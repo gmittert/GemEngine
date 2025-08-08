@@ -3,7 +3,7 @@ use std::time::Duration;
 use bitboard::moves::Color;
 
 use crate::{
-    board::{self, Board},
+    board::{self, Board, search::SearchTarget},
     transposition_table::TranspositionTable,
     uci::{self, *},
 };
@@ -153,7 +153,7 @@ impl UciEngine for Gem {
         };
 
         let (m, eval, info) = self.board.search_best_move_for(
-            Duration::from_millis(search_ms),
+            SearchTarget::Time(Duration::from_millis(search_ms)),
             self.options.num_threads,
             &self.cache,
         );

@@ -1,5 +1,5 @@
 use smallvec::SmallVec;
-use tracing::{field, info_span, instrument, Level};
+use tracing::{Level, field, info_span, instrument};
 
 use crate::board::evaluation::PIECE_VALUES;
 use crate::board::*;
@@ -35,24 +35,42 @@ pub enum ExpectedNodeType {
     All,
 }
 
+pub enum SearchTarget {
+    Time(Duration),
+    Depth(u16),
+}
+
 impl Board {
     pub fn search_best_move_for(
         &mut self,
-        time: Duration,
+        target: SearchTarget,
         num_threads: usize,
         cache: &TranspositionTable,
     ) -> (Option<Move>, Evaluation, SearchInfo) {
         self.reset_stats();
         let start = Instant::now();
-        let end_time = start + time;
+        let end_time = if let SearchTarget::Time(dur) = target {
+            Some(start + dur)
+        } else {
+            None
+        };
         let mut completed_search = self.best_move(1, num_threads, &cache, None).unwrap();
         let mut depth = 2;
         loop {
             let now = Instant::now();
-            if now > end_time {
+            if let SearchTarget::Depth(target_depth) = target
+                && depth > target_depth
+            {
                 break;
             }
-            if let Some(evalp) = self.best_move(depth, num_threads, &cache, Some(end_time - now)) {
+            if let Some(end_time) = end_time
+                && now > end_time
+            {
+                break;
+            }
+            if let Some(evalp) =
+                self.best_move(depth, num_threads, &cache, end_time.map(|t| t - now))
+            {
                 completed_search = evalp;
             } else {
                 break;
@@ -61,14 +79,14 @@ impl Board {
         }
 
         let (seldepth, nodes, qnodes) = self.get_stats();
-        let elapsed_ms = start.elapsed().as_millis().min(1);
+        let elapsed_ms = start.elapsed().as_millis().max(1);
         let info = SearchInfo {
             depth,
             seldepth: max(seldepth, self.half_move) - self.half_move,
             nodes,
             qnodes,
             nodes_per_sec: 1000 * self.nodes / elapsed_ms as usize,
-            time,
+            time: Instant::now() - start,
             hash_full: 0,
         };
         (
@@ -78,21 +96,6 @@ impl Board {
             completed_search.eval,
             info,
         )
-    }
-
-    pub fn it_depth_best_move(
-        &mut self,
-        target_depth: u16,
-        num_threads: usize,
-        cache: &TranspositionTable,
-    ) -> SearchResult {
-        let mut res = self.best_move(1, num_threads, &cache, None).unwrap();
-        for depth in 1..target_depth {
-            res = self
-                .best_move(depth + 1, num_threads, &cache, None)
-                .unwrap();
-        }
-        res
     }
 
     pub fn best_move(
@@ -819,7 +822,7 @@ mod tests {
             "r1b1kb1r/pp5p/1qn1pp2/3p2pn/2pP4/1PP1PNB1/P1QN1PPP/R3KB1R b KQkq - 0 11",
         )
         .expect("Invalid fen?");
-        board.it_depth_best_move(6, 64, &TranspositionTable::new());
+        board.search_best_move_for(SearchTarget::Depth(6), 64, &TranspositionTable::new());
     }
 
     #[test]
@@ -986,8 +989,8 @@ Bg6 {-0.12/7 5.0s} 6. c4 {6.6s} h6 {-0.09/6 5.0s} 7. h4 {7.7s} c6 {+0.23/6 5.0s}
         let fen = "6rk/p1p5/4BNQ1/4P3/4P3/2p2P2/6R1/3R3K w - - 1 39";
         let mut board = Board::from_fen(fen).expect("bad fen?");
         let eval = board
-            .it_depth_best_move(7, 32, &TranspositionTable::new())
-            .eval;
+            .search_best_move_for(SearchTarget::Depth(7), 32, &TranspositionTable::new())
+            .1;
         assert_eq!(eval, Evaluation::m1(board.half_move));
     }
     #[test]
@@ -1234,7 +1237,8 @@ Nb8 {-4.00/9 5.0s} 53. Ra7 {+4.00/8 5.0s} Nd7 {-4.00/9 5.0s}
 35. Ke1 {-1.20/7 0.21s} Re2+ {0.00/7 0.21s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::new();
-        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(300), 16, &cache);
+        let (_, eval, _) =
+            board.search_best_move_for(SearchTarget::Time(Duration::from_millis(300)), 16, &cache);
 
         assert!(!eval.mate());
     }
@@ -1293,7 +1297,8 @@ Bd2+ {-4.30/4 0.21s} 51. Kg3 {0.00/5 0.21s}
 Be1+ {0.00/5 0.21s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::new();
-        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(100), 16, &cache);
+        let (_, eval, _) =
+            board.search_best_move_for(SearchTarget::Time(Duration::from_millis(100)), 16, &cache);
 
         assert!(!eval.mate());
     }
@@ -1327,7 +1332,8 @@ Qa5 {-1.58/7 0.29s} 12. b4 {-0.11/5 0.31s} Qe5 {-2.36/7 0.40s}
 13. Bb2 {+0.03/5 0.31s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::new();
-        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(400), 16, &cache);
+        let (_, eval, _) =
+            board.search_best_move_for(SearchTarget::Time(Duration::from_millis(400)), 16, &cache);
 
         assert!(!eval.mate());
     }
@@ -1362,7 +1368,8 @@ Kf8 {+1.21/7 0.31s} 15. exd5 {+0.90/5 0.29s} Qa5 {+1.61/7 0.30s}
 16. Bb3 {+0.74/5 0.29s} *"###;
         let mut board = Board::from_pgn(pgn).expect("bad pgn?");
         let cache = TranspositionTable::new();
-        let (_, eval, _) = board.search_best_move_for(Duration::from_millis(1000), 32, &cache);
+        let (_, eval, _) =
+            board.search_best_move_for(SearchTarget::Time(Duration::from_millis(1000)), 32, &cache);
         assert!(!eval.mate());
     }
     #[test]

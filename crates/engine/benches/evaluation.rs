@@ -4,7 +4,7 @@ use bitboard::moves::{Color, Piece};
 use bitboard::posn::{d4, e5};
 use criterion::{BenchmarkId, Criterion, criterion_group};
 use engine::{
-    board::{self, Board},
+    board::{self, Board, search::SearchTarget},
     transposition_table::TranspositionTable,
 };
 
@@ -185,7 +185,7 @@ pub fn london(c: &mut Criterion) {
                     .expect("Invalid fen?");
                     b.iter_batched(
                         TranspositionTable::new,
-                        |tt| board.it_depth_best_move(depth, num_cpus, &tt),
+                        |tt| board.search_best_move_for(SearchTarget::Depth(depth), num_cpus, &tt),
                         criterion::BatchSize::PerIteration,
                     );
                 },
@@ -210,7 +210,7 @@ pub fn london_qnodes(c: &mut Criterion<Nodes>) {
                     let mut qnodes = 0;
                     for _i in 0..iters {
                         let tt = TranspositionTable::new();
-                        let _ = board.it_depth_best_move(4, num_cpus, &tt);
+                        let _ = board.search_best_move_for(SearchTarget::Depth(4), num_cpus, &tt);
                         qnodes += board.qnodes;
                     }
                     qnodes
@@ -236,7 +236,7 @@ pub fn london_nodes(c: &mut Criterion<Nodes>) {
                     let mut nodes = 0;
                     for _i in 0..iters {
                         let tt = TranspositionTable::new();
-                        let _ = board.it_depth_best_move(4, num_cpus, &tt);
+                        let _ = board.search_best_move_for(SearchTarget::Depth(4), num_cpus, &tt);
                         nodes += board.nodes;
                     }
                     nodes
@@ -263,7 +263,7 @@ pub fn london_node_throughput(c: &mut Criterion<NodeThroughput>) {
                     let begin = Instant::now();
                     for _i in 0..iters {
                         let tt = TranspositionTable::new();
-                        let _ = board.it_depth_best_move(4, num_cpus, &tt);
+                        let _ = board.search_best_move_for(SearchTarget::Depth(4), num_cpus, &tt);
                         nodes += board.nodes;
                     }
                     (nodes, begin.elapsed())
