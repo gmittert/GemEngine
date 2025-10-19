@@ -1,17 +1,15 @@
 use bullet_lib::{
-    ExecutionContext,
-    core::optimiser,
+    acyclib::trainer::optimiser::adam::AdamW,
     game::inputs::Chess768,
-    nn::optimiser::AdamW,
+    nn::ExecutionContext,
     trainer::save::SavedFormat,
     value::{NoOutputBuckets, ValueTrainer, ValueTrainerBuilder},
 };
 
-pub fn get_trainer()
--> ValueTrainer<optimiser::adam::AdamW<ExecutionContext>, Chess768, NoOutputBuckets> {
+pub fn get_trainer() -> ValueTrainer<AdamW<ExecutionContext>, Chess768, NoOutputBuckets> {
     ValueTrainerBuilder::default()
         .dual_perspective()
-        .optimiser(AdamW)
+        .optimiser(bullet_lib::nn::optimiser::AdamW)
         .inputs(Chess768)
         .save_format(&[
             SavedFormat::id("l0w").quantise::<i16>(nnue::QA),
