@@ -179,9 +179,10 @@ impl Board {
     pub fn mvv_lva(&self) -> SmallVec<[AlgebraicMove; 8]> {
         let mut vec = SmallVec::<[AlgebraicMove; 8]>::new();
         self.pseudo_legal_captures(&mut vec);
+        let opponent = !self.to_play;
         vec.sort_by(|m1, m2| {
-            let capture1 = self.query_pos(m1.to, self.to_play).unwrap_or(Piece::Pawn) as u8;
-            let capture2 = self.query_pos(m2.to, self.to_play).unwrap_or(Piece::Pawn) as u8;
+            let capture1 = self.query_pos(m1.to, opponent).unwrap_or(Piece::Pawn) as u8;
+            let capture2 = self.query_pos(m2.to, opponent).unwrap_or(Piece::Pawn) as u8;
             capture2.cmp(&capture1)
         });
         vec
