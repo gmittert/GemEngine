@@ -9,3 +9,4 @@ perf.data.old
 *.pb
 profile.json.gz
 data
+.claude

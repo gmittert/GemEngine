@@ -1,4 +1,4 @@
-#![feature(array_chunks, portable_simd)]
+#![feature(portable_simd)]
 // On znver1, Rust/LLVM's default auto vectorization only uses xmm registers to do 128 bits at a
 // time, even when zenver1 supports avx2.
 use std::simd::prelude::*;
@@ -153,26 +153,26 @@ impl Network {
         // Side to move perspective.
         for (inputs, weights) in stm
             .vals
-            .array_chunks::<64>()
-            .zip(self.output_weights[..HIDDEN_SIZE].array_chunks::<64>())
+            .chunks_exact(64)
+            .zip(self.output_weights[..HIDDEN_SIZE].chunks_exact(64))
         {
             // Cast up to i32s so we don't overflow when we multiply
-            let screlu_inputs = i16x64::from_array(*inputs)
+            let screlu_inputs = i16x64::from_slice(inputs)
                 .simd_clamp(screlu_min, screlu_max)
                 .cast::<i32>();
-            acc += screlu_inputs * screlu_inputs * i16x64::from_array(*weights).cast::<i32>();
+            acc += screlu_inputs * screlu_inputs * i16x64::from_slice(weights).cast::<i32>();
         }
 
         // Not Side to move perspective.
         for (input, weights) in nstm
             .vals
-            .array_chunks::<64>()
-            .zip(self.output_weights[HIDDEN_SIZE..].array_chunks::<64>())
+            .chunks_exact(64)
+            .zip(self.output_weights[HIDDEN_SIZE..].chunks_exact(64))
         {
-            let screlu_inputs = i16x64::from_array(*input)
+            let screlu_inputs = i16x64::from_slice(input)
                 .simd_clamp(screlu_min, screlu_max)
                 .cast::<i32>();
-            acc += screlu_inputs * screlu_inputs * i16x64::from_array(*weights).cast::<i32>();
+            acc += screlu_inputs * screlu_inputs * i16x64::from_slice(weights).cast::<i32>();
         }
 
         // Sum up the accumulator and add in the final bias.
