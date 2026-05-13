@@ -395,10 +395,31 @@ impl Board {
             return None;
         }
 
-        if hash_move.is_none()
-            && node_type == ExpectedNodeType::PV
-            && target_depth - self.half_move > 2
+        let remaining_depth = target_depth - self.half_move;
+
+        // Compute static eval once for RFP and futility pruning at shallow non-PV nodes not in check.
+        let static_eval = if remaining_depth <= 4
+            && node_type != ExpectedNodeType::PV
+            && !self.in_check(self.to_play)
         {
+            Some(self.eval(self.to_play))
+        } else {
+            None
+        };
+
+        // Reverse futility pruning: if static eval minus a per-ply margin still beats beta, the
+        // opponent has no way to hold. Prune this node.
+        if let Some(eval) = static_eval
+            && !beta.mate()
+            && eval - Evaluation(100 * remaining_depth as i16) >= beta
+        {
+            return Some(SearchResult {
+                eval: beta,
+                best_move: None,
+            });
+        }
+
+        if hash_move.is_none() && node_type == ExpectedNodeType::PV && remaining_depth > 2 {
             let _span = info_span!("iid").entered();
             // Do internal iterative deepening.
             hash_move = self
@@ -417,16 +438,9 @@ impl Board {
         let mut alpha = alpha;
         let mut had_legal_move = false;
 
-        let remaining_depth = target_depth - self.half_move;
-
-        // Compute static eval once for futility pruning. Only pay for the eval call at
-        // shallow non-PV nodes where we're not in check and not chasing a mate score.
-        let futility_eval = if remaining_depth <= 2
-            && node_type != ExpectedNodeType::PV
-            && !self.in_check(self.to_play)
-            && !alpha.mate()
-        {
-            Some(self.eval(self.to_play))
+        // Reuse static_eval (already computed above) for futility pruning at depth <= 2.
+        let futility_eval = if remaining_depth <= 2 && !alpha.mate() {
+            static_eval
         } else {
             None
         };
