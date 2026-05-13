@@ -1117,6 +1117,7 @@ impl Board {
     pub fn reset_stats(&mut self) {
         self.seldepth = 0;
         self.nodes = 0;
+        self.qnodes = 0;
     }
     pub fn get_stats(&mut self) -> (u16, usize, usize) {
         (self.seldepth, self.nodes, self.qnodes)

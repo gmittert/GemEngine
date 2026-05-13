@@ -348,7 +348,7 @@ impl TranspositionTable {
         name = "inserting",
         eval = eval.0,
         hash = hash,
-        node_type=?ScoreType::Upper,
+        node_type=?node_type,
         depth=target_depth
         );
     }
