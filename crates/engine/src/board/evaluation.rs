@@ -141,9 +141,9 @@ impl Board {
     ) -> Option<(Posn, Piece)> {
         let pieces = [
             Piece::Pawn,
-            Piece::Rook,
             Piece::Knight,
             Piece::Bishop,
+            Piece::Rook,
             Piece::Queen,
             Piece::King,
         ];
