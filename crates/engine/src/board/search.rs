@@ -417,6 +417,20 @@ impl Board {
         let mut alpha = alpha;
         let mut had_legal_move = false;
 
+        let remaining_depth = target_depth - self.half_move;
+
+        // Compute static eval once for futility pruning. Only pay for the eval call at
+        // shallow non-PV nodes where we're not in check and not chasing a mate score.
+        let futility_eval = if remaining_depth <= 2
+            && node_type != ExpectedNodeType::PV
+            && !self.in_check(self.to_play)
+            && !alpha.mate()
+        {
+            Some(self.eval(self.to_play))
+        } else {
+            None
+        };
+
         let recapture = if let Some((Some(p), _)) = self.moves.last() {
             self.get_smallest_attacker(*p, self.to_play)
         } else {
@@ -478,6 +492,18 @@ impl Board {
             if stage == 2 && m.capture.is_some() {
                 continue;
             }
+
+            // Futility pruning: skip quiet moves at shallow depth when the static eval is so far
+            // below alpha that even a generous margin can't close the gap. Guard with move_count >
+            // 0 so we always search at least one legal move.
+            if stage == 2 && m.promotion.is_none() && move_count > 0 {
+                if let Some(static_eval) = futility_eval {
+                    if static_eval + Evaluation(100 * remaining_depth as i16) < alpha {
+                        continue;
+                    }
+                }
+            }
+
             self.make_move(&m);
             if !self.in_check(!self.to_play) {
                 if best_move.is_none() {
