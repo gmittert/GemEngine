@@ -259,7 +259,12 @@ impl Board {
         }
         let mut count = 1;
         if self.half_move - irr >= 8 {
-            for (_, prev_state) in &self.moves[*irr as usize..] {
+            // irr is an absolute half_move value; moves is 0-indexed from the board's creation.
+            // Translate to a moves index by subtracting the initial half_move, clamping to 0 so
+            // FEN positions with a non-zero starting half_move never produce an out-of-bounds index.
+            let initial_half_move = self.half_move - self.moves.len() as u16;
+            let moves_start = (*irr).saturating_sub(initial_half_move) as usize;
+            for (_, prev_state) in &self.moves[moves_start..] {
                 if *prev_state == self.hash {
                     count += 1;
                 }
